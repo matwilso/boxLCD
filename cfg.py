@@ -46,14 +46,15 @@ def define_cfg():
 
     # BASICS
     cfg.logdir = pathlib.Path('logs/')
+    cfg.barrel_path = ''
     cfg.device = 'cuda' # 'cuda', 'cpu'
     cfg.env = 'box'
-    cfg.num_envs = 12
+    cfg.num_envs = 10
     cfg.seed = 0
     cfg.epochs = 100
     cfg.steps_per_epoch = 1000
     cfg.save_freq = 10
-    cfg.exp_name = 'sac'
+    cfg.exp_name = ''
     cfg.pi_lr = 1e-3
     cfg.vf_lr = 1e-3
     cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha

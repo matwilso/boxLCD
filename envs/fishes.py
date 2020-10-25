@@ -11,7 +11,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 import utils
-from base import BaseIndexEnv
+from envs.base import BaseIndexEnv
 import pyglet
 A = utils.A
 

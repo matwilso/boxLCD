@@ -51,6 +51,7 @@ class Box(BaseIndexEnv):
             #self.obs_info[f'{object}:thetavel'] = [-self.max_angular, self.max_angular]
         # ACTION 
         self.act_info = {}
+        self.act_info['dummy'] = A[-1, 1]  
         #for object in self.object_list:
         #    self.act_info[f'{object}:force'] = A[-1, 1]  
         #    self.act_info[f'{object}:theta'] = A[-1, 1]
@@ -133,7 +134,7 @@ class Box(BaseIndexEnv):
         return obs.arr, reward, done, {}
 
     def render(self, mode='rgb_array'):
-        import rendering
+        from envs import rendering
         if self.viewer is None:
             self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
             self.viewer.set_bounds(0, VIEWPORT_W/SCALE, 0, VIEWPORT_H/SCALE)
