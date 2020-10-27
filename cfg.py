@@ -58,14 +58,20 @@ def define_cfg():
     cfg.pi_lr = 1e-3
     cfg.vf_lr = 1e-3
     cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
+    cfg.dyn_lr = 3e-4
     cfg.net = 'mlp' # 'mlp', 'split'
-    cfg.bs = 256
+    cfg.bs = 50
 
     # ARCHITECTURE
     cfg.split_share = 0  # whether or not to share weights in the split network
 
+    # 
+    cfg.ep_len = 50
+    cfg.num_eps = 100
+
+    cfg.mode = 'collect'
+
     # ----- RL -----
-    cfg.max_ep_len = 1000
     cfg.gamma = 0.99
     # SAC
     cfg.learned_alpha = 1

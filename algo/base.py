@@ -18,7 +18,6 @@ import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 from gym.vector.async_vector_env import AsyncVectorEnv
-from data.roller import Roller
 import utils
 from nets.sacnets import ActorCritic
 from functools import partial
@@ -42,13 +41,13 @@ class Trainer:
         print(self.logpath)
         print(cfg.full_cmd)
 
-
         torch.manual_seed(seed)
         np.random.seed(seed)
         self.venv = AsyncVectorEnv([make_env(self.cfg, i) for i in range(self.cfg.num_envs)]) # vector env
         self.tenv = make_env(self.cfg, seed)() # test env
-        obs_dim = self.tenv.observation_space.shape
-        act_dim = self.tenv.action_space.shape[0]
+        self.state_shape = self.tenv.observation_space['state'].shape
+        self.image_shape = self.tenv.observation_space['image'].shape
+        self.act_n = self.tenv.action_space.shape[0]
 
         ## Create actor-critic module and target networks
         #self.ac = ActorCritic(self.tenv, self.tenv.observation_space, self.tenv.action_space, cfg=self.cfg).to(cfg.device)
@@ -60,9 +59,6 @@ class Trainer:
 
         ## List of parameters for both Q-networks (save this for convenience)
         #self.q_params = itertools.chain(self.ac.q1.parameters(), self.ac.q2.parameters())
-
-        ## Experience buffer
-        ##self.replay_buffer = ReplayBuffer(self.cfg, obs_dim=obs_dim, act_dim=act_dim)
 
         ## Count variables (protip: try to get a feel for how different size networks behave!)
         #var_counts = tuple(utils.count_vars(module) for module in [self.ac.pi, self.ac.q1, self.ac.q2])
@@ -76,6 +72,24 @@ class Trainer:
         #    self.alpha_optimizer = Adam([self.ac.log_alpha], lr=self.cfg.alpha_lr)
 
         #self.test_agent()
+
+        self.data_iter = None
+
+    @property
+    def can_sample(self):
+        return len(list(self.barrel_path.glob('*.tfrecord'))) != 0
+
+    def refresh_dataset(self):
+        self.data_iter = records.make_dataset(self.barrel_path, self.state_shape, self.image_shape, self.act_n, self.cfg)
+
+    def sample_batch(self, refresh_dataset=False):
+        """return dict(str: arr) where arr is shape (BS, BPTT_N, ...)"""
+        assert self.can_sample
+        if self.data_iter is None or refresh_dataset:
+            self.refresh_dataset()
+        batch = next(self.data_iter)
+        batch = nest.map_structure(lambda x: jnp.array(x), batch)
+        return batch
 
     def test_agent(self, video=False):
         frames = []
@@ -114,14 +128,14 @@ class Trainer:
             pack = defaultdict(lambda: [])
             o = self.venv.reset()
             pack['state'] += [o['state']]
-            pack['image'] += [o['image']]
+            pack['image'] += [o['image']/255.0]
             for t in range(eplen):
                 a = self.venv.action_space.sample()
                 o2, r, d, _ = self.venv.step(a)
                 pack['act'] += [a]
                 pack['rew'] += [r]
                 pack['state'] += [o2['state']]
-                pack['image'] += [o2['image']]
+                pack['image'] += [o2['image']/255.0]
                 o = o2
             for key in pack:
                 tot[key] += [pack[key]]
