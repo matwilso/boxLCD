@@ -29,7 +29,6 @@ from data import records
 class Trainer:
     def __init__(self, cfg, make_env):
         self.cfg = cfg
-        print(self.cfg.full_cmd)
         seed = self.cfg.seed
         # Set up logger and save configuration
         self.logger = defaultdict(lambda: [])
@@ -50,7 +49,10 @@ class Trainer:
         self.venv = AsyncVectorEnv([make_env(self.cfg, i) for i in range(self.cfg.num_envs)]) # vector env
         self.tenv = make_env(self.cfg, seed)() # test env
         self.state_shape = self.tenv.observation_space['state'].shape
-        self.image_shape = self.tenv.observation_space['image'].shape
+        if self.cfg.use_image:
+            self.image_shape = self.tenv.observation_space['image'].shape
+        else:
+            self.image_shape = (64, 64, 3)
         self.act_n = self.tenv.action_space.shape[0]
 
         ## Create actor-critic module and target networks

@@ -43,11 +43,11 @@ class Box(BaseIndexEnv):
         for i in range(self.num_objects): 
             self.obs_info[f'object{i}:x:p'] = A[0, W]
             self.obs_info[f'object{i}:y:p'] = A[0, H]
-            self.obs_info[f'object{i}:x:v'] = A[-10, 10]
-            self.obs_info[f'object{i}:y:v'] = A[-10, 10]
             self.obs_info[f'object{i}:cos'] = A[-1, 1]
             self.obs_info[f'object{i}:sin'] = A[-1, 1]
             # extra we can add later if needed
+            self.obs_info[f'object{i}:x:v'] = A[-10, 10]
+            self.obs_info[f'object{i}:y:v'] = A[-10, 10]
             #self.obs_info[f'{object}:thetavel'] = [-self.max_angular, self.max_angular]
         # ACTION 
         self.act_info = {}
@@ -65,20 +65,15 @@ class Box(BaseIndexEnv):
         self.statics = {}
         self.dynamics = {}
 
-    def reset(self):
-        self.ep_t = 0
-        self._destroy()
-        self.statics = {}
-        self.statics['wall1'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (W, 0)]) )
-        self.statics['wall2'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (0, H)]) )
-        self.statics['wall3'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(W, 0), (W, H)]) )
-        self.statics['wall4'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, H), (W, H)]) )
+    def _reset_bodies(self, obs=None):
+        if obs is not None: obs = utils.DWrap(obs, self.obs_info)
         self.dynbodies = {}
         color = (0.9,0.4,0.4), (0.5,0.3,0.5)
         #color = (0.5,0.4,0.9), (0.3,0.3,0.5)
         # bodies
         for i in range(self.num_objects):
-            sample = lambda x: self.sample(f'object{i}{x}')
+            def sample(x):
+                return self.sample(f'object{i}{x}') if obs is None else obs[f'object{i}{x}']
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
             fixture = fixtureDef(shape=polygonShape(box=(0.15, 0.15)), density=1)
             body = self.world.CreateDynamicBody(
@@ -88,6 +83,15 @@ class Box(BaseIndexEnv):
             body.color1, body.color2 = color
             self.dynbodies[i] = body
 
+    def reset(self):
+        self.ep_t = 0
+        self._destroy()
+        self.statics = {}
+        self.statics['wall1'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (W, 0)]) )
+        self.statics['wall2'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (0, H)]) )
+        self.statics['wall3'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(W, 0), (W, H)]) )
+        self.statics['wall4'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, H), (W, H)]) )
+        self._reset_bodies()
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.world.Step(1.0/FPS, 6*30, 2*30)
@@ -100,7 +104,7 @@ class Box(BaseIndexEnv):
             obs[f'object{i}:x:p'], obs[f'object{i}:y:p'] = body.position
             obs[f'object{i}:sin'] = np.sin(body.angle)
             obs[f'object{i}:cos'] = np.cos(body.angle)
-            obs[f'object{i}:x:v'], obs[f'object{i}:y:v'] = body.linearVelocity
+            #obs[f'object{i}:x:v'], obs[f'object{i}:y:v'] = body.linearVelocity
         return obs
 
     def step(self, vec_action):
@@ -132,6 +136,10 @@ class Box(BaseIndexEnv):
         reward = 0.0
         done = self.ep_t >= 100
         return obs.arr, reward, done, {}
+
+    def visualize_obs(self, obs):
+        self._reset_bodies(obs=obs)
+        return self.render()
 
     def render(self, mode='rgb_array'):
         from envs import rendering
@@ -173,6 +181,8 @@ if __name__ == '__main__':
     paused = False
     traj = []
     past_keys = {}
+
+    import ipdb; ipdb.set_trace()
 
     while True:
         action = env.action_space.sample()

@@ -24,7 +24,7 @@ def make_env(cfg, seed):
 
 def env_fn(cfg, seed=None):
     """function for creating an env with the cfg and seed"""
-    from envs.wrappers import PixelEnv
+    from envs.wrappers import PixelEnv, NormalEnv
     if cfg.env == 'fishes':
         from envs.fishes import Fishes
         env = Fishes(cfg)
@@ -35,14 +35,15 @@ def env_fn(cfg, seed=None):
         import gym
         env = gym.make('LunarLanderContinuous-v2')
     env.seed(seed)
-    if cfg.pixel_env:
+    if cfg.use_image:
         env = PixelEnv(env)
+    else:
+        env = NormalEnv(env)
     return env
 
 def define_cfg():
     cfg = utils.AttrDict() # dictionary that can grab items with dot notation.
 
-    cfg.pixel_env = 1
 
     # BASICS
     cfg.logdir = pathlib.Path('logs/')
@@ -76,6 +77,9 @@ def define_cfg():
     cfg.hidden = 200
     cfg.kl_scale = 1.0
     cfg.log_n = 1000
+
+
+    cfg.use_image = 1
 
     # ----- RL -----
     cfg.gamma = 0.99

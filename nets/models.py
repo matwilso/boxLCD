@@ -1,176 +1,191 @@
 import numpy as np
 import torch.nn as nn
 from torch import distributions
-
+import torch.nn.functional as F
+import torch
+from tensorflow import nest
+import utils
 
 class RSSM(nn.Module):
-    def __init__(self, stoch=30, deter=200, hidden=200, act=tf.nn.elu):
+    def __init__(self, act_n, cfg):
         super().__init__()
-        self._activation = act
-        self._stoch_size = stoch
-        self._deter_size = deter
-        self._hidden_size = hidden
-        self._cell = tfkl.GRUCell(self._deter_size)
+        self.cfg = cfg
+        self.cell = nn.GRUCell(self.cfg.hidden, self.cfg.deter)
+        self.obs1 = nn.Linear(1024+self.cfg.deter, self.cfg.hidden)
+        self.obs2 = nn.Linear(self.cfg.hidden, 2*self.cfg.stoch)
+        self.img1 = nn.Linear(self.cfg.stoch+act_n, self.cfg.hidden)
+        self.img2 = nn.Linear(self.cfg.deter, self.cfg.hidden)
+        self.img3 = nn.Linear(self.cfg.hidden, 2*self.cfg.stoch)
 
-    def initial(self, batch_size):
-        dtype = prec.global_policy().compute_dtype
-        return dict(
-            mean=tf.zeros([batch_size, self._stoch_size], dtype),
-            std=tf.zeros([batch_size, self._stoch_size], dtype),
-            stoch=tf.zeros([batch_size, self._stoch_size], dtype),
-            deter=self._cell.get_initial_state(None, batch_size, dtype))
+    def initial(self, bs):
+        init = dict(mean=torch.zeros([bs, self.cfg.stoch]), std=torch.zeros([bs, self.cfg.stoch]), stoch=torch.zeros([bs, self.cfg.stoch]), deter=torch.zeros([bs, self.cfg.deter]))
+        return nest.map_structure(lambda x: x.to(self.cfg.device), init)
 
-    @tf.function
     def observe(self, embed, action, state=None):
         if state is None:
-            state = self.initial(tf.shape(action)[0])
-        embed = tf.transpose(embed, [1, 0, 2])
-        action = tf.transpose(action, [1, 0, 2])
-        post, prior = tools.static_scan(
-            lambda prev, inputs: self.obs_step(prev[0], *inputs),
-            (action, embed), (state, state))
-        post = {k: tf.transpose(v, [1, 0, 2]) for k, v in post.items()}
-        prior = {k: tf.transpose(v, [1, 0, 2]) for k, v in prior.items()}
+            state = self.initial(action.shape[0])
+        embed = embed.permute([1, 0, 2])
+        action = action.permute([1, 0, 2])
+        post, prior = utils.static_scan(lambda prev, inputs: self.obs_step(prev[0], *inputs), (action, embed), (state, state))
+        post = {k: v.permute([1, 0, 2]) for k, v in post.items()}
+        prior = {k: v.permute([1, 0, 2]) for k, v in prior.items()}
         return post, prior
 
-    @tf.function
     def imagine(self, action, state=None):
         if state is None:
-            state = self.initial(tf.shape(action)[0])
+            state = self.initial(action.shape[0])
         assert isinstance(state, dict), state
-        action = tf.transpose(action, [1, 0, 2])
-        prior = tools.static_scan(self.img_step, action, state)
-        prior = {k: tf.transpose(v, [1, 0, 2]) for k, v in prior.items()}
+        action = action.permute([1, 0, 2])
+        prior = utils.static_scan(self.img_step, action, state)
+        prior = {k: v.permute([1, 0, 2]) for k, v in prior.items()}
         return prior
 
     def get_feat(self, state):
-        return tf.concat([state['stoch'], state['deter']], -1)
+        return torch.cat([state['stoch'], state['deter']], -1)
 
     def get_dist(self, state):
-        return tfd.MultivariateNormalDiag(state['mean'], state['std'])
+        return distributions.MultivariateNormal(state['mean'], scale_tril=torch.diag_embed(state['std']))
 
-    @tf.function
     def obs_step(self, prev_state, prev_action, embed):
         prior = self.img_step(prev_state, prev_action)
-        x = tf.concat([prior['deter'], embed], -1)
-        x = self.get('obs1', tfkl.Dense, self._hidden_size,
-                     self._activation)(x)
-        x = self.get('obs2', tfkl.Dense, 2 * self._stoch_size, None)(x)
-        mean, std = tf.split(x, 2, -1)
-        std = tf.nn.softplus(std) + 0.1
+        x = torch.cat([prior['deter'], embed], -1)
+        x = self.obs1(x)
+        x = F.relu(x)
+        x = self.obs2(x)
+        mean, std = torch.split(x, self.cfg.stoch, -1)
+        std = F.softplus(std) + 0.1
         stoch = self.get_dist({'mean': mean, 'std': std}).sample()
-        post = {'mean': mean, 'std': std,
-                'stoch': stoch, 'deter': prior['deter']}
+        post = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': prior['deter']}
         return post, prior
 
-    @tf.function
     def img_step(self, prev_state, prev_action):
-        x = tf.concat([prev_state['stoch'], prev_action], -1)
-        x = self.get('img1', tfkl.Dense, self._hidden_size,
-                     self._activation)(x)
-        x, deter = self._cell(x, [prev_state['deter']])
-        deter = deter[0]  # Keras wraps the state in a list.
-        x = self.get('img2', tfkl.Dense, self._hidden_size,
-                     self._activation)(x)
-        x = self.get('img3', tfkl.Dense, 2 * self._stoch_size, None)(x)
-        mean, std = tf.split(x, 2, -1)
-        std = tf.nn.softplus(std) + 0.1
+        x = torch.cat([prev_state['stoch'], prev_action], -1)
+        x = self.img1(x)
+        x = F.relu(x)
+        deter = self.cell(x, prev_state['deter'])
+        x = self.img2(deter)
+        x = F.relu(x)
+        x = self.img3(x)
+        mean, std = torch.split(x, self.cfg.stoch, -1)
+        std = F.softplus(std) + 0.1
         stoch = self.get_dist({'mean': mean, 'std': std}).sample()
         prior = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': deter}
         return prior
 
-
 class ConvEncoder(nn.Module):
-    def __init__(self, depth=32, act=tf.nn.relu):
-        self._act = act
-        self._depth = depth
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self._depth = 32
+        self.c1 = nn.Conv2d(3, self._depth, kernel_size=4, stride=2)
+        self.c2 = nn.Conv2d(self._depth, 2*self._depth, kernel_size=4, stride=2)
+        self.c3 = nn.Conv2d(2*self._depth, 4*self._depth, kernel_size=4, stride=2)
+        self.c4 = nn.Conv2d(4*self._depth, 8*self._depth, kernel_size=4, stride=2)
 
-    def __call__(self, obs):
-        kwargs = dict(strides=2, activation=self._act)
-        x = tf.reshape(obs['image'], (-1,) + tuple(obs['image'].shape[-3:]))
-        x = self.get('h1', tfkl.Conv2D, 1 * self._depth, 4, **kwargs)(x)
-        x = self.get('h2', tfkl.Conv2D, 2 * self._depth, 4, **kwargs)(x)
-        x = self.get('h3', tfkl.Conv2D, 4 * self._depth, 4, **kwargs)(x)
-        x = self.get('h4', tfkl.Conv2D, 8 * self._depth, 4, **kwargs)(x)
-        shape = tf.concat([tf.shape(obs['image'])[:-3], [32 * self._depth]], 0)
-        return tf.reshape(x, shape)
-
+    def forward(self, image):
+        x = self.c1(image)
+        x = F.relu(x)
+        x = self.c2(x)
+        x = F.relu(x)
+        x = self.c3(x)
+        x = F.relu(x)
+        x = self.c4(x)
+        return x.flatten(1, -1)
 
 class ConvDecoder(nn.Module):
-    def __init__(self, depth=32, act=tf.nn.relu, shape=(64, 64, 3)):
-        self._act = act
-        self._depth = depth
-        self._shape = shape
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self._depth = 32
+        self._shape = (64, 64, 3)
+        self.l1 = nn.Linear(self.cfg.deter+self.cfg.stoch, 32*self._depth)
+        self.d1 = nn.ConvTranspose2d(32*self._depth, 4*self._depth, 5, stride=2)
+        self.d2 = nn.ConvTranspose2d(4*self._depth, 2*self._depth, 5, stride=2)
+        self.d3 = nn.ConvTranspose2d(2*self._depth, 1*self._depth, 6, stride=2)
+        self.d4 = nn.ConvTranspose2d(1*self._depth, 3, 6, stride=2)
 
-    def __call__(self, features):
-        kwargs = dict(strides=2, activation=self._act)
-        x = self.get('h1', tfkl.Dense, 32 * self._depth, None)(features)
-        x = tf.reshape(x, [-1, 1, 1, 32 * self._depth])
-        x = self.get('h2', tfkl.Conv2DTranspose,
-                     4 * self._depth, 5, **kwargs)(x)
-        x = self.get('h3', tfkl.Conv2DTranspose,
-                     2 * self._depth, 5, **kwargs)(x)
-        x = self.get('h4', tfkl.Conv2DTranspose,
-                     1 * self._depth, 6, **kwargs)(x)
-        x = self.get('h5', tfkl.Conv2DTranspose,
-                     self._shape[-1], 6, strides=2)(x)
-        mean = tf.reshape(x, tf.concat(
-            [tf.shape(features)[:-1], self._shape], 0))
-        return tfd.Independent(tfd.Normal(mean, 1), len(self._shape))
+    def forward(self, features):
+        x = self.l1(features)
+        x = x[..., None, None]
+        x = self.d1(x)
+        x = F.relu(x)
+        x = self.d2(x)
+        x = F.relu(x)
+        x = self.d3(x)
+        x = F.relu(x)
+        x = self.d4(x)
+        #return distributions.Independent(distributions.Bernoulli(logits=x), len(self._shape))
+        return distributions.Independent(distributions.Normal(x,1), len(self._shape))
 
+class MLP(nn.Module):
+    def __init__(self, sizes, cfg=None):
+        super().__init__()
+        self.cfg = cfg
+        self.layers = nn.ModuleDict()
+        self.sizes = sizes
+        for i in range(len(sizes)-1):
+            self.layers[f'dense{i}'] = nn.Linear(sizes[i], sizes[i+1])
+
+    def forward(self, inputs):
+        x = inputs
+        for i in range(len(self.sizes)-1):
+            x = self.layers[f'dense{i}'].forward(x)
+            if i != (len(self.sizes)-2): x = F.relu(x)
+        return x
+
+class DenseEncoder(nn.Module):
+    def __init__(self, obs_n, cfg):
+        super().__init__()
+        self.mlp = MLP([obs_n, 128, 1024])
+
+    def forward(self, obs):
+        x = self.mlp.forward(obs)
+        return x
 
 class DenseDecoder(nn.Module):
-    def __init__(self, shape, layers, units, dist='normal', act=tf.nn.elu):
-        self._shape = shape
-        self._layers = layers
-        self._units = units
-        self._dist = dist
-        self._act = act
+    def __init__(self, obs_n, cfg):
+        super().__init__()
+        self.mlp = MLP([cfg.stoch+cfg.deter, 128, obs_n])
 
-    def __call__(self, features):
-        x = features
-        for index in range(self._layers):
-            x = self.get(f'h{index}', tfkl.Dense, self._units, self._act)(x)
-        x = self.get(f'hout', tfkl.Dense, np.prod(self._shape))(x)
-        x = tf.reshape(x, tf.concat([tf.shape(features)[:-1], self._shape], 0))
-        if self._dist == 'normal':
-            return tfd.Independent(tfd.Normal(x, 1), len(self._shape))
-        if self._dist == 'binary':
-            return tfd.Independent(tfd.Bernoulli(x), len(self._shape))
-        raise NotImplementedError(self._dist)
+    def forward(self, features):
+        x = self.mlp.forward(features)
+        return distributions.Independent(distributions.Normal(x,1), 1)
+        #if self._dist == 'normal':
+        #    return tfd.Independent(tfd.Normal(x, 1), len(self._shape))
+        #if self._dist == 'binary':
+        #    return tfd.Independent(tfd.Bernoulli(x), len(self._shape))
+        #raise NotImplementedError(self._dist)
 
 
-class ActionDecoder(nn.Module):
-    def __init__(
-            self, size, layers, units, dist='tanh_normal', act=tf.nn.elu,
-            min_std=1e-4, init_std=5, mean_scale=5):
-        self._size = size
-        self._layers = layers
-        self._units = units
-        self._dist = dist
-        self._act = act
-        self._min_std = min_std
-        self._init_std = init_std
-        self._mean_scale = mean_scale
-
-    def __call__(self, features):
-        raw_init_std = np.log(np.exp(self._init_std) - 1)
-        x = features
-        for index in range(self._layers):
-            x = self.get(f'h{index}', tfkl.Dense, self._units, self._act)(x)
-        if self._dist == 'tanh_normal':
-            # https://www.desmos.com/calculator/rcmcf5jwe7
-            x = self.get(f'hout', tfkl.Dense, 2 * self._size)(x)
-            mean, std = tf.split(x, 2, -1)
-            mean = self._mean_scale * tf.tanh(mean / self._mean_scale)
-            std = tf.nn.softplus(std + raw_init_std) + self._min_std
-            dist = tfd.Normal(mean, std)
-            dist = tfd.TransformedDistribution(dist, tools.TanhBijector())
-            dist = tfd.Independent(dist, 1)
-            dist = tools.SampleDist(dist)
-        elif self._dist == 'onehot':
-            x = self.get(f'hout', tfkl.Dense, self._size)(x)
-            dist = tools.OneHotDist(x)
-        else:
-            raise NotImplementedError(dist)
-        return dist
+#class ActionDecoder(nn.Module):
+#    def __init__(self, size, layers, units, dist='tanh_normal', act=tf.nn.elu, min_std=1e-4, init_std=5, mean_scale=5):
+#        self._size = size
+#        self._layers = layers
+#        self._units = units
+#        self._dist = dist
+#        self._act = act
+#        self._min_std = min_std
+#        self._init_std = init_std
+#        self._mean_scale = mean_scale
+#
+#    def __call__(self, features):
+#        raw_init_std = np.log(np.exp(self._init_std) - 1)
+#        x = features
+#        for index in range(self._layers):
+#            x = self.get(f'h{index}', tfkl.Dense, self._units, self._act)(x)
+#        if self._dist == 'tanh_normal':
+#            # https://www.desmos.com/calculator/rcmcf5jwe7
+#            x = self.get(f'hout', tfkl.Dense, 2 * self._size)(x)
+#            mean, std = tf.split(x, 2, -1)
+#            mean = self._mean_scale * tf.tanh(mean / self._mean_scale)
+#            std = tf.nn.softplus(std + raw_init_std) + self._min_std
+#            dist = tfd.Normal(mean, std)
+#            dist = tfd.TransformedDistribution(dist, tools.TanhBijector())
+#            dist = tfd.Independent(dist, 1)
+#            dist = tools.SampleDist(dist)
+#        elif self._dist == 'onehot':
+#            x = self.get(f'hout', tfkl.Dense, self._size)(x)
+#            dist = tools.OneHotDist(x)
+#        else:
+#            raise NotImplementedError(dist)
+#        return dist

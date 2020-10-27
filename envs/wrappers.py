@@ -10,6 +10,26 @@ from PIL import Image
 from envs.base import BaseIndexEnv
 from gym.utils import seeding, EzPickle
 
+class NormalEnv(gym.Env, EzPickle):
+    def __init__(self, env):
+        self.env = env
+    @property
+    def observation_space(self):
+        spaces = {}
+        spaces['state'] = self.env.observation_space
+        return gym.spaces.Dict(spaces)
+
+    @property
+    def action_space(self):
+        return self.env.action_space
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        return {'state': obs}, rew, done, info
+
+    def reset(self):
+        obs = self.env.reset()
+        return {'state': obs}
 
 class PixelEnv(gym.Env, EzPickle):
     def __init__(self, env):
