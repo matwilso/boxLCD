@@ -75,6 +75,7 @@ def define_cfg():
     cfg.deter = 200
     cfg.hidden = 200
     cfg.kl_scale = 1.0
+    cfg.log_n = 1000
 
     # ----- RL -----
     cfg.gamma = 0.99

@@ -9,7 +9,7 @@ from algo.base import Trainer
 from tensorflow import nest
 from torch import distributions
 import utils
-
+from torch.cuda import amp
 
 def fvmap(f):
     """fakes vmap by just reshaping"""
@@ -109,7 +109,6 @@ class ConvEncoder(nn.Module):
         x = self.c4(x)
         return x.flatten(1, -1)
 
-
 class ConvDecoder(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -136,7 +135,6 @@ class ConvDecoder(nn.Module):
         #return distributions.Independent(distributions.Bernoulli(logits=x), len(self._shape))
         return distributions.Independent(distributions.Normal(x,1), len(self._shape))
 
-
 class Dyn(Trainer, nn.Module):
     def __init__(self, cfg, make_env):
         nn.Module.__init__(self)
@@ -148,20 +146,21 @@ class Dyn(Trainer, nn.Module):
         self.optimizer = optim.Adam(self.params, lr=self.cfg.dyn_lr)
         # TODO: try out just autoencoder first
         self.venc = fvmap(self.encoder)
+        #self.scaler = amp.GradScaler()
 
     def image_summaries(self, data, embed, image_pred):
-        truth = data['image'][:4] + 0.5
+        truth = data['image'][:5] + 0.5
         recon = image_pred.mean
-        recon = recon.reshape((50, 50)+recon.shape[1:])[:4]
-        init, _ = self.dynamics.observe(embed[:4, :5], data['act'][:4, :5])
+        recon = recon.reshape((50, 50)+recon.shape[1:])[:5]
+        init, _ = self.dynamics.observe(embed[:5, :5], data['act'][:5, :5])
         init = {k: v[:, -1] for k, v in init.items()}
-        prior = self.dynamics.imagine(data['act'][:4, 5:], init)
+        prior = self.dynamics.imagine(data['act'][:5, 5:], init)
         openl = self.decoder(self.dynamics.get_feat(prior).flatten(0,1)).mean
-        openl = openl.reshape((4, 45) + openl.shape[1:])
+        openl = openl.reshape((5, 45) + openl.shape[1:])
         model = torch.cat([recon[:, :5] + 0.5, openl + 0.5], 1)
         error = (model - truth + 1) / 2
         openl = torch.cat([truth, model, error], 3)
-        openl = openl.permute([1, 2, 3, 4, 0]).flatten(-2,-1)[None]
+        openl = openl.permute([1, 2, 3, 0, 4]).flatten(-2,-1)[None]
         self.writer.add_video('agent/openl', openl, self.t, fps=20)
 
     def update(self, batch, log_extra=False):
@@ -174,9 +173,11 @@ class Dyn(Trainer, nn.Module):
         recon_loss = -image_pred.log_prob(batch['image'].flatten(0,1)).mean()
         prior_dist = self.dynamics.get_dist(prior)
         post_dist = self.dynamics.get_dist(post)
-        div = distributions.kl_divergence(post_dist, prior_dist).mean()
+        div = distributions.kl_divergence(post_dist, prior_dist).mean() # TODO: figure out how to make this work for amp
         div = torch.max(div, torch.tensor(3.0).to(self.cfg.device))
         model_loss = self.cfg.kl_scale*div + recon_loss
+
+        #self.scaler.scale(model_loss).backward()
         model_loss.backward()
         if log_extra:
             ct, norms = 0, 0
@@ -185,6 +186,8 @@ class Dyn(Trainer, nn.Module):
                 ct += 1
             logs['grad_norm'] = norms/ct
         self.optimizer.step()
+        #self.scaler.step(self.optimizer)
+        #self.scaler.update()
 
         logs['recon_loss'] = recon_loss
         if log_extra:
@@ -227,10 +230,10 @@ class Dyn(Trainer, nn.Module):
             self.logger['bdt'] += [time.time() - bt]
 
             ut = time.time()
-            self.update(batch, log_extra=1)
-            #self.update(batch, log_extra=self.t%100==0)
+            #self.update(batch, log_extra=1)
+            self.update(batch, log_extra=self.t%self.cfg.log_n==0)
             self.logger['udt'] += [time.time() - ut]
-            if self.t % 1 == 0:
+            if self.t % self.cfg.log_n == 0:
                 print('='*30)
                 print('t', self.t)
                 for key in self.logger:
