@@ -91,10 +91,9 @@ def define_cfg():
 
     # extra info that we set here for convenience and don't modify 
     cfg.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
+    cfg.clipboard = 0
 
     parser = argparse.ArgumentParser()
     for key, value in cfg.items():
         parser.add_argument(f'--{key}', type=args_type(value), default=value)
     return parser
-
-

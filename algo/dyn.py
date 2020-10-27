@@ -150,18 +150,18 @@ class Dyn(Trainer, nn.Module):
         self.venc = fvmap(self.encoder)
 
     def image_summaries(self, data, embed, image_pred):
-        truth = data['image'][:6] + 0.5
+        truth = data['image'][:4] + 0.5
         recon = image_pred.mean
-        recon = recon.reshape((50, 50)+recon.shape[1:])[:6]
-        init, _ = self.dynamics.observe(embed[:6, :5], data['act'][:6, :5])
+        recon = recon.reshape((50, 50)+recon.shape[1:])[:4]
+        init, _ = self.dynamics.observe(embed[:4, :5], data['act'][:4, :5])
         init = {k: v[:, -1] for k, v in init.items()}
-        prior = self.dynamics.imagine(data['act'][:6, 5:], init)
+        prior = self.dynamics.imagine(data['act'][:4, 5:], init)
         openl = self.decoder(self.dynamics.get_feat(prior).flatten(0,1)).mean
-        openl = openl.reshape((6, 45) + openl.shape[1:])
+        openl = openl.reshape((4, 45) + openl.shape[1:])
         model = torch.cat([recon[:, :5] + 0.5, openl + 0.5], 1)
         error = (model - truth + 1) / 2
         openl = torch.cat([truth, model, error], 3)
-        import ipdb; ipdb.set_trace()
+        openl = openl.permute([1, 2, 3, 4, 0]).flatten(-2,-1)[None]
         self.writer.add_video('agent/openl', openl, self.t, fps=20)
 
     def update(self, batch, log_extra=False):

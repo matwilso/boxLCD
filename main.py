@@ -7,6 +7,7 @@ if __name__ == '__main__':
     parser.set_defaults(**{'exp_name': 'collect'})
     cfg = parser.parse_args()
 
+
     T = {'collect': collect.Collect, 'dyn': dyn.Dyn, 'sac': sac.SAC}[cfg.mode]
     t = T(cfg, make_env)
     t.run()

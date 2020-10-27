@@ -35,6 +35,10 @@ class Trainer:
         self.logger = defaultdict(lambda: [])
         timestamp = datetime.now().strftime('%Y%m%dT-%H-%M-%S')
         self.logpath = self.cfg.logdir/f'{self.cfg.env}/{self.cfg.exp_name}-{timestamp}'
+        if cfg.clipboard:
+            import pyperclip
+            pyperclip.copy(str(self.logpath))
+
         self.writer = SummaryWriter(self.logpath)
         self.barrel_path = self.cfg.barrel_path if self.cfg.barrel_path != '' else self.logpath / 'barrels'
 
