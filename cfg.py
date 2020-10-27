@@ -71,6 +71,11 @@ def define_cfg():
 
     cfg.mode = 'collect'
 
+    cfg.stoch = 30
+    cfg.deter = 200
+    cfg.hidden = 200
+    cfg.kl_scale = 1.0
+
     # ----- RL -----
     cfg.gamma = 0.99
     # SAC

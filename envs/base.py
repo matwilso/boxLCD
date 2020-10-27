@@ -24,7 +24,6 @@ class BaseIndexEnv(gym.Env, EzPickle):
         EzPickle.__init__(self)
 
     def seed(self, seed=None):
-        print(seed)
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 

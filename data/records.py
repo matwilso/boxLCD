@@ -105,7 +105,7 @@ def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg):
     onp.random.shuffle(files)
     dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=32)
     dataset = dataset.repeat()
-    dataset = dataset.shuffle(5000)
+    dataset = dataset.shuffle(1000)
     dataset = dataset.batch(cfg.bs)
     dataset = dataset.map(lambda x: parse(x, state_shape, image_shape, act_n, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
     #dataset = dataset.map(lambda x: bptt_n(x, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
