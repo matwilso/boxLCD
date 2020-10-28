@@ -90,7 +90,7 @@ class Dyn(Trainer, nn.Module):
         prior_dist = self.dynamics.get_dist(prior)
         post_dist = self.dynamics.get_dist(post)
         div = distributions.kl_divergence(post_dist, prior_dist).mean() # TODO: figure out how to make this work for amp
-        div = torch.max(div, torch.tensor(0.35).to(self.cfg.device))
+        div = torch.max(div, torch.tensor(self.cfg.free_nats).to(self.cfg.device))
         model_loss = self.cfg.kl_scale*div + recon_loss
 
         #self.scaler.scale(model_loss).backward()

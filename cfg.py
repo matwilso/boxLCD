@@ -76,6 +76,7 @@ def define_cfg():
     cfg.deter = 200
     cfg.hidden = 200
     cfg.kl_scale = 1.0
+    cfg.free_nats = 0.3
     cfg.log_n = 1000
 
 

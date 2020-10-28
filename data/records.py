@@ -90,7 +90,7 @@ def parse(example_proto, state_shape, image_shape, act_n, cfg):
         'act': [bs, size, act_n],
         'rew': [bs, size],
     }
-    if cfg.use_image: shapes['image'] = [size+1, *image_shape]
+    if cfg.use_image: shapes['image'] = [bs, size+1, *image_shape]
     feature_description = {key: tf.io.FixedLenFeature([], tf.string) for key in shapes}
     parsed = tf.io.parse_example(example_proto, feature_description)
     out = {}
