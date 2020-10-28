@@ -54,7 +54,7 @@ class RSSM(nn.Module):
         x = self.obs2(x)
         mean, std = torch.split(x, self.cfg.stoch, -1)
         std = F.softplus(std) + 0.1
-        stoch = self.get_dist({'mean': mean, 'std': std}).sample()
+        stoch = self.get_dist({'mean': mean, 'std': std}).rsample()
         post = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': prior['deter']}
         return post, prior
 
@@ -68,7 +68,7 @@ class RSSM(nn.Module):
         x = self.img3(x)
         mean, std = torch.split(x, self.cfg.stoch, -1)
         std = F.softplus(std) + 0.1
-        stoch = self.get_dist({'mean': mean, 'std': std}).sample()
+        stoch = self.get_dist({'mean': mean, 'std': std}).rsample()
         prior = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': deter}
         return prior
 

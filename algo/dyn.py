@@ -59,7 +59,7 @@ class Dyn(Trainer, nn.Module):
             truth[i] = self.tenv.env.visualize_obs(np.array(data['state'][0][i].detach().cpu())).transpose(2,0,1) / 255.0
 
         recon = obs_pred.mean
-        recon = recon.reshape((50, 50)+recon.shape[1:])[0]
+        recon = recon.reshape((self.cfg.bs, 50)+recon.shape[1:])[0]
         init, _ = self.dynamics.observe(embed[:5, :5], data['act'][:5, :5])
         init = {k: v[:, -1] for k, v in init.items()}
         prior = self.dynamics.imagine(data['act'][:5, 5:], init)
@@ -90,7 +90,7 @@ class Dyn(Trainer, nn.Module):
         prior_dist = self.dynamics.get_dist(prior)
         post_dist = self.dynamics.get_dist(post)
         div = distributions.kl_divergence(post_dist, prior_dist).mean() # TODO: figure out how to make this work for amp
-        div = torch.max(div, torch.tensor(3.0).to(self.cfg.device))
+        div = torch.max(div, torch.tensor(0.35).to(self.cfg.device))
         model_loss = self.cfg.kl_scale*div + recon_loss
 
         #self.scaler.scale(model_loss).backward()
@@ -106,15 +106,18 @@ class Dyn(Trainer, nn.Module):
         #self.scaler.update()
 
         logs['recon_loss'] = recon_loss
+        logs['div'] = div
+        logs['model_loss'] = model_loss
         if log_extra:
-            logs['div'] = div
             logs['prior_ent'] = prior_dist.entropy()
             logs['post_ent'] = post_dist.entropy()
             #self.logger['model_grad_norm'] = post_dist.entropy()
+            lt = time.time()
             if self.cfg.use_image:
                 self.image_summaries(batch, embed, obs_pred)
             else:
                 self.state_summaries(batch, embed, obs_pred)
+            self.logger['dt/summary'] += [time.time()-lt]
         for key in logs:
             self.logger[key] += [logs[key].mean().detach().cpu()]
         return model_loss
@@ -148,12 +151,12 @@ class Dyn(Trainer, nn.Module):
                 if 'image' in batch: batch.pop('image')
                 batch = nest.map_structure(lambda x: torch.tensor(x).to(self.cfg.device), batch)
             batch['state'] = batch['state'][:,:-1]
-            self.logger['bdt'] += [time.time() - bt]
+            self.logger['dt/batch'] += [time.time() - bt]
 
             ut = time.time()
             #self.update(batch, log_extra=1)
             self.update(batch, log_extra=self.t%self.cfg.log_n==0)
-            self.logger['udt'] += [time.time() - ut]
+            self.logger['dt/update'] += [time.time() - ut]
             if self.t % self.cfg.log_n == 0:
                 print('='*30)
                 print('t', self.t)

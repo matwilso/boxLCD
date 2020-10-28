@@ -33,6 +33,7 @@ class Viz(Trainer):
 
         paused = False
         k = False
+        l = False
         past_keys = {}
 
         batch_idx = 0
@@ -57,9 +58,8 @@ class Viz(Trainer):
 
             if not paused:
                 time_idx = time_idx + 1
-            if time_idx > 49 and not k:
+            if time_idx > 49 and k:
                 batch_idx += 1
-                k = not k
             time_idx = time_idx % 50
 
 
@@ -74,9 +74,3 @@ class Viz(Trainer):
             obs['object0:x:p', 'object0:y:p'] *= 10
             self.tenv.env.visualize_obs(obs.arr)
             past_keys = {key: val for key, val in curr_keys.items()}
-
-            label = pyglet.text.Label('Hello, world', font_name='Times New Roman', font_size=36, x=window.width//2, y=window.height//2, anchor_x='center', anchor_y='center')
-            label.draw()
-
-
-
