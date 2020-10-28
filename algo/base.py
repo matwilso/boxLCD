@@ -134,14 +134,16 @@ class Trainer:
             pack = defaultdict(lambda: [])
             o = self.venv.reset()
             pack['state'] += [o['state']]
-            pack['image'] += [o['image']/255.0]
+            if self.cfg.use_image:
+                pack['image'] += [o['image']/255.0]
             for t in range(eplen):
                 a = self.venv.action_space.sample()
                 o2, r, d, _ = self.venv.step(a)
                 pack['act'] += [a]
                 pack['rew'] += [r]
                 pack['state'] += [o2['state']]
-                pack['image'] += [o2['image']/255.0]
+                if self.cfg.use_image:
+                    pack['image'] += [o2['image']/255.0]
                 o = o2
             for key in pack:
                 tot[key] += [pack[key]]
@@ -155,4 +157,4 @@ class Trainer:
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
         filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.exp_name}-{num_ep}-{eplen}.tfrecord'
-        records.write_barrel(filename, tot)
+        records.write_barrel(filename, tot, self.cfg)

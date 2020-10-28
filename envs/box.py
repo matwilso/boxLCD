@@ -17,10 +17,6 @@ A = utils.A
 
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
-VIEWPORT_W = 64
-VIEWPORT_H = 64
-W = VIEWPORT_W/SCALE
-H = VIEWPORT_H/SCALE
 
 class Box(BaseIndexEnv):
     metadata = {
@@ -29,6 +25,8 @@ class Box(BaseIndexEnv):
     }
     def __init__(self):
         EzPickle.__init__(self)
+        self.VIEWPORT_W = 64
+        self.VIEWPORT_H = 64
         self.num_objects = 1
         self.seed()
         self.viewer = None
@@ -41,13 +39,13 @@ class Box(BaseIndexEnv):
         # OBSERVATION
         self.obs_info = {}
         for i in range(self.num_objects): 
-            self.obs_info[f'object{i}:x:p'] = A[0, W]
-            self.obs_info[f'object{i}:y:p'] = A[0, H]
+            self.obs_info[f'object{i}:x:p'] = A[0, self.W]
+            self.obs_info[f'object{i}:y:p'] = A[0, self.H]
             self.obs_info[f'object{i}:cos'] = A[-1, 1]
             self.obs_info[f'object{i}:sin'] = A[-1, 1]
             # extra we can add later if needed
-            self.obs_info[f'object{i}:x:v'] = A[-10, 10]
-            self.obs_info[f'object{i}:y:v'] = A[-10, 10]
+            #self.obs_info[f'object{i}:x:v'] = A[-10, 10]
+            #self.obs_info[f'object{i}:y:v'] = A[-10, 10]
             #self.obs_info[f'{object}:thetavel'] = [-self.max_angular, self.max_angular]
         # ACTION 
         self.act_info = {}
@@ -56,6 +54,14 @@ class Box(BaseIndexEnv):
         #    self.act_info[f'{object}:force'] = A[-1, 1]  
         #    self.act_info[f'{object}:theta'] = A[-1, 1]
         self.pack_info()
+
+    @property
+    def W(self):
+        return self.VIEWPORT_W/SCALE
+
+    @property
+    def H(self):
+        return self.VIEWPORT_H/SCALE
 
     def _destroy(self):
         for name, body in self.statics.items():
@@ -71,11 +77,12 @@ class Box(BaseIndexEnv):
         color = (0.9,0.4,0.4), (0.5,0.3,0.5)
         #color = (0.5,0.4,0.9), (0.3,0.3,0.5)
         # bodies
+        box_size = self.VIEWPORT_W / (SCALE*14.2222)
         for i in range(self.num_objects):
             def sample(x):
                 return self.sample(f'object{i}{x}') if obs is None else obs[f'object{i}{x}']
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
-            fixture = fixtureDef(shape=polygonShape(box=(0.15, 0.15)), density=1)
+            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1)
             body = self.world.CreateDynamicBody(
                 position=(sample(':x:p'), sample(':y:p')),
                 angle=utils.get_angle(sample(':cos'), sample(':sin')),
@@ -87,10 +94,10 @@ class Box(BaseIndexEnv):
         self.ep_t = 0
         self._destroy()
         self.statics = {}
-        self.statics['wall1'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (W, 0)]) )
-        self.statics['wall2'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (0, H)]) )
-        self.statics['wall3'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(W, 0), (W, H)]) )
-        self.statics['wall4'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, H), (W, H)]) )
+        self.statics['wall1'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (self.W, 0)]) )
+        self.statics['wall2'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, 0), (0, self.H)]) )
+        self.statics['wall3'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(self.W, 0), (self.W, self.H)]) )
+        self.statics['wall4'] = self.world.CreateStaticBody( shapes=edgeShape(vertices=[(0, self.H), (self.W, self.H)]) )
         self._reset_bodies()
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.world.Step(1.0/FPS, 6*30, 2*30)
@@ -144,8 +151,8 @@ class Box(BaseIndexEnv):
     def render(self, mode='rgb_array'):
         from envs import rendering
         if self.viewer is None:
-            self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
-            self.viewer.set_bounds(0, VIEWPORT_W/SCALE, 0, VIEWPORT_H/SCALE)
+            self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H)
+            self.viewer.set_bounds(0, self.VIEWPORT_W/SCALE, 0, self.VIEWPORT_H/SCALE)
 
         for i in range(self.num_objects):
             obj = self.dynbodies[i]
@@ -160,7 +167,7 @@ class Box(BaseIndexEnv):
                     path = [trans*v for v in f.shape.vertices]
                     self.viewer.draw_polygon(path, color=obj.color1)
                     path.append(path[0])
-                    self.viewer.draw_polyline(path, color=obj.color2, linewidth=0.640)
+                    self.viewer.draw_polyline(path, color=obj.color2, linewidth=self.VIEWPORT_H/100)
 
         return self.viewer.render(return_rgb_array = mode=='rgb_array')
 

@@ -23,6 +23,10 @@ class NormalEnv(gym.Env, EzPickle):
     def action_space(self):
         return self.env.action_space
 
+    @property
+    def viewer(self):
+        return self.env.viewer
+
     def step(self, action):
         obs, rew, done, info = self.env.step(action)
         return {'state': obs}, rew, done, info
@@ -30,6 +34,9 @@ class NormalEnv(gym.Env, EzPickle):
     def reset(self):
         obs = self.env.reset()
         return {'state': obs}
+
+    def render(self, mode='rgb_array'):
+        return self.env.render(mode=mode)
 
 class PixelEnv(gym.Env, EzPickle):
     def __init__(self, env):

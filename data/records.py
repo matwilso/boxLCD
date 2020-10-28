@@ -27,18 +27,19 @@ def _bytes_feature(value):
       value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-KEYS = ['image', 'state', 'act', 'rew']
-def episode_example(ep):
+def episode_example(ep, cfg):
     feature = {}
+    KEYS = ['state', 'act', 'rew']
+    KEYS = ['image']+KEYS if cfg.use_image else KEYS
     for key in KEYS:
         feature[key] = _bytes_feature(ep[key].astype('float32').tobytes())
     return tf.train.Example(features=tf.train.Features(feature=feature))
 
-def write_barrel(filename, barrel_dict):
+def write_barrel(filename, barrel_dict, cfg):
     #with tf.io.TFRecordWriter(str(filename)) as writer:
     with tf.io.TFRecordWriter(str(filename), options=tf.io.TFRecordOptions(compression_type='GZIP')) as writer:
         for i in range(len(barrel_dict['state'])):
-            example = episode_example(nest.map_structure(lambda x: x[i], barrel_dict))
+            example = episode_example(nest.map_structure(lambda x: x[i], barrel_dict), cfg)
             writer.write(example.SerializeToString())
     writer.close()
 
@@ -70,11 +71,11 @@ def parse_single(example_proto, state_shape, image_shape, act_n, cfg):
     size = cfg.ep_len
     shapes = {
         'state': [size+1, *state_shape],
-        'image': [size+1, *image_shape],
         'act': [size, act_n],
         'rew': [size],
     }
-    feature_description = {key: tf.io.FixedLenFeature([], tf.string) for key in KEYS}
+    if cfg.use_image: shapes['image'] = [size+1, *image_shape]
+    feature_description = {key: tf.io.FixedLenFeature([], tf.string) for key in shapes}
     parsed = tf.io.parse_single_example(example_proto, feature_description)
     out = {}
     for key in shapes:
@@ -86,11 +87,11 @@ def parse(example_proto, state_shape, image_shape, act_n, cfg):
     bs = cfg.bs
     shapes = {
         'state': [bs, size+1, *state_shape],
-        'image': [bs, size+1, *image_shape],
         'act': [bs, size, act_n],
         'rew': [bs, size],
     }
-    feature_description = {key: tf.io.FixedLenFeature([], tf.string) for key in KEYS}
+    if cfg.use_image: shapes['image'] = [size+1, *image_shape]
+    feature_description = {key: tf.io.FixedLenFeature([], tf.string) for key in shapes}
     parsed = tf.io.parse_example(example_proto, feature_description)
     out = {}
     for key in shapes:
