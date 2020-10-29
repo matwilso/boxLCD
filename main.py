@@ -1,5 +1,4 @@
 from cfg import define_cfg, args_type, env_fn, make_env
-
 from algo import sac, collect, dyn, viz
 
 if __name__ == '__main__':

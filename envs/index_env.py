@@ -13,7 +13,7 @@ from gym import spaces
 from gym.utils import seeding, EzPickle
 import utils
 
-class BaseIndexEnv(gym.Env, EzPickle):
+class IndexEnv(gym.Env, EzPickle):
     """
     This class holds the logic for enabling indexable observation and action.
 
@@ -26,10 +26,8 @@ class BaseIndexEnv(gym.Env, EzPickle):
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
-
     def sample(self, name):
         return self.np_random.uniform(*self.obs_info[name])
-
     def pack_info(self):
         self.obs_info = utils.sortdict(self.obs_info)
         self.obs_info['size'], self.obs_info['keys'] = self.obs_size, self.obs_keys = len(self.obs_info), list(self.obs_info.keys())
@@ -37,15 +35,12 @@ class BaseIndexEnv(gym.Env, EzPickle):
         self.act_info = utils.sortdict(self.act_info)
         self.act_info['size'], self.act_info['keys'] = self.act_size, self.act_keys = len(self.act_info), list(self.act_info.keys())
         self.action_space = spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
-
     def obs_index(self, name):
         return self.obs_info['keys'].index(name)
     def act_index(self, name):
         return self.act_info['keys'].index(name)
-
     def get_act_dict(self, act_vec, map=True):
         """convert vector action to dictionary action
-
         (-1, 1) in vec shape --> (-act_bounds, act_bounds) in dict shape
         """
         act_dict = {}
@@ -54,10 +49,8 @@ class BaseIndexEnv(gym.Env, EzPickle):
             act_dict[key] = utils.mapto(act_vec[i], bounds) if map else act_vec[i]
         assert sorted(act_dict) == list(act_dict.keys())
         return act_dict
-
     def get_act_vec(self, act_dict, map=True):
         """convert act obs to vector act (inverse of get_act_dict)
-
         (-act_bounds, act_bounds) in dict shape --> (-1, 1) in vector shape
         """
         act_dict = utils.sortdict(act_dict)
@@ -67,10 +60,8 @@ class BaseIndexEnv(gym.Env, EzPickle):
             val = utils.rmapto(act_dict[key], bounds) if map else act_dict[key]
             act_vec.append(val)
         return np.array(act_vec)
-
     def get_obs_vec(self, obs_dict, map=True):
         """convert dict obs to vector obs for export
-
         (-obs_bounds, obs_bounds) in dict shape --> (-1, 1) in vector shape
         """
         obs_dict = utils.sortdict(obs_dict)
@@ -80,10 +71,8 @@ class BaseIndexEnv(gym.Env, EzPickle):
             val = utils.rmapto(obs_dict[key], bounds) if map else obs_dict[key]
             obs_vec.append(val)
         return np.array(obs_vec)
-
     def get_obs_dict(self, obs_vec, map=True):
         """convert vector obs to dict obs (reverse of get_obs_vec)
-
         (-1, 1) in vec shape --> (-obs_bounds, obs_bounds) in dict shape
         """
         obs_dict = {}
@@ -96,7 +85,6 @@ class BaseIndexEnv(gym.Env, EzPickle):
                 import ipdb; ipdb.set_trace()
         assert sorted(obs_dict) == list(obs_dict.keys())
         return obs_dict
-
     def map_dict_obs(self, obs_dict):
         """dict: (-1, 1) --> bounds"""
         new_dict = {}

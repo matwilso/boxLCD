@@ -78,6 +78,7 @@ def define_cfg():
     cfg.kl_scale = 1.0
     cfg.free_nats = 0.3
     cfg.log_n = 1000
+    cfg.env_size = 64
 
 
     cfg.use_image = 1
