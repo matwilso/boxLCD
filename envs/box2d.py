@@ -20,37 +20,19 @@ A = utils.A
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 HULL_POLY = A[(-30,+0), (-20,+16), (+20,+16), (+30,+0), (+20,-16), (-20, -16) ]
-hull_shape = polygonShape(vertices=[(x/SCALE,y/SCALE) for x,y in HULL_POLY])
 VERT = 8/SCALE
 SIDE = 20/SCALE
 
 LEG_W, LEG_H = 8/SCALE, 20/SCALE
-
-TABLE_H = 34 / SCALE
-ARM_W, ARM_H = 6/SCALE, 26/SCALE
-ARM_UP = 8/SCALE
-OBJECT_H = 20/SCALE
-FINGER_W, FINGER_H = 4/SCALE, 16/SCALE
+ARM_W, ARM_H = 8/SCALE, 20/SCALE
+CLAW_W, CLAW_H = 4/SCALE, 16/SCALE
 
 SHAPES = {}
 SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
-SHAPES['lshoulder'] = SHAPES['lelbow'] = SHAPES['rshoulder'] = SHAPES['relbow'] = polygonShape(box = (ARM_W/2, ARM_H/2))
-SHAPES['lfinger'] = SHAPES['rfinger'] = polygonShape(box = (FINGER_W/2, FINGER_H/2))
-SHAPES['lhip'] = SHAPES['rhip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
-SHAPES['lknee'] = SHAPES['rknee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
-
-robot_bounds = {}
-robot_bounds['lhip:angle'] = [-0.8, 1.1]
-robot_bounds['lknee:angle'] = [-1.6, -0.1]
-robot_bounds['rhip:angle'] = [-0.8, 1.1]
-robot_bounds['rknee:angle'] = [-1.6, -0.1]
-# arm
-robot_bounds['shoulder:angle'] = [-2.57, 2.57]
-#robot_bounds['elbow:angle'] = [-1.57, 1.57]
-robot_bounds['elbow:angle'] = [-2.57, 2.57]  # toggle
-# finger
-robot_bounds['lfinger:angle'] = [-1.0, 2.5]
-robot_bounds['rfinger:angle'] = [-2.5, 1.0]
+SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
+SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
+SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
+SHAPES['claw'] = polygonShape(box = (CLAW_W/2, CLAW_H/2))
 
 class Body(NamedTuple):
     shape: polygonShape
@@ -64,26 +46,46 @@ class Joint(NamedTuple):
 
 class Agent(NamedTuple):
     name: str
-    root_body: Body = Body(hull_shape)
+    root_body: Body = Body(SHAPES['root'])
     bodies: Dict[str, Body] = {
-        'lhip': Body(SHAPES['lhip']),
-        'lknee': Body(SHAPES['lknee']),
-        'rhip': Body(SHAPES['lhip']),
-        'rknee': Body(SHAPES['rknee']),
-        'lshoulder': Body(SHAPES['lshoulder']),
-        'lelbow': Body(SHAPES['lelbow']),
-        'rshoulder': Body(SHAPES['rshoulder']),
-        'relbow': Body(SHAPES['relbow']),
+        'lhip': Body(SHAPES['hip']),
+        'lknee': Body(SHAPES['knee']),
+        'rhip': Body(SHAPES['hip']),
+        'rknee': Body(SHAPES['knee']),
+        'lshoulder': Body(SHAPES['arm']),
+        'lelbow': Body(SHAPES['arm']),
+        'rshoulder': Body(SHAPES['arm']),
+        'relbow': Body(SHAPES['arm']),
+        # left claw
+        'llclaw0': Body(SHAPES['claw']),
+        'llclaw1': Body(SHAPES['claw']),
+        'lrclaw0': Body(SHAPES['claw']),
+        'lrclaw1': Body(SHAPES['claw']),
+        # right claw
+        'rlclaw0': Body(SHAPES['claw']),
+        'rlclaw1': Body(SHAPES['claw']),
+        'rrclaw0': Body(SHAPES['claw']),
+        'rrclaw1': Body(SHAPES['claw']),
         }
     joints: Dict[str, Joint] = {
         'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
-        'lknee': Joint('lhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [0.0, 0.5]),
-        'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [-0.5, 0.5]),
-        'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [0.0, 0.5]),
-        'lshoulder': Joint('root', 0.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
-        'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [0.0, 0.5]),
-        'rshoulder': Joint('root', 0.0, (SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
-        'relbow': Joint('rshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [0.0, 0.5]),
+        'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+        'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
+        'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+        'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
+        'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-0.5, 0.5]),
+        'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
+        'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-0.5, 0.5]),
+        # left claw
+        'llclaw0': Joint('lelbow', 0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
+        'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
+        'lrclaw0': Joint('lelbow', -0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
+        'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
+        # right claw
+        'rlclaw0': Joint('relbow', 0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
+        'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
+        'rrclaw0': Joint('relbow', -0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
+        'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
         }
 
 class Object(NamedTuple):
@@ -93,9 +95,8 @@ class World(NamedTuple):
     agents: List[Agent] = []
     objects: List[Object] = [] 
 
-
 MOTORS_TORQUE = defaultdict(lambda: 160)
-#MOTORS_TORQUE['finger'] = 20
+#MOTORS_TORQUE['claw'] = 20
 SPEEDS = defaultdict(lambda: 4)
 SPEEDS['knee'] = 6
 
@@ -112,6 +113,7 @@ class B2D(IndexEnv):
         self.cfg = cfg
         self.VIEWPORT_W = cfg.env_size
         self.VIEWPORT_H = cfg.env_size
+        #self.world = Box2D.b2World(gravity=(0, 0))
         self.world = Box2D.b2World(gravity=(0, -9.81))
         self.seed()
         self.viewer = None
@@ -134,8 +136,8 @@ class B2D(IndexEnv):
             for joint_name, joint in agent.joints.items():
                 self.obs_info[f'{agent.name}:{joint_name}:theta'] = A[joint.limits]
                 self.act_info[f'{agent.name}:{joint_name}:force'] = A[-1,1]
-        if len(self.w.agents) == 0:
-            self.act_info['dummy'] = A[-1, 1]  
+        if len(self.w.agents) == 0: # because having a zero shaped array makes things break
+            self.act_info['dummy'] = A[-1, 1] 
         self.pack_info()
 
     @property
@@ -158,16 +160,21 @@ class B2D(IndexEnv):
         color = (0.9,0.4,0.4), (0.5,0.3,0.5)
         #color = (0.5,0.4,0.9), (0.3,0.3,0.5)
         # bodies
-        def sample(name, x):
-            return self.sample(f'{name}{x}') if obs is None else obs[f'{name}{x}']
+        def sample(namex, lr=-1.0, ur=None):
+            if ur is None:
+                ur = -lr
+            if obs is None:
+                return utils.mapto(self.np_random.uniform(lr,ur), self.obs_info[f'{namex}'])
+            else:
+                return obs[f'{namex}']
 
         box_size = self.VIEWPORT_W / (B2D.SCALE*14.2222)
         for obj in self.w.objects:
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
             fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1)
             body = self.world.CreateDynamicBody(
-                position=(sample(obj.name, ':x:p'), sample(obj.name, ':y:p')),
-                angle=utils.get_angle(sample(obj.name, ':cos'), sample(obj.name, ':sin')),
+                position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.95)),
+                angle=utils.get_angle(sample(obj.name+':cos'), sample(obj.name+':sin')),
                 fixtures=fixture)
             body.color1, body.color2 = color
             self.dynbodies[obj.name] = body
@@ -176,13 +183,12 @@ class B2D(IndexEnv):
             # TODO: maybe create root first, and then add each of the body-joint pairs onto that.
             # this way we know where they should go. but first, let's get food.
             # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
-            fixture = fixtureDef(shape=agent.root_body.shape, density=1)
+            fixture = fixtureDef(shape=agent.root_body.shape, density=1, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
-            root_xy = sample(name, ':x:p'), sample(name, ':y:p')
-            root_xy = A[self.W//2,2]
-            root_angle = utils.get_angle(sample(name, ':cos'), sample(name, ':sin'))
-            root_angle = 0
-
+            #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
+            root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, -0.80)
+            root_angle = utils.get_angle(sample(name+':cos'), sample(name+':sin'))
+            root_angle = 0.0
             dyn = self.world.CreateDynamicBody(
                 position=root_xy,
                 angle=root_angle,
@@ -190,18 +196,31 @@ class B2D(IndexEnv):
             dyn.color1, dyn.color2 = color
             self.dynbodies[name] = dyn
 
+            parent_angles = {}
+            parent_angles[name] = root_angle
+
             for bj_name in agent.joints:
                 name = agent.name + ':' + bj_name
                 body = agent.bodies[bj_name]
                 joint = agent.joints[bj_name]
                 parent_name = agent.name+':'+joint.parent
+                mangle = root_angle+joint.angle
+                mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
+                parent_angles[name] = mangle
+                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001)
 
-                fixture = fixtureDef(shape=body.shape, density=1)
-
+                # parent rot
+                aa_delta = A[joint.anchorA]
+                pangle = parent_angles[parent_name]
+                rot = utils.make_rot(pangle)
+                aa_delta = rot.dot(aa_delta)
+                # kid rot
+                ab_delta = A[joint.anchorB]
+                rot = utils.make_rot(mangle)
+                ab_delta = rot.dot(ab_delta)
                 dyn = self.world.CreateDynamicBody(
-                    position=self.dynbodies[parent_name].position-A[joint.anchorB],
-                    #position=root_xy-A[joint.anchorA]-A[joint.anchorB],
-                    angle=joint.angle,
+                    position=self.dynbodies[parent_name].position+aa_delta-ab_delta,
+                    angle=mangle,
                     fixtures=fixture)
                 dyn.color1, dyn.color2 = color
                 self.dynbodies[name] = dyn
@@ -229,6 +248,7 @@ class B2D(IndexEnv):
         self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.W, 0), (self.W, self.H)]))
         self.statics['wall4'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.H), (self.W, self.H)]))
         self._reset_bodies()
+        #self.start_positions = {key: A[self.dynbodies[key].position] for key in self.dynbodies}
         return self._get_obs().arr
 
     def _get_obs(self):
@@ -251,6 +271,7 @@ class B2D(IndexEnv):
             speed = SPEEDS['default']
             self.joints[key].motorSpeed = float(speed * np.sign(action[name]))
             self.joints[key].maxMotorTorque = float(torque * np.clip(np.abs(action[name]), 0, 1))
+        #self.end_positions = {key: A[self.dynbodies[key].position] for key in self.dynbodies}
         # RUN SIM STEP
         self.world.Step(1.0/FPS, 6*30, 2*30)
         obs = self._get_obs()
@@ -281,6 +302,21 @@ class B2D(IndexEnv):
                     self.viewer.draw_polygon(path, color=body.color1)
                     path.append(path[0])
                     self.viewer.draw_polyline(path, color=body.color2, linewidth=self.VIEWPORT_H/100)
+
+            if 'root' in name:
+                rot = utils.make_rot(body.angle)
+                X = 0.1
+                t = rendering.Transform(translation=body.position+rot.dot(A[2*X, +0.1]))
+                self.viewer.draw_circle(X, 20, color=(0.1, 0.1, 0.1)).add_attr(t)
+                #self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
+                t = rendering.Transform(translation=body.position+rot.dot(A[-2*X, +0.1]))
+                self.viewer.draw_circle(X, 20, color=(0.1, 0.1, 0.1)).add_attr(t)
+               # self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
+                t = rendering.Transform(translation=body.position+rot.dot(A[0.0, -X*2]), rotation=body.angle)
+                Y = 0.2
+                self.viewer.draw_line((0, 0), (Y, Y/2)).add_attr(t)
+                self.viewer.draw_line((0, 0), (-Y, Y/2)).add_attr(t)
+
 
         return self.viewer.render(return_rgb_array = mode=='rgb_array')
 

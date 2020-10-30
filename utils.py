@@ -5,36 +5,20 @@ import numpy as np
 from tensorflow import nest
 
 # utils
-
-
 def subdict(dict, keys): return {key: dict[key] for key in keys}
-
-
-def filter(dict, name): return {key: dict[key]
-                                for key in dict if re.match(name, key) is not None}
-def lfilter(list, name): return [
-    item for item in list if re.match(name, item) is not None]
-
-
+def filter(dict, name): return {key: dict[key] for key in dict if re.match(name, key) is not None}
+def lfilter(list, name): return [item for item in list if re.match(name, item) is not None]
 def sortdict(x): return subdict(x, sorted(x))
 def subdlist(dict, keys): return [dict[key] for key in keys]
 
-
 def get_angle(sin, cos): return np.arctan2(sin, cos)
 # map from -1,1 to bounds
-
-
-def mapto(a, lowhigh): return ((a + 1.0) / (2.0)
-                               * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
+def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
 # map from bounds to -1,1
+def rmapto(a, lowhigh): return ( (a - lowhigh[0]) / (lowhigh[1]-lowhigh[0]) * (2)) + -1
+def umapto(a, from_lh, to_lh): return ( (a - from_lh[0]) / (from_lh[1]-from_lh[0]) * (to_lh[0]+to_lh[1])) + to_lh[0]
 
 
-def rmapto(a, lowhigh): return (
-    (a - lowhigh[0]) / (lowhigh[1]-lowhigh[0]) * (2)) + -1
-
-
-def umapto(a, from_lh, to_lh): return (
-    (a - from_lh[0]) / (from_lh[1]-from_lh[0]) * (to_lh[0]+to_lh[1])) + to_lh[0]
 
 
 def combined_shape(length, shape=None):
@@ -80,6 +64,9 @@ class X:
 
 
 A = X()
+
+def make_rot(angle):
+    return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
 
 
 class AttrDict(dict):

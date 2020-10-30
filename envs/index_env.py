@@ -26,8 +26,6 @@ class IndexEnv(gym.Env, EzPickle):
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
-    def sample(self, name):
-        return self.np_random.uniform(*self.obs_info[name])
     def pack_info(self):
         self.obs_info = utils.sortdict(self.obs_info)
         self.obs_info['size'], self.obs_info['keys'] = self.obs_size, self.obs_keys = len(self.obs_info), list(self.obs_info.keys())
