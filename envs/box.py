@@ -13,6 +13,7 @@ from gym.utils import seeding, EzPickle
 import utils
 from envs.box2d import B2D, World, Agent, Object
 import pyglet
+KEY = pyglet.window.key
 A = utils.A
 
 class Box(B2D):
@@ -31,22 +32,31 @@ if __name__ == '__main__':
     env = Box(cfg)
     env.reset()
     env.render()
-    KEY = pyglet.window.key
-    keys = KEY.KeyStateHandler()
-    env.viewer.window.push_handlers(keys)
+    key_handler = KEY.KeyStateHandler()
+    env.viewer.window.push_handlers(key_handler)
     window = env.viewer.window
-    paused = True
+
+    @window.event
+    def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
+        print()
+        print(x,y,dx,dy, buttons, modifiers)
+        cp = env.SCALE*env.dynbodies['crab0:root'].position
+        if np.linalg.norm(A[cp] - A[x,y]) < 100:
+            env.dynbodies['crab0:root'].position += (dx,dy)
+
+    paused = False
     traj = []
     past_keys = {}
     delay = 0.1*1/4
-    dor = False
+    dor = True
+    plotting = False
 
     while True:
         action = env.action_space.sample()
         action = np.zeros_like(action)
         act_dict = env.get_act_dict(action)
         curr_keys = defaultdict(lambda: False)
-        curr_keys.update({key: val for key, val in keys.items()})
+        curr_keys.update({key: val for key, val in key_handler.items()})
 
         if curr_keys[KEY._0] or curr_keys[KEY.NUM_0]: 
             env.reset()
@@ -62,6 +72,8 @@ if __name__ == '__main__':
             act_dict['object0:theta'] = -0.5
         if curr_keys[KEY.SPACE] and not past_keys[KEY.SPACE]:
             paused = not paused
+        if curr_keys[KEY.P] and not past_keys[KEY.P]:
+            plotting = not plotting
         if curr_keys[KEY._1] and not past_keys[KEY._1]:
             dor = not dor
 
@@ -87,5 +99,6 @@ if __name__ == '__main__':
             # print only the obs data that comes from object0
             #print(rew, utils.filter(env.get_obs_dict(obs, map=False), 'object0'))
         obs = env.render()
-        #plt.imshow(obs); plt.show()
+        if plotting:
+            plt.imshow(obs); plt.show()
         past_keys = {key: val for key, val in curr_keys.items()}

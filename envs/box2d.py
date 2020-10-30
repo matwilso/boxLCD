@@ -1,3 +1,4 @@
+import pyglet
 import time
 import itertools
 from collections import defaultdict
@@ -19,7 +20,7 @@ A = utils.A
 
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
-HULL_POLY = A[(-30,+0), (-20,+16), (+20,+16), (+30,+0), (+20,-16), (-20, -16) ]
+HULL_POLY = A[(-25,+0), (-20,+16), (+20,+16), (+25,+0), (+20,-16), (-20, -16) ]
 
 class Body(NamedTuple):
     shape: polygonShape
@@ -37,14 +38,14 @@ class Agent(NamedTuple):
     bodies: Dict[str, Body] = None
     joints: Dict[str, Joint] = None
 
-def make_crab(name, scale):
-    VERT = 10/scale
-    SIDE = 20/scale
-    LEG_W, LEG_H = 8/scale, 16/scale
-    ARM_W, ARM_H = 8/scale, 20/scale
-    CLAW_W, CLAW_H = 4/scale, 16/scale
+def make_crab(name):
+    VERT = 10/SCALE
+    SIDE = 20/SCALE
+    LEG_W, LEG_H = 8/SCALE, 16/SCALE
+    ARM_W, ARM_H = 8/SCALE, 20/SCALE
+    CLAW_W, CLAW_H = 4/SCALE, 16/SCALE
     SHAPES = {}
-    SHAPES['root'] = polygonShape(vertices=[ (x/scale,y/scale) for x,y in HULL_POLY ])
+    SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
     SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
     SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
     SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
@@ -115,9 +116,9 @@ class B2D(IndexEnv):
         EzPickle.__init__(self)
         self.w = w
         self.cfg = cfg
-        self.VIEWPORT_W = cfg.env_size
+        self.VIEWPORT_W = 2*cfg.env_size
         self.VIEWPORT_H = cfg.env_size
-        self.scale = (640/cfg.env_size)
+        self.scale = 320/self.VIEWPORT_H
 
         #self.world = Box2D.b2World(gravity=(0, 0))
         self.world = Box2D.b2World(gravity=(0, -9.81))
@@ -135,7 +136,7 @@ class B2D(IndexEnv):
             self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
             self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
         for i in range(len(self.w.agents)):
-            self.w.agents[i] = agent = make_crab(self.w.agents[i].name, SCALE*self.scale)
+            self.w.agents[i] = agent = make_crab(self.w.agents[i].name)
             self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.W]
             self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.H]
             self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
@@ -149,10 +150,10 @@ class B2D(IndexEnv):
 
     @property
     def W(self):
-        return self.VIEWPORT_W/B2D.SCALE
+        return 20
     @property
     def H(self):
-        return self.VIEWPORT_H/B2D.SCALE
+        return 10
 
     def _destroy(self):
         for name, body in {**self.statics, **self.dynbodies}.items():
@@ -173,12 +174,11 @@ class B2D(IndexEnv):
             else:
                 return obs[f'{namex}']
 
-        #box_size = self.VIEWPORT_W / (B2D.SCALE*14.2222)
-        box_size = self.VIEWPORT_W / (B2D.SCALE*60.00)
+        box_size = self.H / 30.00
         for obj in self.w.objects:
             color = (0.5,0.4,0.9), (0.3,0.3,0.5)
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
-            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=0.1, friction=1.0)
+            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1.0, friction=1.0)
             body = self.world.CreateDynamicBody(
                 position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80)),
                 angle=utils.get_angle(sample(obj.name+':cos'), sample(obj.name+':sin')),
@@ -191,10 +191,10 @@ class B2D(IndexEnv):
             # TODO: maybe create root first, and then add each of the body-joint pairs onto that.
             # this way we know where they should go. but first, let's get food.
             # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
-            fixture = fixtureDef(shape=agent.root_body.shape, density=1, categoryBits=0x0020, maskBits=0x001)
+            fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-            root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, -0.80)
+            root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
             root_angle = utils.get_angle(sample(name+':cos'), sample(name+':sin'))
             root_angle = 0.0
             dyn = self.world.CreateDynamicBody(
@@ -295,7 +295,7 @@ class B2D(IndexEnv):
         from envs import rendering
         if self.viewer is None:
             self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H)
-            self.viewer.set_bounds(0, self.VIEWPORT_W/B2D.SCALE, 0, self.VIEWPORT_H/B2D.SCALE)
+            self.viewer.set_bounds(0, self.scale*self.VIEWPORT_W/(SCALE), 0, self.scale*self.VIEWPORT_H/(SCALE))
 
         for name in self.dynbodies:
             body = self.dynbodies[name]
@@ -307,26 +307,28 @@ class B2D(IndexEnv):
                     self.viewer.draw_circle(f.shape.radius, 20, color=body.color2, filled=False, linewidth=2).add_attr(t)
                 else:
                     path = [trans*v for v in f.shape.vertices]
-                    self.viewer.draw_polygon(path, color=body.color1)
+                    self.viewer.draw_polygon(A[path], color=body.color1)
+                    #self.viewer.draw_polygon(A[path]/self.scale, color=body.color1)
                     path.append(path[0])
-                    self.viewer.draw_polyline(path, color=body.color2, linewidth=self.VIEWPORT_H/100)
+                    self.viewer.draw_polyline(A[path], color=body.color2, linewidth=self.VIEWPORT_H/100)
+                    #self.viewer.draw_polyline(A[path]/self.scale, color=body.color2, linewidth=self.VIEWPORT_H/100)
 
             if 'root' in name:
                 rot = utils.make_rot(body.angle)
-                X = 0.1 / self.scale
-                X2 = 0.2 / self.scale
-                t = rendering.Transform(translation=body.position+rot.dot(A[X2, +X]))
+                pos = body.position
+                X = 0.1
+                X2 = 0.2
+                t = rendering.Transform(translation=pos+rot.dot(A[X2, +X]))
                 self.viewer.draw_circle(X, 20, color=body.color2).add_attr(t)
                 #self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
-                t = rendering.Transform(translation=body.position+rot.dot(A[-X2, +X]))
+                t = rendering.Transform(translation=pos+rot.dot(A[-X2, +X]))
                 self.viewer.draw_circle(X, 20, color=body.color2).add_attr(t)
                # self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
-                t = rendering.Transform(translation=body.position+rot.dot(A[0.0, -X2]), rotation=body.angle)
+                t = rendering.Transform(translation=pos+rot.dot(A[0.0, -X2]), rotation=body.angle)
                 self.viewer.draw_line((0, 0), (X2, X), color=body.color2).add_attr(t)
                 self.viewer.draw_line((0, 0), (-X2, X), color=body.color2).add_attr(t)
 
-
-        return self.viewer.render(return_rgb_array = mode=='rgb_array')
+        return self.viewer.render(return_rgb_array = mode=='rgb_array', text='Hello, world', size=4//self.scale)
 
     def close(self):
         if self.viewer is not None:

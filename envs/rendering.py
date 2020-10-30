@@ -104,9 +104,11 @@ class Viewer(object):
     def add_onetime(self, geom):
         self.onetime_geoms.append(geom)
 
-    def render(self, return_rgb_array=False):
+    def render(self, return_rgb_array=False, text='', size=4):
         glClearColor(1,1,1,1)
         self.window.clear()
+        label = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size="{size}">{text}</font>', x=self.window.width//2, y=self.window.height//2, anchor_x='center', anchor_y='center')
+        label.draw()
         self.window.switch_to()
         self.window.dispatch_events()
         self.transform.enable()
