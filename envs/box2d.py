@@ -20,12 +20,12 @@ A = utils.A
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 HULL_POLY = A[(-30,+0), (-20,+16), (+20,+16), (+30,+0), (+20,-16), (-20, -16) ]
-VERT = 8/SCALE
+VERT = 10/SCALE
 SIDE = 20/SCALE
 
-LEG_W, LEG_H = 8/SCALE, 20/SCALE
+LEG_W, LEG_H = 8/SCALE, 16/SCALE
 ARM_W, ARM_H = 8/SCALE, 20/SCALE
-CLAW_W, CLAW_H = 4/SCALE, 16/SCALE
+CLAW_W, CLAW_H = 6/SCALE, 16/SCALE
 
 SHAPES = {}
 SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
@@ -43,6 +43,9 @@ class Joint(NamedTuple):
     anchorA: list
     anchorB: list
     limits: List[float]
+
+# TODO: add drawing options and such
+# TODO: add collision options, like different masks
 
 class Agent(NamedTuple):
     name: str
@@ -72,20 +75,20 @@ class Agent(NamedTuple):
         'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
         'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
         'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
-        'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
-        'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-0.5, 0.5]),
-        'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-1.0, 1.0]),
-        'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-0.5, 0.5]),
+        'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 2.0]),
+        'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
+        'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-2.0, 1.0]),
+        'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-2.0, 1.0]),
         # left claw
-        'llclaw0': Joint('lelbow', 0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
-        'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
-        'lrclaw0': Joint('lelbow', -0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
-        'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
+        'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+        'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+        'lrclaw0': Joint('lelbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+        'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
         # right claw
-        'rlclaw0': Joint('relbow', 0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
-        'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
-        'rrclaw0': Joint('relbow', -0.5, (0, ARM_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
-        'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.0, 0.0]),
+        'rlclaw0': Joint('relbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+        'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+        'rrclaw0': Joint('relbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+        'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
         }
 
 class Object(NamedTuple):
@@ -301,7 +304,7 @@ class B2D(IndexEnv):
                     path = [trans*v for v in f.shape.vertices]
                     self.viewer.draw_polygon(path, color=body.color1)
                     path.append(path[0])
-                    self.viewer.draw_polyline(path, color=body.color2, linewidth=self.VIEWPORT_H/100)
+                    self.viewer.draw_polyline(path, color=(0.1, 0.1, 0.1), linewidth=self.VIEWPORT_H/200)
 
             if 'root' in name:
                 rot = utils.make_rot(body.angle)

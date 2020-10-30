@@ -34,7 +34,7 @@ if __name__ == '__main__':
     keys = KEY.KeyStateHandler()
     env.viewer.window.push_handlers(keys)
     window = env.viewer.window
-    paused = False
+    paused = True
     traj = []
     past_keys = {}
     delay = 0.1*1/4
