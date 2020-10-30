@@ -20,76 +20,78 @@ A = utils.A
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 HULL_POLY = A[(-30,+0), (-20,+16), (+20,+16), (+30,+0), (+20,-16), (-20, -16) ]
-VERT = 10/SCALE
-SIDE = 20/SCALE
-
-LEG_W, LEG_H = 8/SCALE, 16/SCALE
-ARM_W, ARM_H = 8/SCALE, 20/SCALE
-CLAW_W, CLAW_H = 6/SCALE, 16/SCALE
-
-SHAPES = {}
-SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
-SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
-SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
-SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
-SHAPES['claw'] = polygonShape(box = (CLAW_W/2, CLAW_H/2))
 
 class Body(NamedTuple):
     shape: polygonShape
-
 class Joint(NamedTuple):
     parent: str
     angle: float
     anchorA: list
     anchorB: list
     limits: List[float]
-
 # TODO: add drawing options and such
 # TODO: add collision options, like different masks
-
 class Agent(NamedTuple):
     name: str
-    root_body: Body = Body(SHAPES['root'])
-    bodies: Dict[str, Body] = {
-        'lhip': Body(SHAPES['hip']),
-        'lknee': Body(SHAPES['knee']),
-        'rhip': Body(SHAPES['hip']),
-        'rknee': Body(SHAPES['knee']),
-        'lshoulder': Body(SHAPES['arm']),
-        'lelbow': Body(SHAPES['arm']),
-        'rshoulder': Body(SHAPES['arm']),
-        'relbow': Body(SHAPES['arm']),
-        # left claw
-        'llclaw0': Body(SHAPES['claw']),
-        'llclaw1': Body(SHAPES['claw']),
-        'lrclaw0': Body(SHAPES['claw']),
-        'lrclaw1': Body(SHAPES['claw']),
-        # right claw
-        'rlclaw0': Body(SHAPES['claw']),
-        'rlclaw1': Body(SHAPES['claw']),
-        'rrclaw0': Body(SHAPES['claw']),
-        'rrclaw1': Body(SHAPES['claw']),
-        }
-    joints: Dict[str, Joint] = {
-        'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
-        'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
-        'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
-        'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
-        'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 2.0]),
-        'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
-        'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-2.0, 1.0]),
-        'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-2.0, 1.0]),
-        # left claw
-        'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
-        'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-        'lrclaw0': Joint('lelbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
-        'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-        # right claw
-        'rlclaw0': Joint('relbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
-        'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-        'rrclaw0': Joint('relbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
-        'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-        }
+    root_body: Body = None
+    bodies: Dict[str, Body] = None
+    joints: Dict[str, Joint] = None
+
+def make_crab(name, scale):
+    VERT = 10/scale
+    SIDE = 20/scale
+    LEG_W, LEG_H = 8/scale, 16/scale
+    ARM_W, ARM_H = 8/scale, 20/scale
+    CLAW_W, CLAW_H = 4/scale, 16/scale
+    SHAPES = {}
+    SHAPES['root'] = polygonShape(vertices=[ (x/scale,y/scale) for x,y in HULL_POLY ])
+    SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
+    SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
+    SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
+    SHAPES['claw'] = polygonShape(box = (CLAW_W/2, CLAW_H/2))
+    return Agent(
+        name=name,
+        root_body=Body(SHAPES['root']),
+        bodies = {
+            'lhip': Body(SHAPES['hip']),
+            'lknee': Body(SHAPES['knee']),
+            'rhip': Body(SHAPES['hip']),
+            'rknee': Body(SHAPES['knee']),
+            'lshoulder': Body(SHAPES['arm']),
+            'lelbow': Body(SHAPES['arm']),
+            'rshoulder': Body(SHAPES['arm']),
+            'relbow': Body(SHAPES['arm']),
+            # left claw
+            'llclaw0': Body(SHAPES['claw']),
+            'llclaw1': Body(SHAPES['claw']),
+            'lrclaw0': Body(SHAPES['claw']),
+            'lrclaw1': Body(SHAPES['claw']),
+            # right claw
+            'rlclaw0': Body(SHAPES['claw']),
+            'rlclaw1': Body(SHAPES['claw']),
+            'rrclaw0': Body(SHAPES['claw']),
+            'rrclaw1': Body(SHAPES['claw']),
+            },
+        joints = {
+            'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
+            'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+            'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
+            'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+            'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 2.0]),
+            'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
+            'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-2.0, 1.0]),
+            'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-2.0, 1.0]),
+            # left claw
+            'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+            'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            'lrclaw0': Joint('lelbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+            'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            # right claw
+            'rlclaw0': Joint('relbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+            'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            'rrclaw0': Joint('relbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+            'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            },)
 
 class Object(NamedTuple):
     name: str
@@ -103,7 +105,6 @@ MOTORS_TORQUE = defaultdict(lambda: 160)
 SPEEDS = defaultdict(lambda: 4)
 SPEEDS['knee'] = 6
 
-
 class B2D(IndexEnv):
     SCALE = SCALE
     metadata = {
@@ -116,6 +117,8 @@ class B2D(IndexEnv):
         self.cfg = cfg
         self.VIEWPORT_W = cfg.env_size
         self.VIEWPORT_H = cfg.env_size
+        self.scale = (640/cfg.env_size)
+
         #self.world = Box2D.b2World(gravity=(0, 0))
         self.world = Box2D.b2World(gravity=(0, -9.81))
         self.seed()
@@ -131,7 +134,8 @@ class B2D(IndexEnv):
             self.obs_info[f'{obj.name}:y:p'] = A[0, self.H]
             self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
             self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
-        for agent in self.w.agents:
+        for i in range(len(self.w.agents)):
+            self.w.agents[i] = agent = make_crab(self.w.agents[i].name, SCALE*self.scale)
             self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.W]
             self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.H]
             self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
@@ -160,8 +164,6 @@ class B2D(IndexEnv):
         if obs is not None: obs = utils.DWrap(obs, self.obs_info)
         self.dynbodies = {}
         self.joints = {}
-        color = (0.9,0.4,0.4), (0.5,0.3,0.5)
-        #color = (0.5,0.4,0.9), (0.3,0.3,0.5)
         # bodies
         def sample(namex, lr=-1.0, ur=None):
             if ur is None:
@@ -171,18 +173,21 @@ class B2D(IndexEnv):
             else:
                 return obs[f'{namex}']
 
-        box_size = self.VIEWPORT_W / (B2D.SCALE*14.2222)
+        #box_size = self.VIEWPORT_W / (B2D.SCALE*14.2222)
+        box_size = self.VIEWPORT_W / (B2D.SCALE*60.00)
         for obj in self.w.objects:
+            color = (0.5,0.4,0.9), (0.3,0.3,0.5)
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
-            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1)
+            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=0.1, friction=1.0)
             body = self.world.CreateDynamicBody(
-                position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.95)),
+                position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80)),
                 angle=utils.get_angle(sample(obj.name+':cos'), sample(obj.name+':sin')),
                 fixtures=fixture)
             body.color1, body.color2 = color
             self.dynbodies[obj.name] = body
 
         for agent in self.w.agents:
+            color = (0.9,0.4,0.4), (0.5,0.3,0.5)
             # TODO: maybe create root first, and then add each of the body-joint pairs onto that.
             # this way we know where they should go. but first, let's get food.
             # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
@@ -304,21 +309,21 @@ class B2D(IndexEnv):
                     path = [trans*v for v in f.shape.vertices]
                     self.viewer.draw_polygon(path, color=body.color1)
                     path.append(path[0])
-                    self.viewer.draw_polyline(path, color=(0.1, 0.1, 0.1), linewidth=self.VIEWPORT_H/200)
+                    self.viewer.draw_polyline(path, color=body.color2, linewidth=self.VIEWPORT_H/100)
 
             if 'root' in name:
                 rot = utils.make_rot(body.angle)
-                X = 0.1
-                t = rendering.Transform(translation=body.position+rot.dot(A[2*X, +0.1]))
-                self.viewer.draw_circle(X, 20, color=(0.1, 0.1, 0.1)).add_attr(t)
+                X = 0.1 / self.scale
+                X2 = 0.2 / self.scale
+                t = rendering.Transform(translation=body.position+rot.dot(A[X2, +X]))
+                self.viewer.draw_circle(X, 20, color=body.color2).add_attr(t)
                 #self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
-                t = rendering.Transform(translation=body.position+rot.dot(A[-2*X, +0.1]))
-                self.viewer.draw_circle(X, 20, color=(0.1, 0.1, 0.1)).add_attr(t)
+                t = rendering.Transform(translation=body.position+rot.dot(A[-X2, +X]))
+                self.viewer.draw_circle(X, 20, color=body.color2).add_attr(t)
                # self.viewer.draw_circle(X, 20, color=(0.8, 0.8, 0.8), filled=False, linewidth=5).add_attr(t)
-                t = rendering.Transform(translation=body.position+rot.dot(A[0.0, -X*2]), rotation=body.angle)
-                Y = 0.2
-                self.viewer.draw_line((0, 0), (Y, Y/2)).add_attr(t)
-                self.viewer.draw_line((0, 0), (-Y, Y/2)).add_attr(t)
+                t = rendering.Transform(translation=body.position+rot.dot(A[0.0, -X2]), rotation=body.angle)
+                self.viewer.draw_line((0, 0), (X2, X), color=body.color2).add_attr(t)
+                self.viewer.draw_line((0, 0), (-X2, X), color=body.color2).add_attr(t)
 
 
         return self.viewer.render(return_rgb_array = mode=='rgb_array')

@@ -17,8 +17,9 @@ A = utils.A
 
 class Box(B2D):
     def __init__(self, cfg):
-        w = World(agents=[Agent('crab0')], objects=[])
-        #w = World(agents=[Agent('crab0')], objects=[Object('object0')])
+        #w = World(agents=[Agent('crab0')], objects=[])
+        #w = World(agents=[Agent('crab0'), Agent('crab1'), Agent('crab2')], objects=[Object('object0'), Object('object1'), Object('object2')])
+        w = World(agents=[Agent('crab0')], objects=[Object('object0'), Object('object1'), Object('object2')])
         super().__init__(w, cfg)
 
 if __name__ == '__main__':
@@ -38,7 +39,7 @@ if __name__ == '__main__':
     traj = []
     past_keys = {}
     delay = 0.1*1/4
-    dor = True
+    dor = False
 
     while True:
         action = env.action_space.sample()
