@@ -1,5 +1,5 @@
 import torch
-from algo.base import Trainer
+from algo.trainer import Trainer
 
 class SAC(Trainer):
     def __init__(self, cfg, make_env):

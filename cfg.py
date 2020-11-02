@@ -30,7 +30,7 @@ def env_fn(cfg, seed=None):
         env = Fishes(cfg)
     elif cfg.env == 'box':
         from envs.box import Box
-        env = Box()
+        env = Box(cfg)
     elif cfg.env == 'llc':
         import gym
         env = gym.make('LunarLanderContinuous-v2')
@@ -62,29 +62,38 @@ def define_cfg():
     cfg.dyn_lr = 3e-4
     cfg.net = 'mlp' # 'mlp', 'split'
     cfg.bs = 50
+    cfg.horizon = 15
+
+    cfg.num_ens = 5
+    cfg.expl = 'additive_gaussian'
+    cfg.expl_amount = 0.3
+    cfg.expl_decay = 0.0
+    cfg.expl_min = 0.0
+    cfg.eval_noise = 0.0
 
     # ARCHITECTURE
     cfg.split_share = 0  # whether or not to share weights in the split network
 
     # 
-    cfg.ep_len = 50
+    cfg.ep_len = 150
     cfg.num_eps = 100
 
-    cfg.mode = 'collect'
+    cfg.mode = 'dream'
 
     cfg.stoch = 30
     cfg.deter = 200
     cfg.hidden = 200
     cfg.kl_scale = 1.0
-    cfg.free_nats = 0.3
     cfg.log_n = 1000
     cfg.env_size = 64
 
 
-    cfg.use_image = 1
+    cfg.free_nats = 0.3
+    cfg.use_image = 0
 
     # ----- RL -----
     cfg.gamma = 0.99
+    cfg.lam = 0.95
     # SAC
     cfg.learned_alpha = 1
     cfg.alpha = 0.1 # for SAC w/o learned alpha

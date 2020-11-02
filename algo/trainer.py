@@ -1,4 +1,4 @@
-
+import yaml
 import uuid
 from datetime import datetime
 import PIL
@@ -78,8 +78,9 @@ class Trainer:
         #    self.alpha_optimizer = Adam([self.ac.log_alpha], lr=self.cfg.alpha_lr)
 
         #self.test_agent()
-
         self.data_iter = None
+        with open(self.logpath/'flags.yaml', 'w') as f:
+            yaml.dump(self.cfg.__dict__, f)
 
     @property
     def can_sample(self):

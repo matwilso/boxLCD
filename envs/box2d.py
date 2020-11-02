@@ -116,7 +116,8 @@ class B2D(IndexEnv):
         EzPickle.__init__(self)
         self.w = w
         self.cfg = cfg
-        self.VIEWPORT_W = 2*cfg.env_size
+        self.VIEWPORT_W = cfg.env_size
+        #self.VIEWPORT_W = 2*cfg.env_size
         self.VIEWPORT_H = cfg.env_size
         self.scale = 320/self.VIEWPORT_H
 
@@ -142,7 +143,12 @@ class B2D(IndexEnv):
             self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
             self.obs_info[f'{agent.name}:root:sin'] = A[-1, 1]
             for joint_name, joint in agent.joints.items():
-                self.obs_info[f'{agent.name}:{joint_name}:theta'] = A[joint.limits]
+                #self.obs_info[f'{agent.name}:{joint_name}:theta'] = A[joint.limits]
+                self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[-0.5, 0.5]
+                self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[-0.5, 0.5]
+                self.obs_info[f'{agent.name}:{joint_name}:cos'] = A[-1, 1]
+                self.obs_info[f'{agent.name}:{joint_name}:sin'] = A[-1, 1]
+                # act
                 self.act_info[f'{agent.name}:{joint_name}:force'] = A[-1,1]
         if len(self.w.agents) == 0: # because having a zero shaped array makes things break
             self.act_info['dummy'] = A[-1, 1] 
@@ -150,7 +156,7 @@ class B2D(IndexEnv):
 
     @property
     def W(self):
-        return 20
+        return 10
     @property
     def H(self):
         return 10
@@ -161,18 +167,18 @@ class B2D(IndexEnv):
         self.statics = {}
         self.dynbodies = {}
 
-    def _reset_bodies(self, obs=None):
-        if obs is not None: obs = utils.DWrap(obs, self.obs_info)
+    def _reset_bodies(self, inject_obs=None):
+        if inject_obs is not None: inject_obs = utils.DWrap(inject_obs, self.obs_info)
         self.dynbodies = {}
         self.joints = {}
         # bodies
         def sample(namex, lr=-1.0, ur=None):
             if ur is None:
                 ur = -lr
-            if obs is None:
+            if inject_obs is None:
                 return utils.mapto(self.np_random.uniform(lr,ur), self.obs_info[f'{namex}'])
             else:
-                return obs[f'{namex}']
+                return inject_obs[f'{namex}']
 
         box_size = self.H / 30.00
         for obj in self.w.objects:
@@ -181,7 +187,7 @@ class B2D(IndexEnv):
             fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1.0, friction=1.0)
             body = self.world.CreateDynamicBody(
                 position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80)),
-                angle=utils.get_angle(sample(obj.name+':cos'), sample(obj.name+':sin')),
+                angle=np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos')),
                 fixtures=fixture)
             body.color1, body.color2 = color
             self.dynbodies[obj.name] = body
@@ -194,9 +200,10 @@ class B2D(IndexEnv):
             fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-            root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
-            root_angle = utils.get_angle(sample(name+':cos'), sample(name+':sin'))
-            root_angle = 0.0
+            root_xy = sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)
+            #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
+            root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
+            if inject_obs is None: root_angle = 0
             dyn = self.world.CreateDynamicBody(
                 position=root_xy,
                 angle=root_angle,
@@ -206,6 +213,8 @@ class B2D(IndexEnv):
 
             parent_angles = {}
             parent_angles[name] = root_angle
+            inject_angles = {}
+            inject_angles[name] = root_angle
 
             for bj_name in agent.joints:
                 name = agent.name + ':' + bj_name
@@ -245,7 +254,11 @@ class B2D(IndexEnv):
                     lowerAngle=joint.limits[0],
                     upperAngle=joint.limits[1],
                     )
-                self.joints[name] = self.world.CreateJoint(rjd)
+                self.joints[name] = jnt = self.world.CreateJoint(rjd)
+                #self.joints[name].bodyB.transform.angle = sample(name+':theta')
+                if inject_obs is not None:
+                    jnt.bodyB.transform.position = root_xy + (inject_obs[name+':x:p'], inject_obs[name+':y:p'])
+                    jnt.bodyB.transform.angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
 
     def reset(self):
         self.ep_t = 0
@@ -264,9 +277,19 @@ class B2D(IndexEnv):
         for obj in self.w.objects:
             body = self.dynbodies[obj.name]
             obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
-            obs[f'{obj.name}:sin'] = np.sin(body.angle)
             obs[f'{obj.name}:cos'] = np.cos(body.angle)
-            #obs[f'object{i}:x:v'], obs[f'object{i}:y:v'] = body.linearVelocity
+            obs[f'{obj.name}:sin'] = np.sin(body.angle)
+        for agent in self.w.agents:
+            body = self.dynbodies[agent.name+':root']
+            obs[f'{agent.name}:root:x:p'], obs[f'{agent.name}:root:y:p'] = root_xy = body.position
+            obs[f'{agent.name}:root:cos'] = np.cos(body.angle)
+            obs[f'{agent.name}:root:sin'] = np.sin(body.angle)
+            for joint_name, joint in agent.joints.items():
+                jnt = self.joints[f'{agent.name}:{joint_name}']
+                obs[f'{agent.name}:{joint_name}:x:p'], obs[f'{agent.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position - root_xy
+                obs[f'{agent.name}:{joint_name}:cos'] = np.cos(jnt.bodyB.transform.angle)
+                obs[f'{agent.name}:{joint_name}:sin'] = np.sin(jnt.bodyB.transform.angle)
+                #obs[f'{agent.name}:{joint_name}:theta'] = jnt.angle
         return obs
 
     def step(self, vec_action):
@@ -274,6 +297,8 @@ class B2D(IndexEnv):
         action = self.get_act_dict(vec_action)
         # TORQUE CONTROL
         for name in action:
+            if name == 'dummy':
+                continue
             key = name.split(':force')[0]
             torque = MOTORS_TORQUE['default']
             speed = SPEEDS['default']
@@ -288,7 +313,7 @@ class B2D(IndexEnv):
         return obs.arr, reward, done, {}
 
     def visualize_obs(self, obs):
-        self._reset_bodies(obs=obs)
+        self._reset_bodies(inject_obs=obs)
         return self.render()
 
     def render(self, mode='rgb_array'):

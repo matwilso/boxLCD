@@ -18,7 +18,24 @@ def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + 
 def rmapto(a, lowhigh): return ( (a - lowhigh[0]) / (lowhigh[1]-lowhigh[0]) * (2)) + -1
 def umapto(a, from_lh, to_lh): return ( (a - from_lh[0]) / (from_lh[1]-from_lh[0]) * (to_lh[0]+to_lh[1])) + to_lh[0]
 
-
+def lambda_return(reward, value, pcont, bootstrap, lambda_, axis):
+    # Setting lambda=1 gives a discounted Monte Carlo return.
+    # Setting lambda=0 gives a fixed 1-step return.
+    assert reward.ndim == value.ndim, (reward.shape, value.shape)
+    dims = list(range(reward.ndim))
+    dims = [axis] + dims[1:axis] + [0] + dims[axis + 1:]
+    if axis != 0:
+        reward = torch.permute(reward, dims)
+        value = torch.permute(value, dims)
+        pcont = torch.permute(pcont, dims)
+    if bootstrap is None:
+        bootstrap = torch.zeros_like(value[-1])
+    next_values = torch.cat([value[1:], bootstrap[None]], 0)
+    inputs = reward + pcont * next_values * (1 - lambda_)
+    returns = static_scan(lambda agg, cur: cur[0] + cur[1] * lambda_ * agg, (inputs, pcont), bootstrap, reverse=True)
+    if axis != 0:
+        returns = torch.permute(returns, dims)
+    return returns
 
 
 def combined_shape(length, shape=None):

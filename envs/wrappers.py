@@ -7,12 +7,12 @@ import traceback
 import gym
 import numpy as np
 from PIL import Image
-from envs.base import BaseIndexEnv
 from gym.utils import seeding, EzPickle
 
 class NormalEnv(gym.Env, EzPickle):
     def __init__(self, env):
         self.env = env
+
     @property
     def observation_space(self):
         spaces = {}

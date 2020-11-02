@@ -5,6 +5,13 @@ import torch.nn.functional as F
 import torch
 from tensorflow import nest
 import utils
+from jax.tree_util import tree_multimap
+
+class EnsembleDyn(nn.Module):
+    def __init__(self, act_n, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.models = nn.ModuleList([RSSM(act_n, cfg) for _ in range(cfg.num_ens)])
 
 class RSSM(nn.Module):
     def __init__(self, act_n, cfg):
@@ -133,6 +140,14 @@ class MLP(nn.Module):
             if i != (len(self.sizes)-2): x = F.relu(x)
         return x
 
+class LatentFwds(nn.Module):
+    def __init__(self, act_n, cfg):
+        super().__init__()
+        self.fwds = nn.ModuleList([MLP([act_n+cfg.stoch+cfg.deter, 128, 128, cfg.stoch+cfg.deter], cfg) for _ in range(cfg.num_ens)])
+
+    def forward(self, obs):
+        return torch.stack([f(obs) for f in self.fwds])
+
 class DenseEncoder(nn.Module):
     def __init__(self, obs_n, cfg):
         super().__init__()
@@ -143,9 +158,9 @@ class DenseEncoder(nn.Module):
         return x
 
 class DenseDecoder(nn.Module):
-    def __init__(self, obs_n, cfg):
+    def __init__(self, out_n, cfg):
         super().__init__()
-        self.mlp = MLP([cfg.stoch+cfg.deter, 128, obs_n])
+        self.mlp = MLP([cfg.stoch+cfg.deter, 128, out_n])
 
     def forward(self, features):
         x = self.mlp.forward(features)
@@ -156,36 +171,23 @@ class DenseDecoder(nn.Module):
         #    return tfd.Independent(tfd.Bernoulli(x), len(self._shape))
         #raise NotImplementedError(self._dist)
 
+MIN_STD = 1e-4
+INIT_STD = 5
+MEAN_SCALE = 5
+class ActionDecoder(nn.Module):
+    def __init__(self, act_n, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.raw_init_std = torch.log(torch.exp(torch.tensor(INIT_STD).float()) - 1).to(cfg.device)
+        self.mlp = MLP([cfg.stoch+cfg.deter, 128, act_n*2])
+        self.act_n = act_n
 
-#class ActionDecoder(nn.Module):
-#    def __init__(self, size, layers, units, dist='tanh_normal', act=tf.nn.elu, min_std=1e-4, init_std=5, mean_scale=5):
-#        self._size = size
-#        self._layers = layers
-#        self._units = units
-#        self._dist = dist
-#        self._act = act
-#        self._min_std = min_std
-#        self._init_std = init_std
-#        self._mean_scale = mean_scale
-#
-#    def __call__(self, features):
-#        raw_init_std = np.log(np.exp(self._init_std) - 1)
-#        x = features
-#        for index in range(self._layers):
-#            x = self.get(f'h{index}', tfkl.Dense, self._units, self._act)(x)
-#        if self._dist == 'tanh_normal':
-#            # https://www.desmos.com/calculator/rcmcf5jwe7
-#            x = self.get(f'hout', tfkl.Dense, 2 * self._size)(x)
-#            mean, std = tf.split(x, 2, -1)
-#            mean = self._mean_scale * tf.tanh(mean / self._mean_scale)
-#            std = tf.nn.softplus(std + raw_init_std) + self._min_std
-#            dist = tfd.Normal(mean, std)
-#            dist = tfd.TransformedDistribution(dist, tools.TanhBijector())
-#            dist = tfd.Independent(dist, 1)
-#            dist = tools.SampleDist(dist)
-#        elif self._dist == 'onehot':
-#            x = self.get(f'hout', tfkl.Dense, self._size)(x)
-#            dist = tools.OneHotDist(x)
-#        else:
-#            raise NotImplementedError(dist)
-#        return dist
+    def forward(self, features):
+        x = features
+        x = self.mlp(x)
+        mean, std = torch.split(x, self.act_n, -1)
+        mean = MEAN_SCALE * torch.tanh(mean / MEAN_SCALE)
+        std = F.softplus(std + self.raw_init_std) + MIN_STD
+        dist = distributions.Normal(mean, std)
+        dist = distributions.Independent(dist, 1)
+        return dist

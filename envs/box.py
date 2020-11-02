@@ -20,7 +20,9 @@ class Box(B2D):
     def __init__(self, cfg):
         #w = World(agents=[Agent('crab0')], objects=[])
         #w = World(agents=[Agent('crab0'), Agent('crab1'), Agent('crab2')], objects=[Object('object0'), Object('object1'), Object('object2')])
-        w = World(agents=[Agent('crab0')], objects=[Object('object0'), Object('object1'), Object('object2')])
+        #w = World(agents=[Agent('crab0')], objects=[Object('object0'), Object('object1'), Object('object2')])
+        #w = World(agents=[], objects=[Object('object0')])
+        w = World(agents=[Agent('crab0')], objects=[Object('object0')])
         super().__init__(w, cfg)
 
 if __name__ == '__main__':
@@ -42,7 +44,7 @@ if __name__ == '__main__':
         print(x,y,dx,dy, buttons, modifiers)
         cp = env.SCALE*env.dynbodies['crab0:root'].position
         if np.linalg.norm(A[cp] - A[x,y]) < 100:
-            env.dynbodies['crab0:root'].position += (dx,dy)
+            env.dynbodies['crab0:root'].position += (dx/env.SCALE,dy/env.SCALE)
 
     paused = False
     traj = []
@@ -98,7 +100,8 @@ if __name__ == '__main__':
                 obs = env.reset()
             # print only the obs data that comes from object0
             #print(rew, utils.filter(env.get_obs_dict(obs, map=False), 'object0'))
-        obs = env.render()
+            print(obs)
+        img = env.render()
         if plotting:
-            plt.imshow(obs); plt.show()
+            plt.imshow(img); plt.show()
         past_keys = {key: val for key, val in curr_keys.items()}
