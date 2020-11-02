@@ -62,6 +62,7 @@ def define_cfg():
     cfg.dyn_lr = 3e-4
     cfg.net = 'mlp' # 'mlp', 'split'
     cfg.bs = 50
+    cfg.bl = 50
     cfg.horizon = 15
 
     cfg.num_ens = 5

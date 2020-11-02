@@ -43,7 +43,6 @@ def write_barrel(filename, barrel_dict, cfg):
             writer.write(example.SerializeToString())
     writer.close()
 
-
 @tf.function
 def vgather(args):
     """vmappable gather"""
@@ -68,9 +67,9 @@ def bptt_n(batch, cfg):
     return batch
 
 def parse_single(example_proto, state_shape, image_shape, act_n, cfg):
-    size = cfg.ep_len
+    size = cfg.bl
     shapes = {
-        'state': [size+1, *state_shape],
+        'state': [size, *state_shape],
         'act': [size, act_n],
         'rew': [size],
     }
@@ -83,10 +82,10 @@ def parse_single(example_proto, state_shape, image_shape, act_n, cfg):
     return out
 
 def parse(example_proto, state_shape, image_shape, act_n, cfg):
-    size = cfg.ep_len
+    size = cfg.bl
     bs = cfg.bs
     shapes = {
-        'state': [bs, size+1, *state_shape],
+        'state': [bs, size, *state_shape],
         'act': [bs, size, act_n],
         'rew': [bs, size],
     }
@@ -100,9 +99,9 @@ def parse(example_proto, state_shape, image_shape, act_n, cfg):
 
 def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg):
     setup = time.time()
-    num_per_barrel = cfg.ep_len * cfg.num_eps
-    num_files = cfg.replay_size // num_per_barrel
-    files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))[:num_files]
+    num_per_barrel = cfg.bl * cfg.num_eps
+    #num_files = cfg.replay_size // num_per_barrel
+    files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))#[:num_files]
     onp.random.shuffle(files)
     dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=32)
     dataset = dataset.repeat()

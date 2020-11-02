@@ -230,11 +230,9 @@ class Dyn(Trainer, nn.Module):
             batch = nest.map_structure(lambda x: torch.tensor(x).to(self.cfg.device), batch)
             batch['image'] = (batch['image'].permute([0, 1, -1, 2, 3]) / 255.0) - 0.5
             #batch = nest.map_structure(lambda x: x.flatten(0,1), batch)
-            batch['image'] = batch['image'][:,:-1]
         else:
             if 'image' in batch: batch.pop('image')
             batch = nest.map_structure(lambda x: torch.tensor(x).to(self.cfg.device), batch)
-        batch['state'] = batch['state'][:,:-1]
         self.logger['dt/batch'] += [time.time() - bt]
         return batch
 
@@ -266,9 +264,9 @@ class Dyn(Trainer, nn.Module):
         elif self.cfg.mode == 'dream':
             # fill up with initial random data
             self.collect_episode(self.cfg.ep_len, 50)
-            self.refresh_dataset()
-            batch = self.get_batch()
-            self.update(batch, log_extra=0)
+            #self.refresh_dataset()
+            #batch = self.get_batch()
+            #self.update(batch, log_extra=0)
             #import ipdb; ipdb.set_trace()
             #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)
             #print(num_files)

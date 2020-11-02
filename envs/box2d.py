@@ -257,7 +257,7 @@ class B2D(IndexEnv):
                 self.joints[name] = jnt = self.world.CreateJoint(rjd)
                 #self.joints[name].bodyB.transform.angle = sample(name+':theta')
                 if inject_obs is not None:
-                    jnt.bodyB.transform.position = root_xy + (inject_obs[name+':x:p'], inject_obs[name+':y:p'])
+                    jnt.bodyB.transform.position = A[root_xy] + A[(inject_obs[name+':x:p'], inject_obs[name+':y:p'])]
                     jnt.bodyB.transform.angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
 
     def reset(self):
@@ -312,11 +312,11 @@ class B2D(IndexEnv):
         done = self.ep_t >= self.cfg.ep_len
         return obs.arr, reward, done, {}
 
-    def visualize_obs(self, obs):
+    def visualize_obs(self, obs, text=''):
         self._reset_bodies(inject_obs=obs)
-        return self.render()
+        return self.render(text=text)
 
-    def render(self, mode='rgb_array'):
+    def render(self, mode='rgb_array', text=''):
         from envs import rendering
         if self.viewer is None:
             self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H)
@@ -353,7 +353,7 @@ class B2D(IndexEnv):
                 self.viewer.draw_line((0, 0), (X2, X), color=body.color2).add_attr(t)
                 self.viewer.draw_line((0, 0), (-X2, X), color=body.color2).add_attr(t)
 
-        return self.viewer.render(return_rgb_array = mode=='rgb_array', text='Hello, world', size=4//self.scale)
+        return self.viewer.render(return_rgb_array = mode=='rgb_array', text=text, size=4//self.scale)
 
     def close(self):
         if self.viewer is not None:

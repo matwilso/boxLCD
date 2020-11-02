@@ -23,12 +23,14 @@ from nets.sacnets import ActorCritic
 from functools import partial
 from tensorflow import nest
 from data import records
+nms = nest.map_structure
 
 # TODO: add support for saving weights to file and loading
 
 class Trainer:
     def __init__(self, cfg, make_env):
         self.cfg = cfg
+        assert cfg.ep_len % cfg.bl == 0 
         seed = self.cfg.seed
         # Set up logger and save configuration
         self.logger = defaultdict(lambda: [])
@@ -95,7 +97,7 @@ class Trainer:
         if self.data_iter is None or refresh_dataset:
             self.refresh_dataset()
         batch = next(self.data_iter)
-        batch = nest.map_structure(lambda x: jnp.array(x), batch)
+        batch = nms(lambda x: jnp.array(x), batch)
         return batch
 
     def test_agent(self, video=False):
@@ -157,5 +159,9 @@ class Trainer:
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
-        filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.exp_name}-{num_ep}-{eplen}.tfrecord'
-        records.write_barrel(filename, tot, self.cfg)
+        filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.exp_name}-{num_ep}-{eplen}'
+        tot['state'] = tot['state'][:,:-1]
+        #tot['image'] = tot['image'][:,:-1]
+        tot = nms(lambda x: x.reshape([50, 3, 50, -1]), tot)
+        for i in range(tot['state'].shape[1]):
+            records.write_barrel(filename.with_suffix(f'.{i}.tfrecord'), nms(lambda x: x[:,i], tot), self.cfg)

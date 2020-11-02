@@ -26,6 +26,10 @@ class Viz(Trainer):
         self.tenv.reset()
         self.tenv.render()
 
+
+        # TODO: add an option here where we can view a contiguous rollout. like stitch together some tfrecords by loading them. like manually maybe
+        # may need some dataset mods.
+
         KEY = pyglet.window.key
         keys = KEY.KeyStateHandler()
         self.tenv.viewer.window.push_handlers(keys)
@@ -36,7 +40,7 @@ class Viz(Trainer):
         l = False
         past_keys = {}
 
-        ep_len = self.cfg.ep_len
+        bl = self.cfg.bl
 
         batch_idx = 0
         time_idx = 0
@@ -70,12 +74,12 @@ class Viz(Trainer):
 
             if not paused:
                 time_idx = time_idx + 1
-            if time_idx > (ep_len-1) and k:
+            if time_idx > (bl-1) and k:
                 batch_idx += 1
-            time_idx = time_idx % ep_len
+            time_idx = time_idx % bl
 
 
-            if batch_idx > (ep_len-1):
+            if batch_idx > (bl-1):
                 batch = next(self.data_iter)
                 batch_idx = 0
                 time_idx = 0
@@ -83,5 +87,5 @@ class Viz(Trainer):
             state = np.array(batch['state'][batch_idx, time_idx])
             obs = utils.DWrap(state, self.tenv.env.obs_info)
             #obs['object0:x:p', 'object0:y:p'] *= 10
-            self.tenv.env.visualize_obs(obs.arr)
+            self.tenv.env.visualize_obs(obs.arr, f'b {batch_idx} t{time_idx}')
             past_keys = {key: val for key, val in curr_keys.items()}
