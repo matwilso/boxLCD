@@ -52,6 +52,8 @@ class Dyn(Trainer, nn.Module):
         #params = nest.map_structure(lambda x: x[None].repeat(3, *([1]*len(x.shape))), params)
         #self.scaler = amp.GradScaler()
         #self.encoder._parameters = params
+        if self.cfg.obs_stats:
+            self.obs_rms = RunningMeanStd(shape=self.state_shape[0])
 
     def image_summaries(self, data, embed, obs_pred):
         truth = data['image'][:5] + 0.5
@@ -69,9 +71,12 @@ class Dyn(Trainer, nn.Module):
         self.writer.add_video('agent/openl', openl, self.t, fps=20)
 
     def state_summaries(self, data, embed, obs_pred):
+        def get_state(x):
+            x = np.array(x.detach().cpu())
+            return x if not self.cfg.obs_stats else (x*(10.0*self.obs_rms.var**0.5) + self.obs_rms.mean)
         truth = np.zeros([50, 3, 64, 64])
         for i in range(50):
-            truth[i] = self.tenv.env.visualize_obs(np.array(data['state'][0][i].detach().cpu())).transpose(2,0,1) / 255.0
+            truth[i] = self.tenv.env.visualize_obs(get_state(data['state'][0][i])).transpose(2,0,1) / 255.0
 
         recon = obs_pred.mean
         recon = recon.reshape((self.cfg.bs, 50)+recon.shape[1:])[0]
@@ -83,9 +88,9 @@ class Dyn(Trainer, nn.Module):
 
         model = np.zeros([50, 3, 64, 64])
         for i in range(5):
-            model[i] = self.tenv.env.visualize_obs(np.array(recon[i].detach().cpu())).transpose(2,0,1) / 255.0
+            model[i] = self.tenv.env.visualize_obs(get_state(recon[i])).transpose(2,0,1) / 255.0
         for i in range(5, 50):
-            model[i] = self.tenv.env.visualize_obs(np.array(openl[0,i-5].detach().cpu())).transpose(2,0,1) / 255.0
+            model[i] = self.tenv.env.visualize_obs(get_state(openl[0,i-5])).transpose(2,0,1) / 255.0
 
         error = (model - truth + 1) / 2
         openl = np.concatenate([truth, model, error], 3)[None]
@@ -233,7 +238,11 @@ class Dyn(Trainer, nn.Module):
             #batch = nest.map_structure(lambda x: x.flatten(0,1), batch)
         else:
             if 'image' in batch: batch.pop('image')
-            batch = nest.map_structure(lambda x: torch.tensor(x).to(self.cfg.device), batch)
+            # TODO: make this an EMA with var
+            if self.cfg.obs_stats:
+                self.obs_rms.update(batch['state'].reshape([self.cfg.bs*self.cfg.bl, -1]))
+            batch['state'] = (batch['state'] - self.obs_rms.mean) / (10*self.obs_rms.var**0.5)
+            batch = nest.map_structure(lambda x: torch.tensor(x).float().to(self.cfg.device), batch)
         self.logger['dt/batch'] += [time.time() - bt]
         return batch
 

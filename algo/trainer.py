@@ -24,6 +24,7 @@ from functools import partial
 from tensorflow import nest
 from data import records
 nms = nest.map_structure
+from algo.stats import RunningMeanStd
 
 # TODO: add support for saving weights to file and loading
 

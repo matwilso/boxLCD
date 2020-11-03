@@ -89,8 +89,9 @@ def define_cfg():
     cfg.log_n = 1000
     cfg.env_size = 64
 
+    cfg.obs_stats = 0
 
-    cfg.free_nats = 0.3
+    cfg.free_nats = 0.9
     cfg.use_image = 0
 
     # ----- RL -----

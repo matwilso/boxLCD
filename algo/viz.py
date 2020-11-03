@@ -96,6 +96,7 @@ class Viz(Trainer):
 
             state = np.array(batch['state'][batch_idx, time_idx])
             obs = utils.DWrap(state, self.tenv.env.obs_info)
+            import ipdb; ipdb.set_trace()
             #obs['object0:x:p', 'object0:y:p'] *= 10
             self.tenv.env.visualize_obs(obs.arr, f'b {batch_idx} t{time_idx}')
             past_keys = {key: val for key, val in curr_keys.items()}

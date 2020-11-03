@@ -93,14 +93,13 @@ if __name__ == '__main__':
             exit()
 
         if not paused or (curr_keys[KEY.NUM_6] and not past_keys[KEY.NUM_6]):
-            
             obs, rew, done, info = env.step(env.action_space.sample())
             #obs, rew, done, info = env.step(env.get_act_vec(act_dict))
             if done and dor:
                 obs = env.reset()
             # print only the obs data that comes from object0
             #print(rew, utils.filter(env.get_obs_dict(obs, map=False), 'object0'))
-            print(obs)
+            print(obs.max(), env.obs_keys[obs.argmax()])
         img = env.render()
         if plotting:
             plt.imshow(img); plt.show()

@@ -144,8 +144,10 @@ class B2D(IndexEnv):
             self.obs_info[f'{agent.name}:root:sin'] = A[-1, 1]
             for joint_name, joint in agent.joints.items():
                 #self.obs_info[f'{agent.name}:{joint_name}:theta'] = A[joint.limits]
-                self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[-0.5, 0.5]
-                self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[-0.5, 0.5]
+                #self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[-0.5, 0.5]
+                #self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[-0.5, 0.5]
+                self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[-2.0, 2.0]
+                self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[-2.0, 2.0]
                 self.obs_info[f'{agent.name}:{joint_name}:cos'] = A[-1, 1]
                 self.obs_info[f'{agent.name}:{joint_name}:sin'] = A[-1, 1]
                 # act
@@ -168,7 +170,8 @@ class B2D(IndexEnv):
         self.dynbodies = {}
 
     def _reset_bodies(self, inject_obs=None):
-        if inject_obs is not None: inject_obs = utils.DWrap(inject_obs, self.obs_info)
+        if inject_obs is not None:
+            inject_obs = utils.DWrap(inject_obs.astype(np.float), self.obs_info, map=not self.cfg.obs_stats)
         self.dynbodies = {}
         self.joints = {}
         # bodies
@@ -178,7 +181,7 @@ class B2D(IndexEnv):
             if inject_obs is None:
                 return utils.mapto(self.np_random.uniform(lr,ur), self.obs_info[f'{namex}'])
             else:
-                return inject_obs[f'{namex}']
+                return inject_obs[f'{namex}'].astype(np.float)
 
         box_size = self.H / 30.00
         for obj in self.w.objects:
@@ -186,7 +189,7 @@ class B2D(IndexEnv):
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
             fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1.0, friction=1.0)
             body = self.world.CreateDynamicBody(
-                position=(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80)),
+                position=A[(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80))],
                 angle=np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos')),
                 fixtures=fixture)
             body.color1, body.color2 = color
@@ -200,7 +203,7 @@ class B2D(IndexEnv):
             fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-            root_xy = sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)
+            root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
             root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
             if inject_obs is None: root_angle = 0
@@ -273,7 +276,7 @@ class B2D(IndexEnv):
         return self._get_obs().arr
 
     def _get_obs(self):
-        obs = utils.DWrap(np.zeros(self.obs_size), self.obs_info, map=True)
+        obs = utils.DWrap(np.zeros(self.obs_size), self.obs_info, map=not self.cfg.obs_stats)
         for obj in self.w.objects:
             body = self.dynbodies[obj.name]
             obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
