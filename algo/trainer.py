@@ -130,23 +130,25 @@ class Trainer:
     def get_action(self, o, deterministic=False):
         return self.ac.act(torch.as_tensor(o, dtype=torch.float32).to(self.cfg.device), deterministic)
 
-    def collect_episode(self, eplen, num_ep):
+    def collect_episode(self, eplen, num_ep, mode='random'):
         num = num_ep // self.cfg.num_envs
         tot = defaultdict(lambda: [])
         for n in range(num):
-            pack = defaultdict(lambda: [])
             o = self.venv.reset()
-            pack['state'] += [o['state']]
-            if self.cfg.use_image:
-                pack['image'] += [o['image']/255.0]
+            agent_state = None
+            pack = defaultdict(lambda: [])
             for t in range(eplen):
-                a = self.venv.action_space.sample()
+                if mode == 'random':
+                    a = self.venv.action_space.sample()
+                else:
+                    a, agent_state = self.policy(o, agent_state, training=True)
+                    a = np.array(a.detach().cpu())
                 o2, r, d, _ = self.venv.step(a)
+                pack['state'] += [o['state']]
+                if self.cfg.use_image:
+                    pack['image'] += [o['image']/255.0]
                 pack['act'] += [a]
                 pack['rew'] += [r]
-                pack['state'] += [o2['state']]
-                if self.cfg.use_image:
-                    pack['image'] += [o2['image']/255.0]
                 o = o2
             for key in pack:
                 tot[key] += [pack[key]]
@@ -160,8 +162,6 @@ class Trainer:
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
         filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.exp_name}-{num_ep}-{eplen}'
-        tot['state'] = tot['state'][:,:-1]
-        #tot['image'] = tot['image'][:,:-1]
-        tot = nms(lambda x: x.reshape([50, 3, 50, -1]), tot)
+        tot = nms(lambda x: x.reshape([num_ep, x.shape[1]//self.cfg.bl, self.cfg.bl, -1]), tot)
         for i in range(tot['state'].shape[1]):
             records.write_barrel(filename.with_suffix(f'.{i}.tfrecord'), nms(lambda x: x[:,i], tot), self.cfg)

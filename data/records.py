@@ -97,15 +97,16 @@ def parse(example_proto, state_shape, image_shape, act_n, cfg):
         out[key] = tf.reshape(tf.io.decode_raw(parsed[key], tf.float32), shapes[key])
     return out
 
-def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg):
+def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg, repeat=True, shuffle=True, files=None):
     setup = time.time()
     num_per_barrel = cfg.bl * cfg.num_eps
     #num_files = cfg.replay_size // num_per_barrel
-    files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))#[:num_files]
-    onp.random.shuffle(files)
+    if files is None:
+        files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))#[:num_files]
+        onp.random.shuffle(files)
     dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=32)
-    dataset = dataset.repeat()
-    dataset = dataset.shuffle(1000)
+    dataset = dataset.repeat() if repeat else dataset
+    dataset = dataset.shuffle(1000) if shuffle else dataset
     dataset = dataset.batch(cfg.bs)
     dataset = dataset.map(lambda x: parse(x, state_shape, image_shape, act_n, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
     #dataset = dataset.map(lambda x: bptt_n(x, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -113,7 +114,7 @@ def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg):
     dataset = tfds.as_numpy(dataset)
     print(f'DATASET SETUP dt {time.time()-setup} num_files {len(files)} num_total {len(files)*num_per_barrel:.2e}')
     itr = iter(dataset)
-    next(itr)
+    #next(itr)
     return itr
 
 if __name__ == '__main__':

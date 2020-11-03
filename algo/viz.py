@@ -1,3 +1,4 @@
+import pathlib
 import time
 from collections import defaultdict
 import itertools
@@ -10,22 +11,30 @@ import numpy as np
 from algo.trainer import Trainer
 from torch import distributions
 import utils
-from torch.cuda import amp
 from nets import models
 import pyglet
+from data import records
+from jax.tree_util import tree_multimap, tree_map
 
 class Viz(Trainer):
     def __init__(self, cfg, make_env):
         super().__init__(cfg, make_env)
 
     def run(self):
-        self.refresh_dataset()
-        batch = next(self.data_iter)
+        files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[:3]
+        #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-3:]
+        #self.data_iter = records.make_dataset(self.barrel_path, self.state_shape, self.image_shape, self.act_n, self.cfg, shuffle=False, files=files, repeat=False)
+
+        batches = []
+        for f in files:
+            self.data_iter = records.make_dataset(self.barrel_path, self.state_shape, self.image_shape, self.act_n, self.cfg, shuffle=False, files=[f], repeat=False)
+            batches += [next(self.data_iter)]
+        batch = tree_multimap(lambda x,*y: np.stack([x,*y],1), batches[0], *batches[1:])
+        batch = tree_map(lambda x: x.reshape([50, -1, x.shape[-1]]), batch)
         #self.tenv.env.VIEWPORT_H *= 10
         #self.tenv.env.VIEWPORT_W *= 10
         self.tenv.reset()
         self.tenv.render()
-
 
         # TODO: add an option here where we can view a contiguous rollout. like stitch together some tfrecords by loading them. like manually maybe
         # may need some dataset mods.
@@ -40,7 +49,7 @@ class Viz(Trainer):
         l = False
         past_keys = {}
 
-        bl = self.cfg.bl
+        bl = 3*self.cfg.bl
 
         batch_idx = 0
         time_idx = 0
@@ -64,6 +73,8 @@ class Viz(Trainer):
                 paused = not paused
             if check(KEY.ESCAPE):
                 exit()
+            if check(KEY.I):
+                import ipdb; ipdb.set_trace()
             if check(KEY.K):
                 k = not k
             if check(KEY.S):
@@ -77,7 +88,6 @@ class Viz(Trainer):
             if time_idx > (bl-1) and k:
                 batch_idx += 1
             time_idx = time_idx % bl
-
 
             if batch_idx > (bl-1):
                 batch = next(self.data_iter)

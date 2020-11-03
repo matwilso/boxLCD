@@ -56,10 +56,11 @@ def define_cfg():
     cfg.steps_per_epoch = 1000
     cfg.save_freq = 10
     cfg.exp_name = ''
-    cfg.pi_lr = 1e-3
-    cfg.vf_lr = 1e-3
+    cfg.pi_lr = 3e-4
+    cfg.vf_lr = 3e-4
+    cfg.dyn_lr = 1e-3
+    cfg.lds_lr = 3e-4
     cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
-    cfg.dyn_lr = 3e-4
     cfg.net = 'mlp' # 'mlp', 'split'
     cfg.bs = 50
     cfg.bl = 50

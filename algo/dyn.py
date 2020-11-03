@@ -10,7 +10,7 @@ import numpy as np
 from algo.trainer import Trainer
 from torch import distributions
 import utils
-from torch.cuda import amp
+#from torch.cuda import amp
 from nets import models
 
 def fvmap(f):
@@ -29,9 +29,11 @@ class Dyn(Trainer, nn.Module):
         if cfg.use_image:
             self.encoder = models.ConvEncoder(cfg).to(cfg.device)
             self.decoder = models.ConvDecoder(cfg).to(cfg.device)
+            self.skey = 'image'
         else:
             self.encoder = models.DenseEncoder(self.state_shape[0], cfg).to(cfg.device)
             self.decoder = models.DenseDecoder(self.state_shape[0], cfg).to(cfg.device)
+            self.skey = 'state'
         self.dynamics = models.RSSM(self.act_n, cfg).to(cfg.device)
         self.latent_fwds = models.LatentFwds(self.act_n, cfg).to(cfg.device)
 
@@ -40,7 +42,7 @@ class Dyn(Trainer, nn.Module):
         self.actor = models.ActionDecoder(self.act_n, cfg).to(cfg.device)
         self.model_params = itertools.chain(self.encoder.parameters(), self.decoder.parameters(), self.dynamics.parameters())
         self.model_optimizer = optim.Adam(self.model_params, lr=self.cfg.dyn_lr)
-        self.lds_optimizer = optim.Adam(self.latent_fwds.parameters(), lr=self.cfg.dyn_lr)
+        self.lds_optimizer = optim.Adam(self.latent_fwds.parameters(), lr=self.cfg.lds_lr)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.cfg.pi_lr)
         self.value_optimizer = optim.Adam(self.value.parameters(), lr=self.cfg.vf_lr)
 
@@ -95,9 +97,10 @@ class Dyn(Trainer, nn.Module):
         # TODO: make policy autoregressive so we get better propagation.
         def func(prev, _):
             prev = prev[0]
-            poo = torch.tanh(self.actor(self.dynamics.get_feat(prev)).rsample())
+            poo = self.actor(self.dynamics.get_feat(prev).detach()).rsample()
+            #poo = self.actor(self.dynamics.get_feat(prev)).rsample()
             return self.dynamics.img_step(prev, poo), poo
-        outs = utils.static_scan(func, torch.range(0, self.cfg.horizon).to(self.cfg.device), (start, actions))
+        outs = utils.static_scan(func, torch.arange(0, self.cfg.horizon).to(self.cfg.device), (start, actions))
         state, actions = outs
         imag_feat = self.dynamics.get_feat(state)
         return imag_feat, actions
@@ -138,33 +141,37 @@ class Dyn(Trainer, nn.Module):
         #self.scaler.update()
         # TODO: freeze model weights, but 
         # TODO: check gradients getting propped right.
-        # ACTOR UPDATE
-        self.actor_optimizer.zero_grad()
-        post = {k: v.detach() for k,v in post.items()}
-        imag_feat, actions = self.imagine_ahead(post)
-        lds = self.latent_fwds(torch.cat([imag_feat, actions], -1))
-        reward = lds.var(0).mean(-1).detach()
-        pcont = self.cfg.gamma * torch.ones_like(reward)
-        value = self.value(imag_feat).mean[...,0]
-        returns = utils.lambda_return(reward[:-1], value[:-1], pcont[:-1], bootstrap=value[-1], lambda_=self.cfg.lam, axis=0)
-        discount = torch.cumprod(torch.cat([torch.ones_like(pcont[:1]), pcont[:-2]], 0), 0).detach()
-        actor_loss = -(discount * returns).mean()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+        if self.cfg.mode == 'dream':
+            # ACTOR UPDATE
+            self.actor_optimizer.zero_grad()
+            post = {k: v.detach() for k,v in post.items()}
+            imag_feat, actions = self.imagine_ahead(post)
+            lds = self.latent_fwds(torch.cat([imag_feat, actions], -1))
+            reward = 100.0*lds.var(0).mean(-1).detach()
+            pcont = self.cfg.gamma * torch.ones_like(reward)
+            value = self.value(imag_feat).mean[...,0]
+            returns = utils.lambda_return(reward[:-1], value[:-1], pcont[:-1], bootstrap=value[-1], lambda_=self.cfg.lam, axis=0)
+            discount = torch.cumprod(torch.cat([torch.ones_like(pcont[:1]), pcont[:-2]], 0), 0).detach()
+            actor_loss = -(discount * returns).mean()
+            actor_loss.backward()
+            self.actor_optimizer.step()
 
-        # VALUE UPDATE
-        self.value_optimizer.zero_grad()
-        value_pred = self.value(imag_feat.detach())
-        target = returns.detach()
-        logp = value_pred.log_prob(torch.cat([target, torch.ones((1,)+target.shape[1:]).to(self.cfg.device)])[...,None])[:-1]
-        value_loss = -(discount * logp).mean()
-        self.value_optimizer.step()
+            # VALUE UPDATE
+            self.value_optimizer.zero_grad()
+            value_pred = self.value(imag_feat.detach())
+            target = returns.detach()
+            logp = value_pred.log_prob(torch.cat([target, torch.ones((1,)+target.shape[1:]).to(self.cfg.device)])[...,None])[:-1]
+            value_loss = -(discount * logp).mean()
+            self.value_optimizer.step()
+
+            logs['value_loss'] = value_loss
+            logs['actor_loss'] = actor_loss
+            logs['reward'] = reward.mean()
 
         logs['recon_loss'] = recon_loss
+        logs['lds_loss'] = lds_loss
         logs['div'] = div
         logs['model_loss'] = model_loss
-        logs['value_loss'] = value_loss
-        logs['actor_loss'] = actor_loss
         if log_extra:
             logs['prior_ent'] = prior_dist.entropy()
             logs['post_ent'] = post_dist.entropy()
@@ -180,7 +187,6 @@ class Dyn(Trainer, nn.Module):
         return model_loss
 
     def exploration(self, action, training):
-        import ipdb; ipdb.set_trace()
         if training:
             amount = self.cfg.expl_amount
             if self.cfg.expl_decay:
@@ -192,33 +198,28 @@ class Dyn(Trainer, nn.Module):
             amount = self.cfg.eval_noise
         else:
             return action
-        import ipdb; ipdb.set_trace()
         if self.cfg.expl == 'additive_gaussian':
-          return tf.clip_by_value(tfd.Normal(action, amount).sample(), -1, 1)
+            return torch.clip(distributions.Normal(action, amount).sample(), -1, 1)
         if self.cfg.expl == 'completely_random':
-          return tf.random.uniform(action.shape, -1, 1)
+            return torch.rand(action.shape, -1, 1)
         if self.cfg.expl == 'epsilon_greedy':
-          indices = tfd.Categorical(0 * action).sample()
-          return tf.where(
-              tf.random.uniform(action.shape[:1], 0, 1) < amount,
-              tf.one_hot(indices, action.shape[-1], dtype=self._float),
-              action)
+            indices = distributions.Categorical(0 * action).sample()
+            return torch.where(torch.random.uniform(action.shape[:1], 0, 1) < amount, torch.one_hot(indices, action.shape[-1], dtype=self._float), action)
         raise NotImplementedError(self.cfg.expl)
 
     def policy(self, obs, state, training):
         if state is None:
-            latent = self.dynamics.initial(len(obs['image']))
-            action = torch.zeros((len(obs['image']), self.act_n)).to(self.cfg.device)
+            latent = self.dynamics.initial(len(obs[self.skey]))
+            action = torch.zeros((len(obs[self.skey]), self.act_n)).to(self.cfg.device)
         else:
             latent, action = state
-        embed = self.encoder(obs)
-        latent, _ = self._dynamics.obs_step(latent, action, embed)
+        embed = self.encoder(torch.tensor(obs[self.skey]).to(self.cfg.device))
+        latent, _ = self.dynamics.obs_step(latent, action, embed)
         feat = self.dynamics.get_feat(latent)
         if training:
-            action = self.actor(feat).rsample()
+            action = self.actor(feat).sample()
         else:
             action = self.actor(feat).mean
-        action = torch.tanh(action)
         action = self.exploration(action, training)
         state = (latent, action)
         return action, state
@@ -236,11 +237,26 @@ class Dyn(Trainer, nn.Module):
         self.logger['dt/batch'] += [time.time() - bt]
         return batch
 
+    def logger_dump(self):
+        print('='*30)
+        print('t', self.t)
+        for key in self.logger:
+            x = np.mean(self.logger[key])
+            self.writer.add_scalar(key, x, self.t)
+            print(key, x)
+        self.writer.flush()
+        print('dt', time.time()-self.dt_time)
+        print('total time', time.time()-self.start_time)
+        print(self.logpath)
+        print(self.cfg.full_cmd)
+        print('='*30)
+        self.dt_time = time.time()
+
     def run(self):
+        self.start_time = time.time()
+        self.dt_time = time.time()
         if self.cfg.mode == 'dyn':
             self.refresh_dataset()
-            start_time = time.time()
-            epoch_time = time.time()
             for self.t in itertools.count(1):
                 ut = time.time()
                 #self.update(batch, log_extra=1)
@@ -248,26 +264,18 @@ class Dyn(Trainer, nn.Module):
                 self.update(batch, log_extra=self.t%self.cfg.log_n==0)
                 self.logger['dt/update'] += [time.time() - ut]
                 if self.t % self.cfg.log_n == 0:
-                    print('='*30)
-                    print('t', self.t)
-                    for key in self.logger:
-                        x = np.mean(self.logger[key])
-                        self.writer.add_scalar(key, x, self.t)
-                        print(key, x)
-                    self.writer.flush()
-                    print('dt', time.time()-epoch_time)
-                    print('total time', time.time()-start_time)
-                    print(self.logpath)
-                    print(self.cfg.full_cmd)
-                    print('='*30)
-                    epoch_time = time.time()
+                    self.logger_dump()
         elif self.cfg.mode == 'dream':
             # fill up with initial random data
-            self.collect_episode(self.cfg.ep_len, 50)
-            #self.refresh_dataset()
-            #batch = self.get_batch()
-            #self.update(batch, log_extra=0)
-            #import ipdb; ipdb.set_trace()
+            self.collect_episode(self.cfg.ep_len, 50, mode='random')
+            for self.t in itertools.count():
+                self.refresh_dataset()
+                for _ in range(100):
+                    batch = self.get_batch()
+                    self.update(batch, log_extra=0)
+                self.collect_episode(self.cfg.ep_len, 50, mode='policy')
+                if self.t % 1 == 0:
+                    self.logger_dump()
             #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)
             #print(num_files)
             #for _ in range(num_files):

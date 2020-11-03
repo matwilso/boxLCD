@@ -189,5 +189,6 @@ class ActionDecoder(nn.Module):
         mean = MEAN_SCALE * torch.tanh(mean / MEAN_SCALE)
         std = F.softplus(std + self.raw_init_std) + MIN_STD
         dist = distributions.Normal(mean, std)
+        dist = distributions.TransformedDistribution(dist, distributions.TanhTransform())
         dist = distributions.Independent(dist, 1)
         return dist
