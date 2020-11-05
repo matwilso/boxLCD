@@ -3,7 +3,6 @@ from algo import sac, collect, dyn, viz
 
 if __name__ == '__main__':
     parser = define_cfg()
-    parser.set_defaults(**{'exp_name': 'collect'})
     cfg = parser.parse_args()
 
     T = {'collect': collect.Collect, 'dream': dyn.Dyn, 'dyn': dyn.Dyn, 'sac': sac.SAC, 'viz': viz.Viz}[cfg.mode]

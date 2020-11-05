@@ -191,7 +191,7 @@ class Dyn(Trainer, nn.Module):
             vt_gam = discount * returns
             act_dist = self.actor.get_dist(actions)
             act_logp = act_dist.log_prob(actions['action'])
-            reinforce_loss = -(act_logp[1:]*((vt_gam - value[1:]).detach())).mean()
+            reinforce_loss = -(act_logp[:-1]*((vt_gam - value[1:]).detach())).mean()
             dyn_back_loss = -vt_gam.mean()
             act_ent_loss = act_logp.mean()
             # TODO: try both

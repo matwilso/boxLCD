@@ -22,6 +22,7 @@ class Box(B2D):
         #w = World(agents=[Agent('crab0'), Agent('crab1'), Agent('crab2')], objects=[Object('object0'), Object('object1'), Object('object2')])
         #w = World(agents=[Agent('crab0')], objects=[Object('object0'), Object('object1'), Object('object2')])
         #w = World(agents=[], objects=[Object('object0')])
+        #w = World(agents=[Agent('crab0')], objects=[])
         w = World(agents=[Agent('crab0')], objects=[Object('object0')])
         super().__init__(w, cfg)
 
@@ -33,6 +34,7 @@ if __name__ == '__main__':
     cfg = parser.parse_args()
     env = Box(cfg)
     env.reset()
+    ret = 0
     env.render()
     key_handler = KEY.KeyStateHandler()
     env.viewer.window.push_handlers(key_handler)
@@ -94,12 +96,15 @@ if __name__ == '__main__':
 
         if not paused or (curr_keys[KEY.NUM_6] and not past_keys[KEY.NUM_6]):
             obs, rew, done, info = env.step(env.action_space.sample())
+            ret += rew
             #obs, rew, done, info = env.step(env.get_act_vec(act_dict))
             if done and dor:
+                print(ret)
+                ret = 0
                 obs = env.reset()
             # print only the obs data that comes from object0
             #print(rew, utils.filter(env.get_obs_dict(obs, map=False), 'object0'))
-            print(obs.max(), env.obs_keys[obs.argmax()])
+            #print(obs.max(), env.obs_keys[obs.argmax()])
         img = env.render()
         if plotting:
             plt.imshow(img); plt.show()

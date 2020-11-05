@@ -93,7 +93,6 @@ def define_cfg():
 
     cfg.obs_stats = 0
 
-    cfg.free_nats = 0.9
     cfg.use_image = 0
 
     # ----- RL -----

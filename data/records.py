@@ -100,9 +100,9 @@ def parse(example_proto, state_shape, image_shape, act_n, cfg):
 def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg, repeat=True, shuffle=True, files=None):
     setup = time.time()
     num_per_barrel = cfg.bl * cfg.num_eps
-    #num_files = cfg.replay_size // num_per_barrel
+    num_files = cfg.replay_size // num_per_barrel
     if files is None:
-        files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))#[:num_files]
+        files = list(sorted(map(lambda x: str(x), pathlib.Path(barrel_path).glob('*.tfrecord'))))[:num_files]
         onp.random.shuffle(files)
     dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=32)
     dataset = dataset.repeat() if repeat else dataset

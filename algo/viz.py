@@ -97,8 +97,9 @@ class Viz(Trainer):
                 batch_idx = 0
                 time_idx = 0
 
+            rew = np.mean(batch['rew'][batch_idx])
             state = np.array(batch['state'][batch_idx, time_idx])
             obs = utils.DWrap(state, self.tenv.env.obs_info)
             #obs['object0:x:p', 'object0:y:p'] *= 10
-            self.tenv.env.visualize_obs(obs.arr, f'b {batch_idx} t{time_idx}')
+            self.tenv.env.visualize_obs(obs.arr, f'b {batch_idx} t{time_idx} r{rew:.2f}')
             past_keys = {key: val for key, val in curr_keys.items()}
