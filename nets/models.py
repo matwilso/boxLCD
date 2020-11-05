@@ -48,7 +48,7 @@ class RSSM(nn.Module):
         return prior
 
     def get_feat(self, state):
-        return torch.cat([state['stoch'], state['deter']], -1)
+        return torch.cat([state['deter'], state['stoch']], -1)
 
     def get_dist(self, state):
         return distributions.MultivariateNormal(state['mean'], scale_tril=torch.diag_embed(state['std']))
@@ -143,7 +143,8 @@ class MLP(nn.Module):
 class LatentFwds(nn.Module):
     def __init__(self, act_n, cfg):
         super().__init__()
-        self.fwds = nn.ModuleList([MLP([act_n+cfg.stoch+cfg.deter, 128, 128, cfg.stoch+cfg.deter], cfg) for _ in range(cfg.num_ens)])
+        self.fwds = nn.ModuleList([MLP([act_n+cfg.deter, 128, 128, cfg.stoch+cfg.deter], cfg) for _ in range(cfg.num_ens)])
+        #self.fwds = nn.ModuleList([MLP([act_n+cfg.stoch+cfg.deter, 128, 128, cfg.stoch+cfg.deter], cfg) for _ in range(cfg.num_ens)])
 
     def forward(self, obs):
         return torch.stack([f(obs) for f in self.fwds])
@@ -151,7 +152,7 @@ class LatentFwds(nn.Module):
 class DenseEncoder(nn.Module):
     def __init__(self, obs_n, cfg):
         super().__init__()
-        self.mlp = MLP([obs_n, 128, 1024])
+        self.mlp = MLP([obs_n, 256, 1024])
 
     def forward(self, obs):
         x = self.mlp.forward(obs)
@@ -160,11 +161,11 @@ class DenseEncoder(nn.Module):
 class DenseDecoder(nn.Module):
     def __init__(self, out_n, cfg):
         super().__init__()
-        self.mlp = MLP([cfg.stoch+cfg.deter, 128, out_n])
+        self.mlp = MLP([cfg.stoch+cfg.deter, 256, out_n])
 
-    def forward(self, features):
+    def forward(self, features, std=None):
         x = self.mlp.forward(features)
-        return distributions.Independent(distributions.Normal(x,1), 1)
+        return distributions.Independent(distributions.Normal(x,1 if std is None else std), 1)
         #if self._dist == 'normal':
         #    return tfd.Independent(tfd.Normal(x, 1), len(self._shape))
         #if self._dist == 'binary':
@@ -179,8 +180,14 @@ class ActionDecoder(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.raw_init_std = torch.log(torch.exp(torch.tensor(INIT_STD).float()) - 1).to(cfg.device)
-        self.mlp = MLP([cfg.stoch+cfg.deter, 128, act_n*2])
+        self.mlp = MLP([cfg.stoch+cfg.deter, 256, act_n*2])
         self.act_n = act_n
+
+    def get_dist(self, state):
+        dist = distributions.Normal(state['mean'], state['std'])
+        dist = distributions.TransformedDistribution(dist, distributions.TanhTransform())
+        dist = distributions.Independent(dist, 1)
+        return dist
 
     def forward(self, features):
         x = features
@@ -188,7 +195,4 @@ class ActionDecoder(nn.Module):
         mean, std = torch.split(x, self.act_n, -1)
         mean = MEAN_SCALE * torch.tanh(mean / MEAN_SCALE)
         std = F.softplus(std + self.raw_init_std) + MIN_STD
-        dist = distributions.Normal(mean, std)
-        dist = distributions.TransformedDistribution(dist, distributions.TanhTransform())
-        dist = distributions.Independent(dist, 1)
-        return dist
+        return {'mean': mean, 'std': std}

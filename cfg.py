@@ -67,11 +67,10 @@ def define_cfg():
     cfg.horizon = 15
 
     cfg.num_ens = 5
-    cfg.expl = 'additive_gaussian'
-    cfg.expl_amount = 0.3
-    cfg.expl_decay = 0.0
-    cfg.expl_min = 0.0
-    cfg.eval_noise = 0.0
+    cfg.act_ent_weight = 3e-3
+    cfg.rew_weight = 1.0
+
+    cfg.polyak = 0.995
 
     # ARCHITECTURE
     cfg.split_share = 0  # whether or not to share weights in the split network

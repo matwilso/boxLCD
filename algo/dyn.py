@@ -1,6 +1,7 @@
 import time
 import itertools
 import torch
+from copy import deepcopy
 from jax.tree_util import tree_multimap
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +13,7 @@ from torch import distributions
 import utils
 #from torch.cuda import amp
 from nets import models
+from algo.stats import RunningMeanStd
 
 def fvmap(f):
     """fakes vmap by just reshaping"""
@@ -21,6 +23,12 @@ def fvmap(f):
         x = f(x.flatten(0, 1))
         return x.reshape(preshape[:2]+x.shape[1:])
     return _thunk
+
+def pass_clamp(b, bound):
+    nb = b.clone()
+    mask = (b<-bound).__or__(b>bound)
+    nb[mask] = b[mask] - (torch.sign(b[mask])*(torch.abs(b[mask]) - bound)).detach()
+    return nb
 
 class Dyn(Trainer, nn.Module):
     def __init__(self, cfg, make_env):
@@ -39,6 +47,9 @@ class Dyn(Trainer, nn.Module):
 
         # dreamer stuff
         self.value = models.DenseDecoder(1, cfg).to(cfg.device)
+        self.targ_value = deepcopy(self.value)
+        for p in self.targ_value.parameters():
+            p.requires_grad = False
         self.actor = models.ActionDecoder(self.act_n, cfg).to(cfg.device)
         self.model_params = itertools.chain(self.encoder.parameters(), self.decoder.parameters(), self.dynamics.parameters())
         self.model_optimizer = optim.Adam(self.model_params, lr=self.cfg.dyn_lr)
@@ -73,7 +84,7 @@ class Dyn(Trainer, nn.Module):
     def state_summaries(self, data, embed, obs_pred):
         def get_state(x):
             x = np.array(x.detach().cpu())
-            return x if not self.cfg.obs_stats else (x*(10.0*self.obs_rms.var**0.5) + self.obs_rms.mean)
+            return x if not self.cfg.obs_stats else (x*(1.0*self.obs_rms.var**0.5) + self.obs_rms.mean)
         truth = np.zeros([50, 3, 64, 64])
         for i in range(50):
             truth[i] = self.tenv.env.visualize_obs(get_state(data['state'][0][i])).transpose(2,0,1) / 255.0
@@ -83,7 +94,8 @@ class Dyn(Trainer, nn.Module):
         init, _ = self.dynamics.observe(embed[:5, :5], data['act'][:5, :5])
         init = {k: v[:, -1] for k, v in init.items()}
         prior = self.dynamics.imagine(data['act'][:5, 5:], init)
-        openl = self.decoder(self.dynamics.get_feat(prior).flatten(0,1)).mean
+        std = torch.tensor(self.obs_rms.var**0.5).to(self.cfg.device) if self.cfg.obs_stats else None
+        openl = self.decoder(self.dynamics.get_feat(prior).flatten(0,1), std).mean
         openl = openl.reshape((5, 45) + openl.shape[1:])
 
         model = np.zeros([50, 3, 64, 64])
@@ -98,13 +110,15 @@ class Dyn(Trainer, nn.Module):
 
     def imagine_ahead(self, post):
         start = {k: v.flatten(0,1) for k, v in post.items()}
-        actions = torch.zeros([50*50, self.act_n]).to(self.cfg.device)
+        actions = {key: torch.zeros([50*50, self.act_n]).to(self.cfg.device) for key in ['action', 'mean', 'std']}
         # TODO: make policy autoregressive so we get better propagation.
         def func(prev, _):
             prev = prev[0]
-            poo = self.actor(self.dynamics.get_feat(prev).detach()).rsample()
+            act_stats = self.actor(self.dynamics.get_feat(prev).detach())
+            poo = self.actor.get_dist(act_stats).rsample()
+            poo = pass_clamp(poo, 0.9995)
             #poo = self.actor(self.dynamics.get_feat(prev)).rsample()
-            return self.dynamics.img_step(prev, poo), poo
+            return self.dynamics.img_step(prev, poo), {'action': poo, **act_stats}
         outs = utils.static_scan(func, torch.arange(0, self.cfg.horizon).to(self.cfg.device), (start, actions))
         state, actions = outs
         imag_feat = self.dynamics.get_feat(state)
@@ -120,17 +134,18 @@ class Dyn(Trainer, nn.Module):
         embed = self.venc(obs)
         post, prior = self.dynamics.observe(embed, batch['act'])
         feat = self.dynamics.get_feat(post)
-        obs_pred = self.decoder(feat.flatten(0,1))
-        recon_loss = -obs_pred.log_prob(obs.flatten(0,1)).mean()
-        #recon_loss = -obs_pred.log_prob(obs.flatten(0,1)).mean()
         prior_dist = self.dynamics.get_dist(prior)
         post_dist = self.dynamics.get_dist(post)
-        div = distributions.kl_divergence(post_dist, prior_dist).mean() # TODO: figure out how to make this work for amp
-        div = torch.max(div, torch.tensor(self.cfg.free_nats).to(self.cfg.device))
-        model_loss = self.cfg.kl_scale*div + recon_loss
+        obs_pred = self.decoder(feat.flatten(0,1), std=batch['std'] if self.cfg.obs_stats else None)
+
+        recon_loss = -obs_pred.log_prob(obs.flatten(0,1)).mean()
+        transition_loss = -0.08*prior_dist.log_prob(post['stoch']).mean()
+        latent_ent_loss = +0.02*post_dist.log_prob(post['stoch']).mean()
+
+        model_loss = recon_loss +  transition_loss + latent_ent_loss
         #self.scaler.scale(model_loss).backward()
         feat = self.dynamics.get_feat(post).detach()
-        lds = self.latent_fwds(torch.cat([feat, batch['act']], -1))
+        lds = self.latent_fwds(torch.cat([feat[...,:-30], batch['act']], -1))
         lds_loss = (0.5*(feat[:,1:].detach() - lds[:,:,:-1])**2).mean()
         model_loss += lds_loss
         model_loss.backward()
@@ -151,20 +166,32 @@ class Dyn(Trainer, nn.Module):
             self.actor_optimizer.zero_grad()
             post = {k: v.detach() for k,v in post.items()}
             imag_feat, actions = self.imagine_ahead(post)
-            lds = self.latent_fwds(torch.cat([imag_feat, actions], -1))
-            reward = 100.0*lds.var(0).mean(-1).detach()
+            lds = self.latent_fwds(torch.cat([imag_feat[...,:-30], actions['action']], -1))
+            reward = self.cfg.rew_weight*lds.var(0).mean(-1).detach()
             pcont = self.cfg.gamma * torch.ones_like(reward)
             value = self.value(imag_feat).mean[...,0]
             returns = utils.lambda_return(reward[:-1], value[:-1], pcont[:-1], bootstrap=value[-1], lambda_=self.cfg.lam, axis=0)
             discount = torch.cumprod(torch.cat([torch.ones_like(pcont[:1]), pcont[:-2]], 0), 0).detach()
-            actor_loss = -(discount * returns).mean()
+            vt_gam = discount * returns
+            act_dist = self.actor.get_dist(actions)
+            act_logp = act_dist.log_prob(actions['action'])
+            reinforce_loss = -act_logp[:-1]*((vt_gam - value[:-1]).detach())
+            dyn_back_loss = -vt_gam
+            act_ent_loss = self.cfg.act_ent_weight*act_logp
+            #reinforce_loss = -0.9*(vt_gam - value[:-1]).detach()
+            # TODO: try both
+            #reinforce_loss = vt_gam - value[1:]
+            #actor_loss = -(vt_gam).mean()
+            actor_loss = 0.9*reinforce_loss.mean() + 0.1*dyn_back_loss.mean() + self.cfg.act_ent_weight*act_ent_loss.mean()
             actor_loss.backward()
             self.actor_optimizer.step()
 
             # VALUE UPDATE
             self.value_optimizer.zero_grad()
+            targ_value = self.targ_value(imag_feat.detach()).mean[...,0]
+            targ_returns = utils.lambda_return(reward[:-1], targ_value[:-1], pcont[:-1], bootstrap=targ_value[-1], lambda_=self.cfg.lam, axis=0)
+            target = targ_returns.detach()
             value_pred = self.value(imag_feat.detach())
-            target = returns.detach()
             logp = value_pred.log_prob(torch.cat([target, torch.ones((1,)+target.shape[1:]).to(self.cfg.device)])[...,None])[:-1]
             value_loss = -(discount * logp).mean()
             self.value_optimizer.step()
@@ -174,9 +201,10 @@ class Dyn(Trainer, nn.Module):
             logs['reward'] = reward.mean()
 
         logs['recon_loss'] = recon_loss
-        logs['lds_loss'] = lds_loss
-        logs['div'] = div
+        logs['transition_loss'] = transition_loss
+        logs['latent_ent_loss'] = latent_ent_loss
         logs['model_loss'] = model_loss
+        logs['lds_loss'] = lds_loss
         if log_extra:
             logs['prior_ent'] = prior_dist.entropy()
             logs['post_ent'] = post_dist.entropy()
@@ -189,28 +217,13 @@ class Dyn(Trainer, nn.Module):
             self.logger['dt/summary'] += [time.time()-lt]
         for key in logs:
             self.logger[key] += [logs[key].mean().detach().cpu()]
-        return model_loss
 
-    def exploration(self, action, training):
-        if training:
-            amount = self.cfg.expl_amount
-            if self.cfg.expl_decay:
-                amount *= 0.5 ** (self.step.float() / self.cfg.expl_decay)
-            if self.cfg.expl_min:
-                amount = torch.max(self.cfg.expl_min, amount)
-            self.logger['expl_amount'] += [amount]
-        elif self.cfg.eval_noise:
-            amount = self.cfg.eval_noise
-        else:
-            return action
-        if self.cfg.expl == 'additive_gaussian':
-            return torch.clip(distributions.Normal(action, amount).sample(), -1, 1)
-        if self.cfg.expl == 'completely_random':
-            return torch.rand(action.shape, -1, 1)
-        if self.cfg.expl == 'epsilon_greedy':
-            indices = distributions.Categorical(0 * action).sample()
-            return torch.where(torch.random.uniform(action.shape[:1], 0, 1) < amount, torch.one_hot(indices, action.shape[-1], dtype=self._float), action)
-        raise NotImplementedError(self.cfg.expl)
+        # Finally, update target networks by polyak averaging.
+        with torch.no_grad():
+            for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
+                p_targ.data.mul_(self.cfg.polyak)
+                p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+        return model_loss
 
     def policy(self, obs, state, training):
         if state is None:
@@ -222,10 +235,9 @@ class Dyn(Trainer, nn.Module):
         latent, _ = self.dynamics.obs_step(latent, action, embed)
         feat = self.dynamics.get_feat(latent)
         if training:
-            action = self.actor(feat).sample()
+            action = self.actor.get_dist(self.actor(feat)).sample()
         else:
-            action = self.actor(feat).mean
-        action = self.exploration(action, training)
+            action = self.actor(feat)['mean']
         state = (latent, action)
         return action, state
 
@@ -241,7 +253,8 @@ class Dyn(Trainer, nn.Module):
             # TODO: make this an EMA with var
             if self.cfg.obs_stats:
                 self.obs_rms.update(batch['state'].reshape([self.cfg.bs*self.cfg.bl, -1]))
-            batch['state'] = (batch['state'] - self.obs_rms.mean) / (10*self.obs_rms.var**0.5)
+                batch['state'] = (batch['state'] - self.obs_rms.mean) / (1.0*self.obs_rms.var**0.5)
+                batch['std'] = self.obs_rms.var**0.5
             batch = nest.map_structure(lambda x: torch.tensor(x).float().to(self.cfg.device), batch)
         self.logger['dt/batch'] += [time.time() - bt]
         return batch
@@ -253,8 +266,10 @@ class Dyn(Trainer, nn.Module):
             x = np.mean(self.logger[key])
             self.writer.add_scalar(key, x, self.t)
             print(key, x)
+        dt = time.time()-self.dt_time
+        self.writer.add_scalar('dt', dt, self.t)
         self.writer.flush()
-        print('dt', time.time()-self.dt_time)
+        print('dt', dt)
         print('total time', time.time()-self.start_time)
         print(self.logpath)
         print(self.cfg.full_cmd)
