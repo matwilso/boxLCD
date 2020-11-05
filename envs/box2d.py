@@ -311,7 +311,7 @@ class B2D(IndexEnv):
         # RUN SIM STEP
         self.world.Step(1.0/FPS, 6*30, 2*30)
         obs = self._get_obs()
-        reward = 0.0
+        reward = np.abs(self.dynbodies['crab0:root'].linearVelocity.x)
         done = self.ep_t >= self.cfg.ep_len
         return obs.arr, reward, done, {}
 

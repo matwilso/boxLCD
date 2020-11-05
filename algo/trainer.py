@@ -35,7 +35,7 @@ class Trainer:
         # Set up logger and save configuration
         self.logger = defaultdict(lambda: [])
         timestamp = datetime.now().strftime('%Y%m%dT-%H-%M-%S')
-        self.logpath = self.cfg.logdir/f'{self.cfg.env}/{self.cfg.exp_name}-{timestamp}'
+        self.logpath = self.cfg.logdir/f'{self.cfg.env}/{self.cfg.name}-{timestamp}'
         if cfg.clipboard:
             import pyperclip
             pyperclip.copy(str(self.logpath))
@@ -161,7 +161,7 @@ class Trainer:
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
-        filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.exp_name}-{num_ep}-{eplen}'
+        filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.name}-{num_ep}-{eplen}'
         tot = nms(lambda x: x.reshape([num_ep, x.shape[1]//self.cfg.bl, self.cfg.bl, -1]), tot)
         for i in range(tot['state'].shape[1]):
             records.write_barrel(filename.with_suffix(f'.{i}.tfrecord'), nms(lambda x: x[:,i], tot), self.cfg)

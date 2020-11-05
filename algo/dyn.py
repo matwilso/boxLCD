@@ -44,6 +44,8 @@ class Dyn(Trainer, nn.Module):
             self.skey = 'state'
         self.dynamics = models.RSSM(self.act_n, cfg).to(cfg.device)
         self.latent_fwds = models.LatentFwds(self.act_n, cfg).to(cfg.device)
+        if self.cfg.reward_mode == 'normal':
+            self.reward = models.DenseDecoder(1, cfg).to(cfg.device)
 
         # dreamer stuff
         self.value = models.DenseDecoder(1, cfg).to(cfg.device)
@@ -51,7 +53,7 @@ class Dyn(Trainer, nn.Module):
         for p in self.targ_value.parameters():
             p.requires_grad = False
         self.actor = models.ActionDecoder(self.act_n, cfg).to(cfg.device)
-        self.model_params = itertools.chain(self.encoder.parameters(), self.decoder.parameters(), self.dynamics.parameters())
+        self.model_params = itertools.chain(self.encoder.parameters(), self.decoder.parameters(), self.dynamics.parameters(), self.reward.parameters())
         self.model_optimizer = optim.Adam(self.model_params, lr=self.cfg.dyn_lr)
         self.lds_optimizer = optim.Adam(self.latent_fwds.parameters(), lr=self.cfg.lds_lr)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.cfg.pi_lr)
@@ -116,9 +118,12 @@ class Dyn(Trainer, nn.Module):
             prev = prev[0]
             act_stats = self.actor(self.dynamics.get_feat(prev).detach())
             poo = self.actor.get_dist(act_stats).rsample()
-            poo = pass_clamp(poo, 0.9995)
+            new_poo = poo.clone()
+            new_poo[poo > 0.0] -= 0.0001
+            new_poo[poo < 0.0] += 0.0001
+            #poo = pass_clamp(poo, 0.9995)
             #poo = self.actor(self.dynamics.get_feat(prev)).rsample()
-            return self.dynamics.img_step(prev, poo), {'action': poo, **act_stats}
+            return self.dynamics.img_step(prev, new_poo), {'action': new_poo, **act_stats}
         outs = utils.static_scan(func, torch.arange(0, self.cfg.horizon).to(self.cfg.device), (start, actions))
         state, actions = outs
         imag_feat = self.dynamics.get_feat(state)
@@ -145,9 +150,17 @@ class Dyn(Trainer, nn.Module):
         model_loss = recon_loss +  transition_loss + latent_ent_loss
         #self.scaler.scale(model_loss).backward()
         feat = self.dynamics.get_feat(post).detach()
-        lds = self.latent_fwds(torch.cat([feat[...,:-30], batch['act']], -1))
-        lds_loss = (0.5*(feat[:,1:].detach() - lds[:,:,:-1])**2).mean()
-        model_loss += lds_loss
+        if self.cfg.reward_mode == 'normal':
+            rew_loss = -self.reward(feat).log_prob(batch['rew'])
+            logs['model/rew_loss'] = rew_loss
+            logs['reward/actual'] = batch['rew'].mean()
+            model_loss += rew_loss.mean()
+        elif self.cfg.reward_mode == 'explore':
+            lds = self.latent_fwds(torch.cat([feat[...,:-30], batch['act']], -1))
+            lds_loss = (0.5*(feat[:,1:].detach() - lds[:,:,:-1])**2).mean()
+            logs['model/lds_loss'] = lds_loss
+            model_loss += lds_loss
+
         model_loss.backward()
         if log_extra:
             ct, norms = 0, 0
@@ -167,7 +180,10 @@ class Dyn(Trainer, nn.Module):
             post = {k: v.detach() for k,v in post.items()}
             imag_feat, actions = self.imagine_ahead(post)
             lds = self.latent_fwds(torch.cat([imag_feat[...,:-30], actions['action']], -1))
-            reward = self.cfg.rew_weight*lds.var(0).mean(-1).detach()
+            if self.cfg.reward_mode == 'normal':
+                reward = self.reward(imag_feat.detach()).mean[...,0]
+            else:
+                reward = self.cfg.rew_weight*lds.var(0).mean(-1).detach()
             pcont = self.cfg.gamma * torch.ones_like(reward)
             value = self.value(imag_feat).mean[...,0]
             returns = utils.lambda_return(reward[:-1], value[:-1], pcont[:-1], bootstrap=value[-1], lambda_=self.cfg.lam, axis=0)
@@ -175,14 +191,12 @@ class Dyn(Trainer, nn.Module):
             vt_gam = discount * returns
             act_dist = self.actor.get_dist(actions)
             act_logp = act_dist.log_prob(actions['action'])
-            reinforce_loss = -act_logp[:-1]*((vt_gam - value[:-1]).detach())
-            dyn_back_loss = -vt_gam
-            act_ent_loss = self.cfg.act_ent_weight*act_logp
-            #reinforce_loss = -0.9*(vt_gam - value[:-1]).detach()
+            reinforce_loss = -(act_logp[1:]*((vt_gam - value[1:]).detach())).mean()
+            dyn_back_loss = -vt_gam.mean()
+            act_ent_loss = act_logp.mean()
             # TODO: try both
-            #reinforce_loss = vt_gam - value[1:]
+            actor_loss = 0.9*reinforce_loss + 0.1*dyn_back_loss + self.cfg.act_ent_weight*act_ent_loss
             #actor_loss = -(vt_gam).mean()
-            actor_loss = 0.9*reinforce_loss.mean() + 0.1*dyn_back_loss.mean() + self.cfg.act_ent_weight*act_ent_loss.mean()
             actor_loss.backward()
             self.actor_optimizer.step()
 
@@ -198,13 +212,15 @@ class Dyn(Trainer, nn.Module):
 
             logs['value_loss'] = value_loss
             logs['actor_loss'] = actor_loss
-            logs['reward'] = reward.mean()
+            logs['actor/reinforce_loss'] = reinforce_loss
+            logs['actor/dyn_back_loss'] = dyn_back_loss
+            logs['actor/act_ent_loss'] = act_ent_loss
+            logs['reward/pred'] = reward.mean()
 
-        logs['recon_loss'] = recon_loss
-        logs['transition_loss'] = transition_loss
-        logs['latent_ent_loss'] = latent_ent_loss
+        logs['model/recon_loss'] = recon_loss
+        logs['model/transition_loss'] = transition_loss
+        logs['model/latent_ent_loss'] = latent_ent_loss
         logs['model_loss'] = model_loss
-        logs['lds_loss'] = lds_loss
         if log_extra:
             logs['prior_ent'] = prior_dist.entropy()
             logs['post_ent'] = post_dist.entropy()
@@ -236,6 +252,7 @@ class Dyn(Trainer, nn.Module):
         feat = self.dynamics.get_feat(latent)
         if training:
             action = self.actor.get_dist(self.actor(feat)).sample()
+            action = torch.clamp(action, -0.9995, 0.9995)
         else:
             action = self.actor(feat)['mean']
         state = (latent, action)
@@ -291,12 +308,14 @@ class Dyn(Trainer, nn.Module):
                     self.logger_dump()
         elif self.cfg.mode == 'dream':
             # fill up with initial random data
-            self.collect_episode(self.cfg.ep_len, 50, mode='random')
+            for i in range(10):
+                self.collect_episode(self.cfg.ep_len, 50, mode='random')
+
             for self.t in itertools.count():
                 self.refresh_dataset()
-                for _ in range(100):
+                for j in range(100):
                     batch = self.get_batch()
-                    self.update(batch, log_extra=0)
+                    self.update(batch, log_extra=j==0 and self.t%5==0)
                 self.collect_episode(self.cfg.ep_len, 50, mode='policy')
                 if self.t % 1 == 0:
                     self.logger_dump()

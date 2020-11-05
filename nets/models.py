@@ -173,7 +173,7 @@ class DenseDecoder(nn.Module):
         #raise NotImplementedError(self._dist)
 
 MIN_STD = 1e-4
-INIT_STD = 5
+INIT_STD = 1.0
 MEAN_SCALE = 5
 class ActionDecoder(nn.Module):
     def __init__(self, act_n, cfg):

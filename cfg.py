@@ -55,7 +55,7 @@ def define_cfg():
     cfg.epochs = 100
     cfg.steps_per_epoch = 1000
     cfg.save_freq = 10
-    cfg.exp_name = ''
+    cfg.name = ''
     cfg.pi_lr = 3e-4
     cfg.vf_lr = 3e-4
     cfg.dyn_lr = 1e-3
@@ -65,6 +65,9 @@ def define_cfg():
     cfg.bs = 50
     cfg.bl = 50
     cfg.horizon = 15
+
+
+    cfg.reward_mode = 'explore'
 
     cfg.num_ens = 5
     cfg.act_ent_weight = 3e-3
