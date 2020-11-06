@@ -56,9 +56,9 @@ def define_cfg():
     cfg.steps_per_epoch = 1000
     cfg.save_freq = 10
     cfg.name = ''
-    cfg.pi_lr = 3e-4
-    cfg.vf_lr = 3e-4
-    cfg.dyn_lr = 1e-3
+    cfg.pi_lr = 8e-5
+    cfg.vf_lr = 8e-5
+    cfg.dyn_lr = 6e-4
     cfg.lds_lr = 3e-4
     cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
     cfg.net = 'mlp' # 'mlp', 'split'
@@ -89,7 +89,11 @@ def define_cfg():
     cfg.hidden = 200
     cfg.kl_scale = 1.0
     cfg.log_n = 1000
+
+    # ENV STUFF
     cfg.env_size = 64
+    cfg.env_wh_ratio = 1
+    cfg.num_objects = 1
 
     cfg.obs_stats = 0
 

@@ -54,7 +54,7 @@ class Trainer:
         if self.cfg.use_image:
             self.image_shape = self.tenv.observation_space['image'].shape
         else:
-            self.image_shape = (64, 64, 3)
+            self.image_shape = (64, self.cfg.env_wh_ratio*64, 3)
         self.act_n = self.tenv.action_space.shape[0]
 
         ## Create actor-critic module and target networks
@@ -159,6 +159,7 @@ class Trainer:
             tot[key] = tk
 
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+        self.logger['reward/collect'] += [np.mean(pack['rew'])]
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
         filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.name}-{num_ep}-{eplen}'

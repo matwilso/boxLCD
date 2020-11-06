@@ -116,9 +116,9 @@ class B2D(IndexEnv):
         EzPickle.__init__(self)
         self.w = w
         self.cfg = cfg
-        self.VIEWPORT_W = cfg.env_size
-        #self.VIEWPORT_W = 2*cfg.env_size
         self.VIEWPORT_H = cfg.env_size
+        self.VIEWPORT_W = cfg.env_wh_ratio*cfg.env_size
+        #self.VIEWPORT_W = 2*cfg.env_size
         self.scale = 320/self.VIEWPORT_H
 
         #self.world = Box2D.b2World(gravity=(0, 0))
@@ -158,7 +158,7 @@ class B2D(IndexEnv):
 
     @property
     def W(self):
-        return 10
+        return self.cfg.env_wh_ratio*10
     @property
     def H(self):
         return 10
@@ -203,7 +203,8 @@ class B2D(IndexEnv):
             fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-            root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
+            root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.75, -0.70)]
+            #root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
             root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
             if inject_obs is None: root_angle = 0
@@ -311,7 +312,12 @@ class B2D(IndexEnv):
         # RUN SIM STEP
         self.world.Step(1.0/FPS, 6*30, 2*30)
         obs = self._get_obs()
-        reward = np.abs(self.dynbodies['crab0:root'].linearVelocity.x)
+        bodies = [self.dynbodies[key] for key in self.dynbodies if 'crab0' in key]
+        masses = [b.mass for b in bodies]
+        linvel = [b.linearVelocity.x for b in bodies]
+        momentum = (A[masses] * A[linvel]).mean()
+        reward = momentum
+        #reward = np.abs(momentum)
         done = self.ep_t >= self.cfg.ep_len
         return obs.arr, reward, done, {}
 

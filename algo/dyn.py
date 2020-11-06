@@ -87,7 +87,7 @@ class Dyn(Trainer, nn.Module):
         def get_state(x):
             x = np.array(x.detach().cpu())
             return x if not self.cfg.obs_stats else (x*(1.0*self.obs_rms.var**0.5) + self.obs_rms.mean)
-        truth = np.zeros([50, 3, 64, 64])
+        truth = np.zeros([50, 3, 64, self.cfg.env_wh_ratio*64])
         for i in range(50):
             truth[i] = self.tenv.env.visualize_obs(get_state(data['state'][0][i])).transpose(2,0,1) / 255.0
 
@@ -100,7 +100,7 @@ class Dyn(Trainer, nn.Module):
         openl = self.decoder(self.dynamics.get_feat(prior).flatten(0,1), std).mean
         openl = openl.reshape((5, 45) + openl.shape[1:])
 
-        model = np.zeros([50, 3, 64, 64])
+        model = np.zeros([50, 3, 64, self.cfg.env_wh_ratio*64])
         for i in range(5):
             model[i] = self.tenv.env.visualize_obs(get_state(recon[i])).transpose(2,0,1) / 255.0
         for i in range(5, 50):
@@ -153,7 +153,7 @@ class Dyn(Trainer, nn.Module):
         if self.cfg.reward_mode == 'normal':
             rew_loss = -self.reward(feat).log_prob(batch['rew'])
             logs['model/rew_loss'] = rew_loss
-            logs['reward/actual'] = batch['rew'].mean()
+            logs['reward/batch'] = batch['rew'].mean()
             model_loss += rew_loss.mean()
         elif self.cfg.reward_mode == 'explore':
             lds = self.latent_fwds(torch.cat([feat[...,:-30], batch['act']], -1))
