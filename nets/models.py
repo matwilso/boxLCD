@@ -137,8 +137,8 @@ class MLP(nn.Module):
         x = inputs
         for i in range(len(self.sizes)-1):
             x = self.layers[f'dense{i}'].forward(x)
-            if i != (len(self.sizes)-2): x = F.elu(x)
-            #if i != (len(self.sizes)-2): x = F.relu(x)
+            #if i != (len(self.sizes)-2): x = F.elu(x)
+            if i != (len(self.sizes)-2): x = F.relu(x)
         return x
 
 class LatentFwds(nn.Module):

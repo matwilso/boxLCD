@@ -38,18 +38,28 @@ class Agent(NamedTuple):
     bodies: Dict[str, Body] = None
     joints: Dict[str, Joint] = None
 
+MOTORS_TORQUE = defaultdict(lambda: 160)
+#MOTORS_TORQUE['claw'] = 20
+SPEEDS = defaultdict(lambda: 4)
+SPEEDS['hip'] = 8
+SPEEDS['knee'] = 8
+SPEEDS['foot'] = 8
+
 def make_crab(name):
     VERT = 10/SCALE
     SIDE = 20/SCALE
-    LEG_W, LEG_H = 8/SCALE, 16/SCALE
+    LEG_W, LEG_H = 8/SCALE, 20/SCALE
+    LL_H = 16/SCALE
+    #LEG_W, LEG_H = 8/SCALE, 16/SCALE
     ARM_W, ARM_H = 8/SCALE, 20/SCALE
     CLAW_W, CLAW_H = 4/SCALE, 16/SCALE
     SHAPES = {}
     SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
     SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
     SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
-    SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
+    SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LL_H/2))
     SHAPES['claw'] = polygonShape(box = (CLAW_W/2, CLAW_H/2))
+    SHAPES['foot'] = polygonShape(box=(0.8*LEG_W/2, LL_H/4))
     return Agent(
         name=name,
         root_body=Body(SHAPES['root']),
@@ -58,6 +68,15 @@ def make_crab(name):
             'lknee': Body(SHAPES['knee']),
             'rhip': Body(SHAPES['hip']),
             'rknee': Body(SHAPES['knee']),
+
+            #'lfoot': Body(SHAPES['foot']),
+            #'rfoot': Body(SHAPES['foot']),
+
+            #'l2hip': Body(SHAPES['hip']),
+            #'l2knee': Body(SHAPES['knee']),
+            #'r2hip': Body(SHAPES['hip']),
+            #'r2knee': Body(SHAPES['knee']),
+
             'lshoulder': Body(SHAPES['arm']),
             'lelbow': Body(SHAPES['arm']),
             'rshoulder': Body(SHAPES['arm']),
@@ -74,13 +93,39 @@ def make_crab(name):
             'rrclaw1': Body(SHAPES['claw']),
             },
         joints = {
+            # legs
             'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
-            'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
             'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
-            'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+            'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
+            'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
+
+            #'lhip': Joint('root', -0.75, (-SIDE, -VERT), (0, LEG_H/2), [-1.25, 0.75]),
+            #'rhip': Joint('root', 0.75, (SIDE, -VERT), (0, LEG_H/2), [0.75, 1.25]),
+            #'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.75, 0.75]),
+            #'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.75, 0.75]),
+
+            #'lhip': Joint('root', -1.75, (-SIDE, -VERT), (0, LEG_H/2), [-0.1, 0.1]),
+            #'lknee': Joint('lhip', 0.0, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.1]),
+            #'lfoot': Joint('lknee', 0.5, (0, -LEG_H/2), (0, LL_H/4), [-0.1, 0.1]),
+
+            #'rhip': Joint('root', 1.75, (SIDE, -VERT), (0, LEG_H/2), [-0.1, 0.1]),
+            #'rknee': Joint('rhip', 0.0, (0, -LEG_H/2), (0, LEG_H/2), [-0.1, 0.5]),
+            #'rfoot': Joint('rknee', -0.5, (0, -LEG_H/2), (0, LL_H/4), [-0.1, 0.1]),
+
+            #'l2hip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
+            #'l2knee': Joint('l2hip', 0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+            #'r2hip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
+            #'r2knee': Joint('r2hip', -0.5, (0, -LEG_H/2), (0, LEG_H/2), [-0.5, 0.5]),
+
+            #'lhip': Joint('root', -1.5, (-SIDE, -1.5*VERT), (0, LEG_H/2), [-1.5, 0.5]),
+            #'rhip': Joint('root', 1.5, (SIDE, -1.5*VERT), (0, LEG_H/2), [0.5, 1.5]),
+            #'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
+            #'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
+
+            # arms
             'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 2.0]),
-            'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
             'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-2.0, 1.0]),
+            'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
             'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-2.0, 1.0]),
             # left claw
             'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
@@ -101,10 +146,6 @@ class World(NamedTuple):
     agents: List[Agent] = []
     objects: List[Object] = [] 
 
-MOTORS_TORQUE = defaultdict(lambda: 160)
-#MOTORS_TORQUE['claw'] = 20
-SPEEDS = defaultdict(lambda: 4)
-SPEEDS['knee'] = 6
 
 class B2D(IndexEnv):
     SCALE = SCALE
@@ -187,7 +228,7 @@ class B2D(IndexEnv):
         for obj in self.w.objects:
             color = (0.5,0.4,0.9), (0.3,0.3,0.5)
             #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
-            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1.0, friction=1.0)
+            fixture = fixtureDef(shape=polygonShape(box=(box_size, box_size)), density=1.0, friction=1.0, categoryBits=0x0110)
             body = self.world.CreateDynamicBody(
                 position=A[(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.85, -0.80))],
                 angle=np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos')),
@@ -228,7 +269,8 @@ class B2D(IndexEnv):
                 mangle = root_angle+joint.angle
                 mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
                 parent_angles[name] = mangle
-                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001)
+                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name and 'elbow' not in name else 0x010, friction=1.0)
+                #fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name else 0x010)
 
                 # parent rot
                 aa_delta = A[joint.anchorA]
@@ -306,6 +348,10 @@ class B2D(IndexEnv):
             key = name.split(':force')[0]
             torque = MOTORS_TORQUE['default']
             speed = SPEEDS['default']
+            for mkey in MOTORS_TORQUE:
+                if mkey in key: torque = MOTORS_TORQUE[mkey]
+            for skey in SPEEDS:
+                if skey in key: speed = SPEEDS[skey]
             self.joints[key].motorSpeed = float(speed * np.sign(action[name]))
             self.joints[key].maxMotorTorque = float(torque * np.clip(np.abs(action[name]), 0, 1))
         #self.end_positions = {key: A[self.dynbodies[key].position] for key in self.dynbodies}

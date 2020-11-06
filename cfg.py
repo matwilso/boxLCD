@@ -56,11 +56,14 @@ def define_cfg():
     cfg.steps_per_epoch = 1000
     cfg.save_freq = 10
     cfg.name = ''
-    cfg.pi_lr = 8e-5
-    cfg.vf_lr = 8e-5
-    cfg.dyn_lr = 6e-4
-    cfg.lds_lr = 3e-4
+    cfg.pi_lr = 3e-4
+    cfg.vf_lr = 3e-4
+    cfg.dyn_lr = 1e-3
+
+    cfg.lds_lr = 3e-4 # latent disagreement models
     cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
+
+
     cfg.net = 'mlp' # 'mlp', 'split'
     cfg.bs = 50
     cfg.bl = 50
@@ -72,6 +75,7 @@ def define_cfg():
     cfg.num_ens = 5
     cfg.act_ent_weight = 3e-3
     cfg.rew_weight = 1.0
+    cfg.warmup = 10
 
     cfg.polyak = 0.995
 

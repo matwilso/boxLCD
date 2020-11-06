@@ -139,9 +139,9 @@ class Dyn(Trainer, nn.Module):
         embed = self.venc(obs)
         post, prior = self.dynamics.observe(embed, batch['act'])
         feat = self.dynamics.get_feat(post)
+        obs_pred = self.decoder(feat.flatten(0,1), std=batch['std'] if self.cfg.obs_stats else None)
         prior_dist = self.dynamics.get_dist(prior)
         post_dist = self.dynamics.get_dist(post)
-        obs_pred = self.decoder(feat.flatten(0,1), std=batch['std'] if self.cfg.obs_stats else None)
 
         recon_loss = -obs_pred.log_prob(obs.flatten(0,1)).mean()
         transition_loss = -0.08*prior_dist.log_prob(post['stoch']).mean()
@@ -151,7 +151,7 @@ class Dyn(Trainer, nn.Module):
         #self.scaler.scale(model_loss).backward()
         feat = self.dynamics.get_feat(post).detach()
         if self.cfg.reward_mode == 'normal':
-            rew_loss = -self.reward(feat).log_prob(batch['rew'])
+            rew_loss = -self.reward(feat).log_prob(self.cfg.rew_weight*batch['rew'])
             logs['model/rew_loss'] = rew_loss
             logs['reward/batch'] = batch['rew'].mean()
             model_loss += rew_loss.mean()
@@ -160,8 +160,8 @@ class Dyn(Trainer, nn.Module):
             lds_loss = (0.5*(feat[:,1:].detach() - lds[:,:,:-1])**2).mean()
             logs['model/lds_loss'] = lds_loss
             model_loss += lds_loss
-
         model_loss.backward()
+
         if log_extra:
             ct, norms = 0, 0
             for p in list(filter(lambda p: p.grad is not None, self.parameters())):
@@ -234,11 +234,11 @@ class Dyn(Trainer, nn.Module):
         for key in logs:
             self.logger[key] += [logs[key].mean().detach().cpu()]
 
-        # Finally, update target networks by polyak averaging.
-        with torch.no_grad():
-            for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
-                p_targ.data.mul_(self.cfg.polyak)
-                p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+        ## Finally, update target networks by polyak averaging.
+        #with torch.no_grad():
+        #    for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
+        #        p_targ.data.mul_(self.cfg.polyak)
+        #        p_targ.data.add_((1 - self.cfg.polyak) * p.data)
         return model_loss
 
     def policy(self, obs, state, training):
@@ -308,7 +308,7 @@ class Dyn(Trainer, nn.Module):
                     self.logger_dump()
         elif self.cfg.mode == 'dream':
             # fill up with initial random data
-            for i in range(10):
+            for i in range(self.cfg.warmup):
                 self.collect_episode(self.cfg.ep_len, 50, mode='random')
 
             for self.t in itertools.count():
@@ -316,6 +316,11 @@ class Dyn(Trainer, nn.Module):
                 for j in range(100):
                     batch = self.get_batch()
                     self.update(batch, log_extra=j==0 and self.t%5==0)
+                    # Finally, update target network
+                    with torch.no_grad():
+                        for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
+                            p_targ.data[:] = p.data[:]
+
                 self.collect_episode(self.cfg.ep_len, 50, mode='policy')
                 if self.t % 1 == 0:
                     self.logger_dump()

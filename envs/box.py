@@ -61,40 +61,41 @@ if __name__ == '__main__':
         act_dict = env.get_act_dict(action)
         curr_keys = defaultdict(lambda: False)
         curr_keys.update({key: val for key, val in key_handler.items()})
+        check = lambda x: curr_keys[x] and not past_keys[x]
 
-        if curr_keys[KEY._0] or curr_keys[KEY.NUM_0]: 
+        if check(KEY._0) or check(KEY.NUM_0):
             env.reset()
             time.sleep(0.1)
             traj = []
-        if curr_keys[KEY.UP]:
+        if check(KEY.UP):
             act_dict['object0:force'] = 1.0
-        if curr_keys[KEY.DOWN]:
+        if check(KEY.DOWN):
             act_dict['object0:force'] = -1.0
-        if curr_keys[KEY.LEFT]:
+        if check(KEY.LEFT):
             act_dict['object0:theta'] = 0.5
-        if curr_keys[KEY.RIGHT]:
+        if check(KEY.RIGHT):
             act_dict['object0:theta'] = -0.5
-        if curr_keys[KEY.SPACE] and not past_keys[KEY.SPACE]:
+        if check(KEY.SPACE):
             paused = not paused
-        if curr_keys[KEY.P] and not past_keys[KEY.P]:
+        if check(KEY.P):
             plotting = not plotting
-        if curr_keys[KEY._1] and not past_keys[KEY._1]:
+        if check(KEY._1):
             dor = not dor
 
-        if curr_keys[KEY.S]:
+        if check(KEY.S):
             delay *= 2.0 
-        if curr_keys[KEY.F]:
+        if check(KEY.F):
             delay *= 0.5
         time.sleep(delay)
 
-        if curr_keys[KEY.NUM_4]:
+        if check(KEY.NUM_4):
             pass
             # TODO: add support for rendering past images in traj
 
-        if curr_keys[KEY.ESCAPE]: 
+        if check(KEY.ESCAPE): 
             exit()
 
-        if not paused or (curr_keys[KEY.NUM_6] and not past_keys[KEY.NUM_6]):
+        if not paused or check(KEY.NUM_6):
             #obs, rew, done, info = env.step(np.zeros_like(env.action_space.sample()))
             obs, rew, done, info = env.step(env.action_space.sample())
             ret += rew
