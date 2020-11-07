@@ -22,8 +22,8 @@ class Viz(Trainer):
 
     def run(self):
         N = self.cfg.ep_len // self.cfg.bl
-        files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-2*N:-N]
-        #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-N:]
+        #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[:N]
+        files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-N:]
         #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))
         #num_files = len(files)
         #idx = np.random.randint(0, num_files // N)
@@ -35,7 +35,8 @@ class Viz(Trainer):
             self.data_iter = records.make_dataset(self.barrel_path, self.state_shape, self.image_shape, self.act_n, self.cfg, shuffle=False, files=[f], repeat=False)
             batches += [next(self.data_iter)]
         batch = tree_multimap(lambda x,*y: np.stack([x,*y],1), batches[0], *batches[1:])
-        batch = tree_map(lambda x: x.reshape([50, -1, x.shape[-1]]), batch)
+        batch = tree_map(lambda x: x.reshape([x.shape[0], -1, x.shape[-1]]), batch)
+        bs = batch['state'].shape[0]
         #self.tenv.env.VIEWPORT_H *= 10
         #self.tenv.env.VIEWPORT_W *= 10
         self.tenv.reset()
@@ -94,7 +95,7 @@ class Viz(Trainer):
                 batch_idx += 1
             time_idx = time_idx % bl
 
-            if batch_idx > (bl-1):
+            if batch_idx > (bs-1):
                 batch = next(self.data_iter)
                 batch_idx = 0
                 time_idx = 0

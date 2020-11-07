@@ -83,7 +83,7 @@ def parse_single(example_proto, state_shape, image_shape, act_n, cfg):
 
 def parse(example_proto, state_shape, image_shape, act_n, cfg):
     size = cfg.bl
-    bs = cfg.bs
+    bs = -1
     shapes = {
         'state': [bs, size, *state_shape],
         'act': [bs, size, act_n],

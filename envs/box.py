@@ -22,8 +22,8 @@ class Box(B2D):
         #w = World(agents=[Agent('crab0'), Agent('crab1'), Agent('crab2')], objects=[Object('object0'), Object('object1'), Object('object2')])
         #w = World(agents=[Agent('crab0')], objects=[Object('object0'), Object('object1'), Object('object2')])
         #w = World(agents=[], objects=[Object('object0')])
-        #w = World(agents=[Agent('crab0')], objects=[])
-        w = World(agents=[Agent('crab0')], objects=[Object(f'object{i}') for i in range(cfg.num_objects)])
+        w = World(agents=[Agent('crab0')], objects=[])
+        #w = World(agents=[Agent('crab0')], objects=[Object(f'object{i}') for i in range(cfg.num_objects)])
         super().__init__(w, cfg)
 
 if __name__ == '__main__':

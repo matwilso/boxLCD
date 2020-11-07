@@ -81,16 +81,16 @@ def make_crab(name):
             'lelbow': Body(SHAPES['arm']),
             'rshoulder': Body(SHAPES['arm']),
             'relbow': Body(SHAPES['arm']),
-            # left claw
-            'llclaw0': Body(SHAPES['claw']),
-            'llclaw1': Body(SHAPES['claw']),
-            'lrclaw0': Body(SHAPES['claw']),
-            'lrclaw1': Body(SHAPES['claw']),
-            # right claw
-            'rlclaw0': Body(SHAPES['claw']),
-            'rlclaw1': Body(SHAPES['claw']),
-            'rrclaw0': Body(SHAPES['claw']),
-            'rrclaw1': Body(SHAPES['claw']),
+            ## left claw
+            #'llclaw0': Body(SHAPES['claw']),
+            #'llclaw1': Body(SHAPES['claw']),
+            #'lrclaw0': Body(SHAPES['claw']),
+            #'lrclaw1': Body(SHAPES['claw']),
+            ## right claw
+            #'rlclaw0': Body(SHAPES['claw']),
+            #'rlclaw1': Body(SHAPES['claw']),
+            #'rrclaw0': Body(SHAPES['claw']),
+            #'rrclaw1': Body(SHAPES['claw']),
             },
         joints = {
             # legs
@@ -127,16 +127,16 @@ def make_crab(name):
             'rshoulder': Joint('root', -1.0, (SIDE, VERT), (0, -ARM_H/2), [-2.0, 1.0]),
             'lelbow': Joint('lshoulder', -0.5, (0, ARM_H/2), (0, -ARM_H/2), [-1.0, 2.0]),
             'relbow': Joint('rshoulder', 0.5, (0, ARM_H/2), (0, -ARM_H/2), [-2.0, 1.0]),
-            # left claw
-            'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
-            'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-            'lrclaw0': Joint('lelbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
-            'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-            # right claw
-            'rlclaw0': Joint('relbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
-            'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
-            'rrclaw0': Joint('relbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
-            'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            ## left claw
+            #'llclaw0': Joint('lelbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+            #'llclaw1': Joint('llclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            #'lrclaw0': Joint('lelbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+            #'lrclaw1': Joint('lrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            ## right claw
+            #'rlclaw0': Joint('relbow', 1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
+            #'rlclaw1': Joint('rlclaw0', -0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
+            #'rrclaw0': Joint('relbow', -1.0, (0, ARM_H/2), (0, -CLAW_H/2), [-2.0, 1.0]),
+            #'rrclaw1': Joint('rrclaw0', 0.5, (0, CLAW_H/2), (0, -CLAW_H/2), [-0.1, 0.1]),
             },)
 
 class Object(NamedTuple):
@@ -359,10 +359,11 @@ class B2D(IndexEnv):
         self.world.Step(1.0/FPS, 6*30, 2*30)
         obs = self._get_obs()
         bodies = [self.dynbodies[key] for key in self.dynbodies if 'crab0' in key]
-        masses = [b.mass for b in bodies]
-        linvel = [b.linearVelocity.x for b in bodies]
-        momentum = (A[masses] * A[linvel]).mean()
-        reward = momentum
+        reward = self.dynbodies['crab0:root'].linearVelocity.x
+        #masses = [b.mass for b in bodies]
+        #linvel = [b.linearVelocity.x for b in bodies]
+        #momentum = (A[masses] * A[linvel]).mean()
+        #reward = momentum
         #reward = np.abs(momentum)
         done = self.ep_t >= self.cfg.ep_len
         return obs.arr, reward, done, {}

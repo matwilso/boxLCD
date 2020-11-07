@@ -24,9 +24,9 @@ class SAC(Trainer):
     def __init__(self, cfg, make_env):
         super().__init__(cfg, make_env)
         #self.pi = models.ActionDecoder(self.act_n, cfg, obs_n=self.state_shape[0]).to(cfg.device)
-        self.pi = sacnets.SquashedGaussianActor(self.tenv, 'mlp', self.state_shape[0], self.act_n, [512], nn.ReLU, 1.0, cfg).to(cfg.device)
-        self.q1 = models.MLP([self.act_n+self.state_shape[0], 512, 1]).to(self.cfg.device)
-        self.q2 = models.MLP([self.act_n+self.state_shape[0], 512, 1]).to(self.cfg.device)
+        self.pi = sacnets.SquashedGaussianActor(self.tenv, 'mlp', self.state_shape[0], self.act_n, [256, 256], nn.ReLU, 1.0, cfg).to(cfg.device)
+        self.q1 = models.MLP([self.act_n+self.state_shape[0], 256, 256, 1]).to(self.cfg.device)
+        self.q2 = models.MLP([self.act_n+self.state_shape[0], 256, 256, 1]).to(self.cfg.device)
         self.target_entropy = -self.act_n
         if cfg.learned_alpha:
             self.log_alpha = torch.nn.Parameter(torch.zeros(1))
@@ -156,11 +156,11 @@ class SAC(Trainer):
 
         # Finally, update target networks by polyak averaging.
         # TODO: try the update every 100 steps method
-        with torch.no_grad():
-            for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()):
-                p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
-            for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()):
-                p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+        #with torch.no_grad():
+        #    for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()):
+        #        p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+        #    for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()):
+        #        p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
 
     def run(self):
         self.start_time = time.time()
@@ -171,15 +171,16 @@ class SAC(Trainer):
 
         for self.t in itertools.count():
             self.refresh_dataset()
-            for j in range(100):
+            for j in range(2000):
                 batch = self.get_batch()
                 self.update(batch, log_extra=j==0 and self.t%5==0)
                 ## Finally, update target network
-                #with torch.no_grad():
-                #    for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
-                #        p_targ.data[:] = p.data[:]
+                if j % 100 == 0:
+                    with torch.no_grad():
+                        for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()): p_targ.data[:] = p.data[:]
+                        for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()): p_targ.data[:] = p.data[:]
             self.collect_episode(self.cfg.ep_len, 10, mode='policy')
-            if self.t % 10 == 0:
+            if self.t % 1 == 0:
                 self.logger_dump()
         #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)
         #print(num_files)

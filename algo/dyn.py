@@ -258,7 +258,6 @@ class Dyn(Trainer, nn.Module):
         state = (latent, action)
         return action, state
 
-
     def run(self):
         self.start_time = time.time()
         self.dt_time = time.time()

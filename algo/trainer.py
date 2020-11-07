@@ -1,3 +1,4 @@
+import pathlib
 import yaml
 import uuid
 from datetime import datetime
@@ -41,7 +42,8 @@ class Trainer:
             pyperclip.copy(str(self.logpath))
 
         self.writer = SummaryWriter(self.logpath)
-        self.barrel_path = self.cfg.barrel_path if self.cfg.barrel_path != '' else self.logpath / 'barrels'
+        self.barrel_path = pathlib.Path(self.cfg.barrel_path) if self.cfg.barrel_path != '' else self.logpath / 'barrels'
+        if self.barrel_path.name != 'barrels': self.barrel_path = self.barrel_path / 'barrels'
 
         print(self.logpath)
         print(cfg.full_cmd)
