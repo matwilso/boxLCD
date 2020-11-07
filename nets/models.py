@@ -177,11 +177,15 @@ MIN_STD = 1e-4
 INIT_STD = 1.0
 MEAN_SCALE = 5
 class ActionDecoder(nn.Module):
-    def __init__(self, act_n, cfg):
+    def __init__(self, act_n, cfg, obs_n=None):
         super().__init__()
         self.cfg = cfg
         self.raw_init_std = torch.log(torch.exp(torch.tensor(INIT_STD).float()) - 1).to(cfg.device)
-        self.mlp = MLP([cfg.stoch+cfg.deter, 256, act_n*2])
+        if obs_n is None:
+            self.mlp = MLP([cfg.stoch+cfg.deter, 256, act_n*2])
+        else:
+            self.mlp = MLP([obs_n, 256, 256, act_n*2])
+            
         self.act_n = act_n
 
     def get_dist(self, state):

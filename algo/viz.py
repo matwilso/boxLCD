@@ -22,7 +22,8 @@ class Viz(Trainer):
 
     def run(self):
         N = self.cfg.ep_len // self.cfg.bl
-        files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-N:]
+        files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-2*N:-N]
+        #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))[-N:]
         #files = list(sorted(map(lambda x: str(x), pathlib.Path(self.barrel_path).glob('*.tfrecord'))))
         #num_files = len(files)
         #idx = np.random.randint(0, num_files // N)

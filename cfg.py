@@ -107,7 +107,7 @@ def define_cfg():
     cfg.gamma = 0.99
     cfg.lam = 0.95
     # SAC
-    cfg.learned_alpha = 1
+    cfg.learned_alpha = 0
     cfg.alpha = 0.1 # for SAC w/o learned alpha
     cfg.polyak = 0.995
     cfg.num_test_episodes = 2

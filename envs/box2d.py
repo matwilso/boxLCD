@@ -269,7 +269,7 @@ class B2D(IndexEnv):
                 mangle = root_angle+joint.angle
                 mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
                 parent_angles[name] = mangle
-                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name and 'elbow' not in name else 0x010, friction=1.0)
+                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name and 'elbow' not in name else 0x010)#, friction=1.0)
                 #fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name else 0x010)
 
                 # parent rot

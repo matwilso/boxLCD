@@ -5,8 +5,8 @@ from copy import deepcopy
 from jax.tree_util import tree_multimap
 import torch.nn as nn
 import torch.nn.functional as F
-from tensorflow import nest
 from torch import optim
+from tensorflow import nest
 import numpy as np
 from algo.trainer import Trainer
 from torch import distributions
@@ -258,40 +258,6 @@ class Dyn(Trainer, nn.Module):
         state = (latent, action)
         return action, state
 
-    def get_batch(self):
-        bt = time.time()
-        batch = next(self.data_iter)
-        if self.cfg.use_image:
-            batch = nest.map_structure(lambda x: torch.tensor(x).to(self.cfg.device), batch)
-            batch['image'] = (batch['image'].permute([0, 1, -1, 2, 3]) / 255.0) - 0.5
-            #batch = nest.map_structure(lambda x: x.flatten(0,1), batch)
-        else:
-            if 'image' in batch: batch.pop('image')
-            # TODO: make this an EMA with var
-            if self.cfg.obs_stats:
-                self.obs_rms.update(batch['state'].reshape([self.cfg.bs*self.cfg.bl, -1]))
-                batch['state'] = (batch['state'] - self.obs_rms.mean) / (1.0*self.obs_rms.var**0.5)
-                batch['std'] = self.obs_rms.var**0.5
-            batch = nest.map_structure(lambda x: torch.tensor(x).float().to(self.cfg.device), batch)
-        self.logger['dt/batch'] += [time.time() - bt]
-        return batch
-
-    def logger_dump(self):
-        print('='*30)
-        print('t', self.t)
-        for key in self.logger:
-            x = np.mean(self.logger[key])
-            self.writer.add_scalar(key, x, self.t)
-            print(key, x)
-        dt = time.time()-self.dt_time
-        self.writer.add_scalar('dt', dt, self.t)
-        self.writer.flush()
-        print('dt', dt)
-        print('total time', time.time()-self.start_time)
-        print(self.logpath)
-        print(self.cfg.full_cmd)
-        print('='*30)
-        self.dt_time = time.time()
 
     def run(self):
         self.start_time = time.time()
