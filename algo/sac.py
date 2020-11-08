@@ -31,7 +31,6 @@ class SAC(Trainer):
         if cfg.learned_alpha:
             self.log_alpha = torch.nn.Parameter(torch.zeros(1))
             self.alpha_optimizer = optim.Adam([self.log_alpha], lr=cfg.alpha_lr)
-
         self.tq1 = deepcopy(self.q1)
         self.tq2 = deepcopy(self.q2)
         for p in self.tq1.parameters(): p.requires_grad = False
@@ -80,6 +79,7 @@ class SAC(Trainer):
     # Set up function for computing SAC pi loss
     def compute_loss_pi(self, batch):
         alpha = self.cfg.alpha if not self.cfg.learned_alpha else torch.exp(self.log_alpha).detach().to(self.cfg.device)
+        #o = batch['state'][:,:-1].flatten(0,1)
         o = batch['state'].flatten(0,1)
         c = lambda x,y: torch.cat([x,y],-1)
 
@@ -166,8 +166,8 @@ class SAC(Trainer):
         self.start_time = time.time()
         self.dt_time = time.time()
         # fill up with initial random data
-        for i in range(self.cfg.warmup):
-            self.collect_episode(self.cfg.ep_len, 50, mode='random')
+        #for i in range(self.cfg.warmup):
+        self.collect_episode(self.cfg.ep_len, 10, mode='random')
 
         for self.t in itertools.count():
             self.refresh_dataset()

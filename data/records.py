@@ -49,16 +49,17 @@ def vgather(args):
     x, y = args
     return tf.gather(x, y)
 
-def bptt_n(batch, cfg):
+def slice_batch(batch, cfg):
     """slice out so we only take what we are going to use for training"""
     # TODO: add support for taking a few from the same traj. we could take like 4 from the same traj to get 4x the batch size for cheap
-    mult = cfg['bs:mult']
+    mult = 1
     bs, nseq = tf.shape(batch['act'])[0], tf.shape(batch['act'])[1]
-    shape = tf.stack([bs, cfg['sample:bptt_n']], axis=0)
-    start_idxs = tf.cast(tf.random.uniform([bs*mult], 0, tf.cast(nseq-cfg['sample:bptt_n'], tf.float32)), tf.int32)
+    shape = tf.stack([bs, cfg.sample_nt], axis=0)
+    start_idxs = tf.cast(tf.random.uniform([bs*mult], 0, tf.cast(nseq-cfg.sample_nt, tf.float32)), tf.int32)
     for key in batch:
-        extra = int(key == 'state' or key == 'image')
-        tot = cfg['sample:bptt_n'] + extra
+        #extra = int(key == 'state' or key == 'image')
+        extra = 0
+        tot = cfg.sample_nt + extra
         #idxs = (start_idxs[:,None] + tf.range(tot)[None])
         idxs = tf.reshape(start_idxs[:,None] + tf.range(tot)[None], [bs, mult, tot])
         #idxs = tf.reshape((start_idxs[:,None] + tf.range(tot)[None]), [-1])
@@ -109,7 +110,8 @@ def make_dataset(barrel_path, state_shape, image_shape, act_n, cfg, repeat=True,
     dataset = dataset.shuffle(1000) if shuffle else dataset
     dataset = dataset.batch(cfg.bs)
     dataset = dataset.map(lambda x: parse(x, state_shape, image_shape, act_n, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    #dataset = dataset.map(lambda x: bptt_n(x, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    if cfg.slice_batch:
+        dataset = dataset.map(lambda x: slice_batch(x, cfg), num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(10)
     dataset = tfds.as_numpy(dataset)
     print(f'DATASET SETUP dt {time.time()-setup} num_files {len(files)} num_total {len(files)*num_per_barrel:.2e}')

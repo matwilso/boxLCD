@@ -94,6 +94,9 @@ def define_cfg():
     cfg.kl_scale = 1.0
     cfg.log_n = 1000
 
+    cfg.sample_nt = 5
+    cfg.slice_batch = 0
+
     # ENV STUFF
     cfg.env_size = 64
     cfg.env_wh_ratio = 1

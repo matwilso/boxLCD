@@ -286,7 +286,7 @@ class Dyn(Trainer, nn.Module):
                         for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
                             p_targ.data[:] = p.data[:]
 
-                self.collect_episode(self.cfg.ep_len, 50, mode='policy')
+                self.collect_episode(self.cfg.ep_len, 10, mode='policy')
                 if self.t % 1 == 0:
                     self.logger_dump()
             #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)

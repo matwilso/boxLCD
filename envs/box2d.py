@@ -20,7 +20,6 @@ A = utils.A
 
 FPS    = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
-HULL_POLY = A[(-25,+0), (-20,+16), (+20,+16), (+25,+0), (+20,-16), (-20, -16) ]
 
 class Body(NamedTuple):
     shape: polygonShape
@@ -45,16 +44,48 @@ SPEEDS['hip'] = 8
 SPEEDS['knee'] = 8
 SPEEDS['foot'] = 8
 
+def make_walker(name):
+    LEG_DOWN = -8/SCALE
+    LEG_W, LEG_H = 8/SCALE, 34/SCALE
+    TABLE_H = 34 / SCALE
+    ARM_W, ARM_H = 6/SCALE, 26/SCALE
+    ARM_UP = 8/SCALE
+    OBJECT_H = 20/SCALE
+    FINGER_W, FINGER_H = 4/SCALE, 16/SCALE
+    HULL_POLY =[(-30,+9), (+6,+9), (+34,+1), (+34,-8), (-30,-8)]
+
+    SHAPES = {}
+    SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
+    SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
+    SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
+
+    return Agent(
+        name=name,
+        root_body=Body(SHAPES['root']),
+        bodies = {
+            'lhip': Body(SHAPES['hip']),
+            'lknee': Body(SHAPES['knee']),
+            'rhip': Body(SHAPES['hip']),
+            'rknee': Body(SHAPES['knee']),
+            },
+        joints = {
+            'lhip': Joint('root', 0.05, (0.0, LEG_DOWN), (0, LEG_H/2), [-0.8, 1.1]),
+            'lknee': Joint('lhip', 0.05, (0, -LEG_H/2), (0, LEG_H/2), [-1.6, -0.1]),
+            'rhip': Joint('root', -0.05, (0.0, LEG_DOWN), (0, LEG_H/2), [-0.8, 1.1]),
+            'rknee': Joint('rhip', -0.05, (0, -LEG_H/2), (0, LEG_H/2), [-1.6, -0.1]),
+            },)
+
 def make_crab(name):
     VERT = 10/SCALE
     SIDE = 20/SCALE
     LEG_W, LEG_H = 8/SCALE, 20/SCALE
-    LL_H = 16/SCALE
+    LL_H = 20/SCALE
     #LEG_W, LEG_H = 8/SCALE, 16/SCALE
     ARM_W, ARM_H = 8/SCALE, 20/SCALE
     CLAW_W, CLAW_H = 4/SCALE, 16/SCALE
+    CRAB_POLY = A[(-25,+0), (-20,+16), (+20,+16), (+25,+0), (+20,-16), (-20, -16) ]
     SHAPES = {}
-    SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HULL_POLY ])
+    SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in CRAB_POLY ])
     SHAPES['arm'] = polygonShape(box = (ARM_W/2, ARM_H/2))
     SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
     SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LL_H/2))
@@ -94,8 +125,8 @@ def make_crab(name):
             },
         joints = {
             # legs
-            'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.0, 0.5]),
-            'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.0]),
+            'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H/2), [-1.5, 0.5]),
+            'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H/2), [0.5, 1.5]),
             'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
             'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
 
@@ -178,7 +209,10 @@ class B2D(IndexEnv):
             self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
             self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
         for i in range(len(self.w.agents)):
-            self.w.agents[i] = agent = make_crab(self.w.agents[i].name)
+            if 'crab' in self.w.agents[i].name:
+                self.w.agents[i] = agent = make_crab(self.w.agents[i].name)
+            elif 'walker' in self.w.agents[i].name:
+                self.w.agents[i] = agent = make_walker(self.w.agents[i].name)
             self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.W]
             self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.H]
             self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
@@ -243,8 +277,9 @@ class B2D(IndexEnv):
             # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
             fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
+            #root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.75, -0.70)]
+            root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.50, -0.50)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-            root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.75, -0.70)]
             #root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
             root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
@@ -269,7 +304,7 @@ class B2D(IndexEnv):
                 mangle = root_angle+joint.angle
                 mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
                 parent_angles[name] = mangle
-                fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name and 'elbow' not in name else 0x010)#, friction=1.0)
+                fixture = fixtureDef(shape=body.shape, density=1, restitution=0.0, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name and 'elbow' not in name else 0x010)#, friction=1.0)
                 #fixture = fixtureDef(shape=body.shape, density=1, categoryBits=0x0020, maskBits=0x001 if 'claw' not in name else 0x010)
 
                 # parent rot
@@ -360,6 +395,8 @@ class B2D(IndexEnv):
         obs = self._get_obs()
         bodies = [self.dynbodies[key] for key in self.dynbodies if 'crab0' in key]
         reward = self.dynbodies['crab0:root'].linearVelocity.x
+        #reward = self.dynbodies['walker0:root'].linearVelocity.x
+        #reward =  self.dynbodies['walker0:root'].position.x / self.W
         #masses = [b.mass for b in bodies]
         #linvel = [b.linearVelocity.x for b in bodies]
         #momentum = (A[masses] * A[linvel]).mean()
