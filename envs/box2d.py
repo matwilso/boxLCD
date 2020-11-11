@@ -278,7 +278,7 @@ class B2D(IndexEnv):
             fixture = fixtureDef(shape=agent.root_body.shape, density=1.0, categoryBits=0x0020, maskBits=0x001)
             name = agent.name+':root'
             #root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.75, -0.70)]
-            root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.50, -0.50)]
+            root_xy = A[sample(name+':x:p', -0.7, -0.7), sample(name+':y:p', -0.70, -0.70)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
             #root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
             #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
@@ -394,7 +394,7 @@ class B2D(IndexEnv):
         self.world.Step(1.0/FPS, 6*30, 2*30)
         obs = self._get_obs()
         bodies = [self.dynbodies[key] for key in self.dynbodies if 'crab0' in key]
-        reward = self.dynbodies['crab0:root'].linearVelocity.x
+        reward = np.abs(self.dynbodies['crab0:root'].linearVelocity.x)
         #reward = self.dynbodies['walker0:root'].linearVelocity.x
         #reward =  self.dynbodies['walker0:root'].position.x / self.W
         #masses = [b.mass for b in bodies]

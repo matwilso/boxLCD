@@ -156,32 +156,34 @@ class SAC(Trainer):
 
         # Finally, update target networks by polyak averaging.
         # TODO: try the update every 100 steps method
-        #with torch.no_grad():
-        #    for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()):
-        #        p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
-        #    for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()):
-        #        p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+        with torch.no_grad():
+            for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()):
+                p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
+            for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()):
+                p_targ.data.mul_(self.cfg.polyak); p_targ.data.add_((1 - self.cfg.polyak) * p.data)
 
     def run(self):
         self.start_time = time.time()
         self.dt_time = time.time()
         # fill up with initial random data
-        #for i in range(self.cfg.warmup):
-        self.collect_episode(self.cfg.ep_len, 10, mode='random')
+        for i in range(self.cfg.warmup):
+            self.collect_episode(self.cfg.ep_len, 1, mode='random')
 
         for self.t in itertools.count():
             self.refresh_dataset()
-            for j in range(2000):
+            for j in range(int(self.cfg.ep_len*self.cfg.num_envs*self.cfg.update_rate)):
                 batch = self.get_batch()
                 self.update(batch, log_extra=j==0 and self.t%5==0)
-                ## Finally, update target network
-                if j % 100 == 0:
-                    with torch.no_grad():
-                        for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()): p_targ.data[:] = p.data[:]
-                        for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()): p_targ.data[:] = p.data[:]
-            self.collect_episode(self.cfg.ep_len, 10, mode='policy')
+                ### Finally, update target network
+                #if j % 100 == 0:
+                #    with torch.no_grad():
+                #        for p, p_targ in zip(self.q1.parameters(), self.tq1.parameters()): p_targ.data[:] = p.data[:]
+                #        for p, p_targ in zip(self.q2.parameters(), self.tq2.parameters()): p_targ.data[:] = p.data[:]
+            self.collect_episode(self.cfg.ep_len, 1, mode='policy')
             if self.t % 1 == 0:
                 self.logger_dump()
         #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)
         #print(num_files)
         #for _ in range(num_files):
+
+

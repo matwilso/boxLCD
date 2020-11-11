@@ -100,7 +100,7 @@ class Viz(Trainer):
                 batch_idx = 0
                 time_idx = 0
 
-            rew = np.mean(batch['rew'][batch_idx])
+            rew = np.sum(batch['rew'][batch_idx])
             state = np.array(batch['state'][batch_idx, time_idx])
             obs = utils.DWrap(state, self.tenv.env.obs_info)
             #obs['object0:x:p', 'object0:y:p'] *= 10

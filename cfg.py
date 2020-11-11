@@ -59,9 +59,9 @@ def define_cfg():
     cfg.pi_lr = 3e-4
     cfg.vf_lr = 3e-4
     cfg.dyn_lr = 1e-3
+    cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
 
     cfg.lds_lr = 3e-4 # latent disagreement models
-    cfg.alpha_lr = 1e-3 # for SAC w/ learned alpha
 
 
     cfg.net = 'mlp' # 'mlp', 'split'
@@ -69,13 +69,16 @@ def define_cfg():
     cfg.bl = 50
     cfg.horizon = 15
 
+    cfg.update_rate = 1.0
+    cfg.total_steps = 200
+
 
     cfg.reward_mode = 'explore'
 
     cfg.num_ens = 5
     cfg.act_ent_weight = 3e-3
     cfg.rew_weight = 1.0
-    cfg.warmup = 10
+    cfg.warmup = 1
 
     cfg.polyak = 0.995
 

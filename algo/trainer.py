@@ -168,10 +168,9 @@ class Trainer:
         self.logger['dt/batch'] += [time.time() - bt]
         return batch
 
-    def collect_episode(self, eplen, num_ep, mode='random'):
-        num = num_ep // self.cfg.num_envs
+    def collect_episode(self, eplen, num_per_env, mode='random'):
         tot = defaultdict(lambda: [])
-        for n in range(num):
+        for n in range(num_per_env):
             o = self.venv.reset()
             agent_state = None
             pack = defaultdict(lambda: [])
@@ -200,6 +199,7 @@ class Trainer:
         self.logger['reward/collect'] += [np.mean(pack['rew'])]
         identifier = str(uuid.uuid4().hex)
         self.barrel_path.mkdir(parents=True, exist_ok=True)
+        num_ep = num_per_env * self.cfg.num_envs
         filename =  self.barrel_path / f'{timestamp}-{identifier}{self.cfg.name}-{num_ep}-{eplen}'
         tot = nms(lambda x: x.reshape([num_ep, x.shape[1]//self.cfg.bl, self.cfg.bl, -1]), tot)
         for i in range(tot['state'].shape[1]):

@@ -58,6 +58,7 @@ class Dyn(Trainer, nn.Module):
         self.lds_optimizer = optim.Adam(self.latent_fwds.parameters(), lr=self.cfg.lds_lr)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.cfg.pi_lr)
         self.value_optimizer = optim.Adam(self.value.parameters(), lr=self.cfg.vf_lr)
+        self.actdist = lambda x: self.actor.get_dist(self.actor(x))
 
         # TODO: try out just autoencoder first
         self.venc = fvmap(self.encoder)
@@ -132,7 +133,6 @@ class Dyn(Trainer, nn.Module):
     def update(self, batch, log_extra=False):
         obs = batch['image'] if self.cfg.use_image else batch['state']
         logs = {}
-        
         # MODEL UPDATE
         self.model_optimizer.zero_grad()
         self.lds_optimizer.zero_grad()
@@ -151,10 +151,12 @@ class Dyn(Trainer, nn.Module):
         #self.scaler.scale(model_loss).backward()
         feat = self.dynamics.get_feat(post).detach()
         if self.cfg.reward_mode == 'normal':
+            #rew_loss = -self.reward(feat).log_prob(batch['rew'])
             rew_loss = -self.reward(feat).log_prob(self.cfg.rew_weight*batch['rew'])
             logs['model/rew_loss'] = rew_loss
             logs['reward/batch'] = batch['rew'].mean()
             model_loss += rew_loss.mean()
+            #model_loss += self.cfg.rew_weight*rew_loss.mean()
         elif self.cfg.reward_mode == 'explore':
             lds = self.latent_fwds(torch.cat([feat[...,:-30], batch['act']], -1))
             lds_loss = (0.5*(feat[:,1:].detach() - lds[:,:,:-1])**2).mean()
@@ -193,9 +195,12 @@ class Dyn(Trainer, nn.Module):
             act_logp = act_dist.log_prob(actions['action'])
             reinforce_loss = -(act_logp[:-1]*((vt_gam - value[1:]).detach())).mean()
             dyn_back_loss = -vt_gam.mean()
-            act_ent_loss = act_logp.mean()
+
+            act_ent_loss = (self.actdist(feat.detach()).log_prob(batch['act'])).mean()
+
             # TODO: try both
-            actor_loss = 0.9*reinforce_loss + 0.1*dyn_back_loss + self.cfg.act_ent_weight*act_ent_loss
+            #actor_loss = dyn_back_loss + self.cfg.act_ent_weight*act_ent_loss
+            actor_loss = 0.9*reinforce_loss + 0.1*dyn_back_loss  +self.cfg.act_ent_weight*act_ent_loss
             #actor_loss = -(vt_gam).mean()
             actor_loss.backward()
             self.actor_optimizer.step()
@@ -224,7 +229,7 @@ class Dyn(Trainer, nn.Module):
         if log_extra:
             logs['prior_ent'] = prior_dist.entropy()
             logs['post_ent'] = post_dist.entropy()
-            #self.logger['model_grad_norm'] = post_dist.entropy()
+            #self.logger['model_grad_norm'] = post_dist.sentropy()
             lt = time.time()
             if self.cfg.use_image:
                 self.image_summaries(batch, embed, obs_pred)
@@ -273,12 +278,11 @@ class Dyn(Trainer, nn.Module):
                     self.logger_dump()
         elif self.cfg.mode == 'dream':
             # fill up with initial random data
-            for i in range(self.cfg.warmup):
-                self.collect_episode(self.cfg.ep_len, 50, mode='random')
+            self.collect_episode(self.cfg.ep_len, 1, mode='random')
 
-            for self.t in itertools.count():
+            for self.t in range(self.cfg.total_steps):
                 self.refresh_dataset()
-                for j in range(100):
+                for j in range(int(100*self.cfg.update_rate)):
                     batch = self.get_batch()
                     self.update(batch, log_extra=j==0 and self.t%5==0)
                     # Finally, update target network
@@ -286,7 +290,7 @@ class Dyn(Trainer, nn.Module):
                         for p, p_targ in zip(self.value.parameters(), self.targ_value.parameters()):
                             p_targ.data[:] = p.data[:]
 
-                self.collect_episode(self.cfg.ep_len, 10, mode='policy')
+                self.collect_episode(self.cfg.ep_len, 1, mode='policy')
                 if self.t % 1 == 0:
                     self.logger_dump()
             #num_files = self.cfg.replay_size // (self.cfg.ep_len * self.cfg.num_eps)
