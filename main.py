@@ -36,7 +36,7 @@ def draw_it(env):
     #points = ((100, 100), (200, 100), (200, 200), (100, 200), (50, 150))
     #draw.polygon((points), fill=200)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
-    image.save(f'imgs/{i}.png')
+    image.save(f'imgs/{i:03d}.png')
     env.step(env.action_space.sample())
   import ipdb; ipdb.set_trace()
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   F = parser.parse_args()
   env = Box(F) 
-  #draw_it(env)
+  draw_it(env)
 
   if True:
     env = Box(F) 

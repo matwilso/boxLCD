@@ -16,4 +16,5 @@ name ideas:
 - lcd_sim
 - mnist_sim
 
-![](./assets/urchin.png)
+<img src="./assets/urchin.png" alt="urchin" width="500">
+<img src="./assets/bounce.gif" alt="bouncy ball" width="500">
