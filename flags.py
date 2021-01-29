@@ -10,6 +10,15 @@ def flags():
   F.weightdir = pathlib.Path('.')
   F.buffdir = pathlib.Path('.')
   F.device = 'cuda' # 'cuda', 'cpu'
+
+  F.bs = 64
+  F.lr = 1e-3
+  F.n_layer = 2
+  F.n_head = 4
+  F.n_embed = 128
+  F.min_std = 1e-4
+  F.log_n = 1000
+
   # ENVIRONMENT
   F.special_viewer = 0
   F.dark_mode = 0
