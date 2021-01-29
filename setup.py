@@ -9,8 +9,8 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = 'box2d_challenge'
-DESCRIPTION = 'box2d_challenge code'
+NAME = 'b2dc'
+DESCRIPTION = 'b2dc code'
 URL = 'anon'
 EMAIL = 'anon'
 AUTHOR = 'anon'

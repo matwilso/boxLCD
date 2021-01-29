@@ -66,18 +66,21 @@ def get_window(width, height, display, **kwargs):
     return pyglet.window.Window(width=width, height=height, display=display, config=config, context=context, **kwargs)
 
 class Viewer(object):
-    def __init__(self, width, height, display=None):
+    def __init__(self, width, height, display=None, config=False):
         display = get_display(display)
-
+        self._c = config
         self.width = width
         self.height = height
-        self.window = get_window(width=width, height=height, display=display)
+        if self._c.special_viewer:
+            self.window = get_window(width=5*width, height=3*height, display=display)
+        else:
+            self.window = get_window(width=width, height=height, display=display)
         self.window.on_close = self.window_closed_by_user
         self.isopen = True
         self.geoms = []
         self.onetime_geoms = []
         self.transform = Transform()
-
+        self.window.config.alpha_size = 8
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
@@ -94,9 +97,7 @@ class Viewer(object):
         assert right > left and top > bottom
         scalex = self.width/(right-left)
         scaley = self.height/(top-bottom)
-        self.transform = Transform(
-            translation=(-left*scalex, -bottom*scaley),
-            scale=(scalex, scaley))
+        self.transform = Transform(translation=(-left*scalex, -bottom*scaley), scale=(scalex, scaley))
 
     def add_geom(self, geom):
         self.geoms.append(geom)
@@ -104,19 +105,48 @@ class Viewer(object):
     def add_onetime(self, geom):
         self.onetime_geoms.append(geom)
 
-    def render(self, return_rgb_array=False, text='', size=4):
-        glClearColor(1,1,1,1)
+    def render(self, return_rgb_array=False, texts=[], size=4, imgs=[], action=None):
+        if self._c.dark_mode:
+            glClearColor(0.3,0.3,0.3, 1)
+        else:
+            glClearColor(1,1,1,1)
+        images = []
+        xys = []
+        for img_xy in imgs:
+            img, xy = img_xy
+            xy = np.array(xy) * self._c.env_size
+            xys += [xy]
+            images += [pyglet.image.ImageData(img.shape[1], img.shape[0], 'RGB', img.tobytes(), pitch=img.shape[1]*-3)]
+            #gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
+            #texture = image.get_texture()
+            #texture.blit()
+            #img_data = img.data.__str__()
+            #tex_data = (GLubyte * img.size)( *img.astype('uint8') )
+            #tex_data = img.data.__str__()
+            ##import ipdb; ipdb.set_trace()
+            #img = np.c_[img, 255*np.ones(img.shape[:2], dtype=np.uint8)[:,:,None]]
+            #tex_data = (gl.GLubyte * img.size).from_buffer(img)
+            #image = pyglet.image.ImageData(*img.shape[:2], 'RGB', tex_data, pitch=img.shape[1]*3)
+            #image = pyglet.resource.image('test.png')
+
         self.window.clear()
-        label = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size="{size}">{text}</font>', x=self.window.width//2, y=self.window.height//2, anchor_x='center', anchor_y='center')
-        label.draw()
         self.window.switch_to()
         self.window.dispatch_events()
+        for i in range(len(images)):
+            images[i].blit(*xys[i])
+            #images[i].blit(0, self.height+image.height//8)
+        for text_xy in texts:
+            text, xy = text_xy
+            xy = np.array(xy) * self._c.env_size
+            label = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size="{size}">{text}</font>', x=xy[0], y=xy[1], anchor_x='center', anchor_y='center')
+            label.draw()
         self.transform.enable()
         for geom in self.geoms:
             geom.render()
         for geom in self.onetime_geoms:
             geom.render()
         self.transform.disable()
+
         arr = None
         if return_rgb_array:
             buffer = pyglet.image.get_buffer_manager().get_color_buffer()
@@ -153,8 +183,8 @@ class Viewer(object):
         self.add_onetime(geom)
         return geom
 
-    def draw_line(self, start, end, **attrs):
-        geom = Line(start, end)
+    def draw_line(self, start, end, width=1, **attrs):
+        geom = Line(start, end, width)
         _add_attrs(geom, attrs)
         self.add_onetime(geom)
         return geom
@@ -178,7 +208,7 @@ def _add_attrs(geom, attrs):
 
 class Geom(object):
     def __init__(self):
-        self._color=Color((0, 0, 0, 1.0))
+        self._color = Color((0, 0, 0, 1.0))
         self.attrs = [self._color]
     def render(self):
         for attr in reversed(self.attrs):
@@ -190,8 +220,8 @@ class Geom(object):
         raise NotImplementedError
     def add_attr(self, attr):
         self.attrs.append(attr)
-    def set_color(self, r, g, b):
-        self._color.vec4 = (r, g, b, 1)
+    def set_color(self, r, g, b, a=1.0):
+        self._color.vec4 = (r, g, b, a)
 
 class Attr(object):
     def enable(self):
@@ -223,6 +253,8 @@ class Color(Attr):
         self.vec4 = vec4
     def enable(self):
         glColor4f(*self.vec4)
+    def disable(self):
+        glColor4f(1, 1, 1, 1)
 
 class LineStyle(Attr):
     def __init__(self, style):
@@ -311,11 +343,11 @@ class PolyLine(Geom):
         self.linewidth.stroke = x
 
 class Line(Geom):
-    def __init__(self, start=(0.0, 0.0), end=(0.0, 0.0)):
+    def __init__(self, start=(0.0, 0.0), end=(0.0, 0.0), width=1):
         Geom.__init__(self)
         self.start = start
         self.end = end
-        self.linewidth = LineWidth(1)
+        self.linewidth = LineWidth(width)
         self.add_attr(self.linewidth)
 
     def render1(self):
@@ -366,10 +398,8 @@ class SimpleImageViewer(object):
                 self.isopen = False
 
         assert len(arr.shape) == 3, "You passed in an image with the wrong number shape"
-        image = pyglet.image.ImageData(arr.shape[1], arr.shape[0],
-            'RGB', arr.tobytes(), pitch=arr.shape[1]*-3)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D,
-            gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
+        image = pyglet.image.ImageData(arr.shape[1], arr.shape[0], 'RGB', arr.tobytes(), pitch=arr.shape[1]*-3)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
         texture = image.get_texture()
         texture.width = self.width
         texture.height = self.height
