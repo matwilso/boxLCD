@@ -11,7 +11,7 @@ def flags():
   F.buffdir = pathlib.Path('.')
   F.device = 'cuda' # 'cuda', 'cpu'
 
-  F.bs = 64
+  F.bs = 256
   F.lr = 1e-3
   F.n_layer = 2
   F.n_head = 4

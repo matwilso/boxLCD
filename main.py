@@ -49,9 +49,9 @@ if __name__ == '__main__':
   env = Box(F) 
   #draw_it(env)
 
-  if False:
+  if True:
     env = Box(F) 
-    N = 10000
+    N = 100000
     obses = np.zeros([N, 200, env.observation_space.shape[0]])
     acts = np.zeros([N, 200, env.action_space.shape[0]])
 
@@ -78,6 +78,9 @@ if __name__ == '__main__':
   optimizer = Adam(model.parameters(), lr=F.lr)
   writer = SummaryWriter(F.logdir)
   logger = utils.dump_logger({}, writer, 0, F)
+
+  # TODO: make sure we are sampling correctly
+  # TODO: seed it to a specific starting point.
 
   for i in itertools.count(0):
     idxs = torch.randint(N, size=(F.bs,))
