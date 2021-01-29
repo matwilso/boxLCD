@@ -217,9 +217,9 @@ class B2D(IndexEnv):
       color = (0.5,0.4,0.9,1.0), (0.3,0.3,0.5,1.0)
       #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0,0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
-      shape = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
-      shape = obj_shapes[shape]
-      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits)
+      shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
+      shape = obj_shapes[shape_name]
+      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=0 if shape_name == 'box' else 0.7)
       if len(self.w.agents) == 0:
         pos = A[(sample(obj.name+':x:p', -0.95, 0.95), sample(obj.name+':y:p', -0.95, 0.95))]
       else:

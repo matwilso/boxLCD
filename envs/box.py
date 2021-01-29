@@ -19,7 +19,7 @@ A = utils.A
 
 class CrabObject(B2D):
   def __init__(self, F):
-    w = World(agents=[Agent('gingy0')], objects=[Object('object0', shape='random')])
+    w = World(agents=[Agent(f'{F.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
     super().__init__(w, F)
 
 class Box(B2D):
@@ -109,8 +109,6 @@ if __name__ == '__main__':
       #while True:
       #  env.render(action=act)
       #  if key_handler[KEY.RIGHT]: break
-      obs, rew, done, info = env.step(act)
-      env.render()
       obs, rew, done, info = env.step(act)
       dobs = utils.DWrap(obs, env.obs_info, map=False)
       #print(dobs['object0:x:p'])

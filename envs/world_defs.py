@@ -13,7 +13,8 @@ class Object(NamedTuple):
   size: float = 1.0
   damping: float = 0.0
   density: float = 1.0
-  friction: float = 1.0
+  friction: float = 0.5
+  restitution: float = 0.0
   categoryBits: int = 0x0110
 
 class Body(NamedTuple):

@@ -13,7 +13,6 @@ def flags():
   # ENVIRONMENT
   F.special_viewer = 0
   F.dark_mode = 0
-  F.action_repeat = 2
   F.use_arms = 1
   F.num_objects = 0
   F.num_agents = 1
