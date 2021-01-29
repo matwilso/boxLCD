@@ -17,6 +17,8 @@ import pyglet
 KEY = pyglet.window.key
 A = utils.A
 
+object_kwargs = dict(shape='circle', size=2.0, density=0.1)
+
 class CrabObject(B2D):
   def __init__(self, F):
     w = World(agents=[Agent(f'{F.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
@@ -26,7 +28,7 @@ class Box(B2D):
   def __init__(self, F):
     gravity = [0, -9.81]
     forcetorque = 0
-    w = World(agents=[Agent(f'{F.cname}{i}') for i in range(F.num_agents)], objects=[Object(f'object{i}') for i in range(F.num_objects)], gravity=gravity, forcetorque=forcetorque)
+    w = World(agents=[Agent(f'{F.cname}{i}') for i in range(F.num_agents)], objects=[Object(f'object{i}', **object_kwargs) for i in range(F.num_objects)], gravity=gravity, forcetorque=forcetorque)
     super().__init__(w, F)
 
 if __name__ == '__main__':
@@ -37,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
   F = parser.parse_args()
-  env = CrabObject(F)
+  env = Box(F)
   start = env.reset()
   #import ipdb; ipdb.set_trace()
   ret = 0
@@ -116,6 +118,7 @@ if __name__ == '__main__':
       #print(omax)
       #print(np.linalg.norm(start[env.gixs] - obs[env.gixs], axis=-1) / len(env.gixs)**0.5)
       #print(env.get_obs_dict(obs))
+      print(obs)
       #print()
       #print(dobs['object0:x:v', 'object0:y:v', 'object0:ang:v'])
       #print(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v'])

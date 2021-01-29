@@ -124,7 +124,7 @@ class B2D(IndexEnv):
         fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits)
 
       name = agent.name+':root'
-      if self.cname == 'crab0':
+      if self.cname == 'crab0' or self.cname == 'urchin0':
         if self.F.env_wh_ratio == 2:
           root_xy = A[sample(name+':x:p', -0.9, 0.95), sample(name+':y:p', -0.7, -0.7)]
         elif self.F.env_wh_ratio < 1:
@@ -149,11 +149,7 @@ class B2D(IndexEnv):
         ang = offset_angle - base_angle
         return np.arctan2(np.sin(ang), np.cos(ang))
 
-      if self.F.all_corners:
-        body = root_body
-        root_angle = comp_angle(name, body, root_xy)
-      else:
-        root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
+      root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
         
       if not agent.rand_angle:
         root_angle = 0
@@ -221,15 +217,11 @@ class B2D(IndexEnv):
       shape = obj_shapes[shape_name]
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=0 if shape_name == 'box' else 0.7)
       if len(self.w.agents) == 0:
-        pos = A[(sample(obj.name+':x:p', -0.95, 0.95), sample(obj.name+':y:p', -0.95, 0.95))]
+        pos = A[(sample(obj.name+':x:p', -0.90, 0.90), sample(obj.name+':y:p', -0.90, 0.90))]
       else:
         pos = A[(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.9, -0.25))]
 
-      if self.F.all_corners:
-        samp = sample(obj.name+':cx:p'), sample(obj.name+':cy:p')
-        angle = np.arctan2(*(pos - samp))
-      else:
-        angle = np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos'))
+      angle = np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos'))
 
       body = self.world.CreateDynamicBody(
         position=pos,
@@ -241,8 +233,6 @@ class B2D(IndexEnv):
         )
       body.color1, body.color2 = color
       self.dynbodies[obj.name] = body
-
-
 
   def reset(self, inject_obs=None):
     self.ep_t = 0
@@ -286,10 +276,7 @@ class B2D(IndexEnv):
         name = agent.name+':root'
         self.dynbodies[f'{name}'].position = root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
 
-        if self.F.all_corners:
-          self.dynbodies[f'{name}'].angle = root_angle = comp_angle(name, agent.root_body, root_xy)
-        else:
-          self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name+':sin'), inject_obs(name+':cos'))
+        self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name+':sin'), inject_obs(name+':cos'))
         parent_angles = {}
         parent_angles[name] = root_angle
 
@@ -317,13 +304,10 @@ class B2D(IndexEnv):
           else:
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(inject_obs[name+':x:p'], inject_obs[name+':y:p'])]
 
-          if self.F.all_corners:
-            offset_angle = comp_angle(name, agent.bodies[name.split(':')[1]], pos)
-          else:
-            offset_angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
-            if self.F.angular_offset:
-              offset_angle = root_angle + offset_angle
-              offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
+          offset_angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
+          if self.F.angular_offset:
+            offset_angle = root_angle + offset_angle
+            offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
           self.dynbodies[name].angle = offset_angle
     if not self.F.walls:
       self.scroll = self.dynbodies[f'{self.cname}:root'].position.x - self.VIEWPORT_W/SCALE/2
@@ -334,11 +318,8 @@ class B2D(IndexEnv):
     for obj in self.w.objects:
       body = self.dynbodies[obj.name]
       obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
-      if self.F.all_corners:
-        obs[f'{obj.name}:cx:p', f'{obj.name}:cy:p'] = A[body.transform*body.fixtures[0].shape.vertices[-1]]
-      else:
-        obs[f'{obj.name}:cos'] = np.cos(body.angle)
-        obs[f'{obj.name}:sin'] = np.sin(body.angle)
+      obs[f'{obj.name}:cos'] = np.cos(body.angle)
+      obs[f'{obj.name}:sin'] = np.sin(body.angle)
 
     for agent in self.w.agents:
       root = self.dynbodies[agent.name+':root']
@@ -347,11 +328,8 @@ class B2D(IndexEnv):
       if self.F.obj_offset:
         obs[f'{obj.name}:xd:p'], obs[f'{obj.name}:yd:p'] = obs[f'{obj.name}:x:p', f'{obj.name}:y:p'] - A[root_xy]
 
-      if self.F.all_corners:
-        obs[f'{agent.name}:root:cx:p', f'{agent.name}:root:cy:p'] = A[root.transform*root.fixtures[0].shape.vertices[-1]]
-      else:
-        obs[f'{agent.name}:root:cos'] = np.cos(root.angle)
-        obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
+      obs[f'{agent.name}:root:cos'] = np.cos(root.angle)
+      obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in agent.joints.items():
         jnt = self.joints[f'{agent.name}:{joint_name}']
         if (float(self.F.env_version) < 0.5 and float(self.F.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
@@ -368,11 +346,8 @@ class B2D(IndexEnv):
             angle = np.arctan2(np.sin(angle), np.cos(angle))
           else:
             angle = jnt.bodyB.transform.angle
-          if self.F.all_corners:
-            obs[f'{agent.name}:{joint_name}:cx:p', f'{agent.name}:{joint_name}:cy:p'] = A[jnt.bodyB.transform*jnt.bodyB.fixtures[0].shape.vertices[-1]]
-          else:
-            obs[f'{agent.name}:{joint_name}:cos'] = np.cos(angle)
-            obs[f'{agent.name}:{joint_name}:sin'] = np.sin(angle)
+          obs[f'{agent.name}:{joint_name}:cos'] = np.cos(angle)
+          obs[f'{agent.name}:{joint_name}:sin'] = np.sin(angle)
     return obs
 
   def step(self, vec_action):
@@ -548,10 +523,7 @@ class B2D(IndexEnv):
         for agent in self.w.agents:
           name = agent.name+':root'
           root_position = position = enti[f'{name}:x:p', f'{name}:y:p']
-          if self.F.all_corners:
-            root_angle = angle = comp_angle(name, root_position)
-          else:
-            root_angle = angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+          root_angle = angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
           draw_it(name, self.dynbodies[name], extra, position, angle)
           base_angles = {name: root_angle}
           parent_angles = {name: root_angle}
@@ -570,14 +542,11 @@ class B2D(IndexEnv):
               position = enti[f'{name}:x:p', f'{name}:y:p']
               if self.F.root_offset:
                 position += enti[f'{agent.name}:root:x:p', f'{agent.name}:root:y:p']
-              if self.F.all_corners:
-                angle = comp_angle(name, position)
-              else:
-                angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
-                if self.F.angular_offset:
-                  #root_angle = np.arctan2(*enti[f'{agent.name}:root:sin', f'{agent.name}:root:cos'])
-                  angle = root_angle + angle
-                  angle = np.arctan2(np.sin(angle), np.cos(angle))
+              angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+              if self.F.angular_offset:
+                #root_angle = np.arctan2(*enti[f'{agent.name}:root:sin', f'{agent.name}:root:cos'])
+                angle = root_angle + angle
+                angle = np.arctan2(np.sin(angle), np.cos(angle))
             else:
               joint = agent.joints[bj_name]
               parent_name = agent.name+':'+joint.parent
@@ -622,10 +591,7 @@ class B2D(IndexEnv):
       for obj in self.w.objects:
         name = obj.name
         position = enti[f'{name}:x:p', f'{name}:y:p']
-        if self.F.all_corners:
-          angle = comp_angle(name, position)
-        else:
-          angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+        angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
         draw_it(name, self.dynbodies[name], extra, position, angle)
 
     if show_main:
