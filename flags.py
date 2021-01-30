@@ -3,6 +3,7 @@ import sys
 import pathlib
 import utils
 
+
 def flags():
   F = utils.AttrDict()
   # BASICS
@@ -20,6 +21,7 @@ def flags():
   F.log_n = 1000
   F.data_frac = 1.0
   F.vanished = 1
+  F.num_envs = 8
 
   # ENVIRONMENT
   F.special_viewer = 0

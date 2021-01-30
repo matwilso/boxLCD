@@ -141,8 +141,9 @@ class Transformer(nn.Module):
       for i in range(start, 199):
         x = torch.cat([samples, acts], -1)
         mu, log_std = self.forward(x).chunk(2, -1)
-        dist = self.get_dist(mu[:, i+1], log_std[:, i+1], past_o=samples[:, i])
-        samples[:, i + 1] = dist.sample()
+        dist = self.get_dist(mu[:, i], log_std[:, i], past_o=samples[:, i])
+        samples[:, i + 1] = dist.mean
+        #samples[:, i + 1] = dist.sample()
         if i == 198:
           logp = self.get_dist(mu, log_std, past_o=samples)
 
