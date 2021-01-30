@@ -10,7 +10,7 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from flags import flags, args_type
+from define_config import config, args_type
 from envs.box import Box
 
 import PIL.ImageDraw as ImageDraw
@@ -47,15 +47,15 @@ def draw_it(env):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  for key, value in flags().items():
+  for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  F = parser.parse_args()
+  C = parser.parse_args()
 
   if False:
-    env = Box(F)
+    env = Box(C)
     draw_it(env)
   elif False:
-    env = Box(F)
+    env = Box(C)
     N = 100000
     obses = np.zeros([N, 200, env.observation_space.shape[0]])
     acts = np.zeros([N, 200, env.action_space.shape[0]])
@@ -70,5 +70,5 @@ if __name__ == '__main__':
       print(i)
     data = np.savez('test.npz', obses=obses, acts=acts)
   else:
-    trainer = Trainer(F)
+    trainer = Trainer(C)
     trainer.run()

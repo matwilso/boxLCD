@@ -26,25 +26,25 @@ class B2D(IndexEnv):
   }
   @property
   def WIDTH(self):
-    return int(self.F.env_wh_ratio*10)
+    return int(self.C.env_wh_ratio*10)
   @property
   def HEIGHT(self):
     return 10
 
-  def __init__(self, w, F):
+  def __init__(self, w, C):
     """world, Hps"""
     EzPickle.__init__(self)
     self.w = w
-    self.F = F
+    self.C = C
     self.SCALE = SCALE
     self.FPS = FPS
     self.scroll = 0.0
-    self.VIEWPORT_H = self.F.env_size
-    self.VIEWPORT_W = int(self.F.env_wh_ratio*self.F.env_size)
+    self.VIEWPORT_H = self.C.env_size
+    self.VIEWPORT_W = int(self.C.env_wh_ratio*self.C.env_size)
     self.scale = 320/self.VIEWPORT_H
-    self.SPEEDS = defaultdict(lambda: 8) if self.F.use_speed else defaultdict(lambda: 6)
-    self.MOTORS_TORQUE = defaultdict(lambda: 150) if float(self.F.env_version) < 0.3 or float(self.F.env_version) >= 0.6 else defaultdict(lambda: 100)
-    if float(self.F.env_version) >= 0.6:
+    self.SPEEDS = defaultdict(lambda: 8) if self.C.use_speed else defaultdict(lambda: 6)
+    self.MOTORS_TORQUE = defaultdict(lambda: 150) if float(self.C.env_version) < 0.3 or float(self.C.env_version) >= 0.6 else defaultdict(lambda: 100)
+    if float(self.C.env_version) >= 0.6:
       self.MOTORS_TORQUE = defaultdict(lambda: 100)
       self.SPEEDS = defaultdict(lambda: 6)
       self.SPEEDS['hip'] = 10
@@ -69,15 +69,15 @@ class B2D(IndexEnv):
       self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
 
     for i in range(len(self.w.agents)):
-      self.w.agents[i] = agent = MAKERS[self.F.cname](self.w.agents[i].name, SCALE, self.F)
-      self.cname = self.F.cname+'0'
+      self.w.agents[i] = agent = MAKERS[self.C.cname](self.w.agents[i].name, SCALE, self.C)
+      self.cname = self.C.cname+'0'
       self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.HEIGHT]
       self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
       self.obs_info[f'{agent.name}:root:sin'] = A[-1, 1]
 
       for joint_name, joint in agent.joints.items():
-        if self.F.root_offset:
+        if self.C.root_offset:
           self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[-2.0, 2.0]
           self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[-2.0, 2.0]
         else:
@@ -88,7 +88,7 @@ class B2D(IndexEnv):
 
         if joint.limits[0] != joint.limits[1]:
           # act
-          if self.F.use_speed:
+          if self.C.use_speed:
             self.act_info[f'{agent.name}:{joint_name}:speed'] = A[-1,1]
           else:
             self.act_info[f'{agent.name}:{joint_name}:force'] = A[-1,1]
@@ -118,17 +118,17 @@ class B2D(IndexEnv):
       # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
       root_body = agent.root_body
 
-      if float(self.F.env_version) >= 0.4:
+      if float(self.C.env_version) >= 0.4:
         fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       else:
         fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits)
 
       name = agent.name+':root'
       if self.cname == 'crab0' or self.cname == 'urchin0':
-        if self.F.env_wh_ratio == 2:
+        if self.C.env_wh_ratio == 2:
           root_xy = A[sample(name+':x:p', -0.9, 0.95), sample(name+':y:p', -0.7, -0.7)]
-        elif self.F.env_wh_ratio < 1:
-          rat = self.F.env_wh_ratio
+        elif self.C.env_wh_ratio < 1:
+          rat = self.C.env_wh_ratio
           root_xy = A[sample(name+':x:p', -0.7*rat, 0.8*rat), sample(name+':y:p', -0.7, -0.70)]
         else:
           root_xy = A[sample(name+':x:p', -0.7, 0.8), sample(name+':y:p', -0.7, -0.70)]
@@ -238,8 +238,8 @@ class B2D(IndexEnv):
     self.ep_t = 0
     self._destroy()
     self.statics = {}
-    if self.F.walls:
-      if float(self.F.env_version) <= 0.1:
+    if self.C.walls:
+      if float(self.C.env_version) <= 0.1:
         self.statics['wall1'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH, 0)]))
         self.statics['wall2'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT)]))
         self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH, 0), (self.WIDTH, self.HEIGHT)]))
@@ -284,7 +284,7 @@ class B2D(IndexEnv):
           name = agent.name + ':' + bj_name
           body = agent.bodies[bj_name]
           joint = agent.joints[bj_name]
-          if (float(self.F.env_version) < 0.5 and float(self.F.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
+          if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
             continue
           parent_name = agent.name+':'+joint.parent
           mangle = root_angle+joint.angle
@@ -299,17 +299,17 @@ class B2D(IndexEnv):
           ab_delta = A[joint.anchorB]
           rot = utils.make_rot(mangle)
           ab_delta = rot.dot(ab_delta)
-          if self.F.root_offset:
+          if self.C.root_offset:
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[root_xy] + A[(inject_obs[name+':x:p'], inject_obs[name+':y:p'])]
           else:
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(inject_obs[name+':x:p'], inject_obs[name+':y:p'])]
 
           offset_angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
-          if self.F.angular_offset:
+          if self.C.angular_offset:
             offset_angle = root_angle + offset_angle
             offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
           self.dynbodies[name].angle = offset_angle
-    if not self.F.walls:
+    if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.cname}:root'].position.x - self.VIEWPORT_W/SCALE/2
     return self._get_obs().arr
 
@@ -325,23 +325,23 @@ class B2D(IndexEnv):
       root = self.dynbodies[agent.name+':root']
       obs[f'{agent.name}:root:x:p'], obs[f'{agent.name}:root:y:p'] = root_xy = root.position
 
-      if self.F.obj_offset:
+      if self.C.obj_offset:
         obs[f'{obj.name}:xd:p'], obs[f'{obj.name}:yd:p'] = obs[f'{obj.name}:x:p', f'{obj.name}:y:p'] - A[root_xy]
 
       obs[f'{agent.name}:root:cos'] = np.cos(root.angle)
       obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in agent.joints.items():
         jnt = self.joints[f'{agent.name}:{joint_name}']
-        if (float(self.F.env_version) < 0.5 and float(self.F.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
+        if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
           continue
-        if self.F.compact_obs:
+        if self.C.compact_obs:
           obs[f'{agent.name}:{joint_name}:angle'] = jnt.angle
         else:
-          if self.F.root_offset:
+          if self.C.root_offset:
             obs[f'{agent.name}:{joint_name}:x:p'], obs[f'{agent.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position - root_xy
           else:
             obs[f'{agent.name}:{joint_name}:x:p'], obs[f'{agent.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position
-          if self.F.angular_offset:
+          if self.C.angular_offset:
             angle = jnt.bodyB.transform.angle - root.angle
             angle = np.arctan2(np.sin(angle), np.cos(angle))
           else:
@@ -358,14 +358,14 @@ class B2D(IndexEnv):
       for name in action:
         if name == 'dummy':
           continue
-        key = name.split(':force')[0] if not self.F.use_speed else name.split(':speed')[0]
+        key = name.split(':force')[0] if not self.C.use_speed else name.split(':speed')[0]
         torque = self.MOTORS_TORQUE['default']
         speed = self.SPEEDS['default']
         for mkey in self.MOTORS_TORQUE:
           if mkey in key: torque = self.MOTORS_TORQUE[mkey]
         for skey in self.SPEEDS:
           if skey in key: speed = self.SPEEDS[skey]
-        if self.F.use_speed:
+        if self.C.use_speed:
           self.joints[key].motorSpeed = float(speed  * np.clip(action[name], -1, 1))
         else:
           self.joints[key].motorSpeed = float(speed * np.sign(action[name]))
@@ -389,19 +389,19 @@ class B2D(IndexEnv):
     self.world.Step(1.0/FPS, 6*30, 2*30)
     obs = self._get_obs()
     #bodies = [self.dynbodies[key] for key in self.dynbodies if self.cname in key]
-    if not self.F.walls:
+    if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.cname}:root'].position.x - self.VIEWPORT_W/SCALE/2
 
-    if self.F.reward_mode == 'env':
+    if self.C.reward_mode == 'env':
       reward = np.abs(self.dynbodies[f'{self.cname}:root'].linearVelocity.x)
-    elif self.F.reward_mode == 'goal':
-      if self.F.only_obj_goal:
+    elif self.C.reward_mode == 'goal':
+      if self.C.only_obj_goal:
         oy = self.dynbodies['object0'].position.y > 0.4
         reward = 0.1*oy
       else:
         reward = 0.0
     else:
-      if self.F.num_agents == 0:
+      if self.C.num_agents == 0:
         reward = 0
       else:
         angle = np.arctan2(*obs[f'{self.cname}:root:sin', f'{self.cname}:root:cos'])
@@ -413,7 +413,7 @@ class B2D(IndexEnv):
         #  spin_penalty = 0.0
         spin_penalty /= 10.0
         #back_penalty = (np.abs(angle) > 2.0).astype(np.float)
-        reward = -self.F.spin_penalty*spin_penalty + -self.F.back_penalty*back_penalty
+        reward = -self.C.spin_penalty*spin_penalty + -self.C.back_penalty*back_penalty
         #print(reward, back_penalty, spin_penalty)
     #reward = self.dynbodies['walker0:root'].linearVelocity.x
     #reward =  self.dynbodies['walker0:root'].position.x / self.WIDTH
@@ -427,7 +427,7 @@ class B2D(IndexEnv):
     #  'object/linvel': np.abs(self.dynbodies['object0'].linearVelocity),
     #}
     info = {}
-    done = self.ep_t >= self.F.ep_len
+    done = self.ep_t >= self.C.ep_len
     return obs.arr, reward, done, info
 
   def visualize_obs(self, obs, *args, **kwargs):
@@ -443,7 +443,7 @@ class B2D(IndexEnv):
   def render(self, mode='rgb_array', texts=[], imgs=[], shapes=[], entis=[], show_main=True, main_tilt=0.0, action=None, lines=[]):
     from envs import rendering
     if self.viewer is None:
-      self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H, config=self.F)
+      self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H, config=self.C)
     self.viewer.set_bounds(self.scroll, self.scale*self.VIEWPORT_W/(SCALE)+self.scroll, 0, self.scale*self.VIEWPORT_H/(SCALE))
     def draw_face(position, angle, color):
       X = 0.1; X2 = 0.2
@@ -494,14 +494,14 @@ class B2D(IndexEnv):
       if len(extra) == 3:
         color1, color2 = extra[2], A[extra[2]]*0.7
       trans = Box2D.b2Transform()
-      trans.position = position + (self.F.env_size*A[offset])/30.0
+      trans.position = position + (self.C.env_size*A[offset])/30.0
       trans.angle = angle
       path = [trans*v for v in body.fixtures[0].shape.vertices]
       self.viewer.draw_polygon(A[path], color=(*color1[:-1], alpha))
       path.append(path[0])
       self.viewer.draw_polyline(A[path], color=(*color2[:-1], alpha), linewidth=self.VIEWPORT_H/100)
       if 'root' in name:
-        draw_face(position + (self.F.env_size*A[offset])/30.0, angle, (*color2[:-1], alpha))
+        draw_face(position + (self.C.env_size*A[offset])/30.0, angle, (*color2[:-1], alpha))
 
 
     reals = {}
@@ -535,15 +535,15 @@ class B2D(IndexEnv):
           for ii, bj_name in enumerate(agent.joints):
             name = agent.name + ':' + bj_name
             body = self.dynbodies[name]
-            if not self.F.compact_obs:
-              if (float(self.F.env_version) < 0.5 and float(self.F.env_version) >= 0.3):
+            if not self.C.compact_obs:
+              if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3):
                 if agent.joints[bj_name].limits[0] == agent.joints[bj_name].limits[1]:
                   continue
               position = enti[f'{name}:x:p', f'{name}:y:p']
-              if self.F.root_offset:
+              if self.C.root_offset:
                 position += enti[f'{agent.name}:root:x:p', f'{agent.name}:root:y:p']
               angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
-              if self.F.angular_offset:
+              if self.C.angular_offset:
                 #root_angle = np.arctan2(*enti[f'{agent.name}:root:sin', f'{agent.name}:root:cos'])
                 angle = root_angle + angle
                 angle = np.arctan2(np.sin(angle), np.cos(angle))
@@ -577,7 +577,7 @@ class B2D(IndexEnv):
             draw_it(name, body, extra, position, angle)
             if len(extra) > 1 and extra[1] is not None and name in act_dict:
               # draw arrows 
-              pos = position + (self.F.env_size*A[offset])/30.0
+              pos = position + (self.C.env_size*A[offset])/30.0
               #pos = body.position
               dx = utils.make_rot(angle).dot([0, act_dict[name]])
               endpoint = pos + dx
@@ -630,12 +630,12 @@ class B2D(IndexEnv):
               self.viewer.draw_line(endpoint, a1, width=3, color=(0, 0, 1.0, 1.0))
               self.viewer.draw_line(endpoint, a2, width=3, color=(0, 0, 1.0, 1.0))
 
-    S = self.F.env_size/SCALE
+    S = self.C.env_size/SCALE
     SS = S*self.scale
     self.viewer.draw_line((0, SS), (SS, SS), color=(0, 0, 0, 1))
     self.viewer.draw_line((SS, 0), (SS, SS), color=(0, 0, 0, 1))
     self.viewer.draw_line((0, 0), (0, SS), color=(0, 0, 0, 1))
-    if self.F.special_viewer:
+    if self.C.special_viewer:
       # hoz
       self.viewer.draw_line((0, 1*S), (5*S,1*S), color=(0, 0, 0, 0.5))
       self.viewer.draw_line((0, 2*S), (5*S,2*S), color=(0, 0, 0, 0.5))
@@ -653,12 +653,12 @@ class B2D(IndexEnv):
     for line in lines:
       shape, color, offset = line
       xy, dxy = shape
-      xy = self.F.env_size*(xy + A[offset])/30.0
-      dxy = self.F.env_size*(dxy + A[offset])/30.0
-      #dxy += (self.F.env_size*A[offset])/30.0
+      xy = self.C.env_size*(xy + A[offset])/30.0
+      dxy = self.C.env_size*(dxy + A[offset])/30.0
+      #dxy += (self.C.env_size*A[offset])/30.0
       self.viewer.draw_line(xy, dxy, color=color)
 
-    return self.viewer.render(return_rgb_array = mode=='rgb_array', texts=texts, size=4//self.scale, imgs=imgs)[-self.F.env_size:,:int(self.F.env_wh_ratio*self.F.env_size)]
+    return self.viewer.render(return_rgb_array = mode=='rgb_array', texts=texts, size=4//self.scale, imgs=imgs)[-self.C.env_size:,:int(self.C.env_wh_ratio*self.C.env_size)]
 
   def close(self):
     if self.viewer is not None:

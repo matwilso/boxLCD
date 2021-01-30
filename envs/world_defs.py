@@ -66,7 +66,7 @@ def register(name):
 
 # TODO: make armed walker
 @register('walker')
-def make_walker(name, SCALE, F):
+def make_walker(name, SCALE, C):
   LEG_DOWN = -8/SCALE
   LEG_W, LEG_H = 8/SCALE, 34/SCALE
   TABLE_H = 34 / SCALE
@@ -97,7 +97,7 @@ def make_walker(name, SCALE, F):
       },)
 
 @register('luxo')
-def make_luxo(name, SCALE, F):
+def make_luxo(name, SCALE, C):
   VERT = 10/SCALE
   SIDE = 5/SCALE
   LEG_W, LEG_H = 8/SCALE, 24/SCALE
@@ -123,7 +123,7 @@ def make_luxo(name, SCALE, F):
       },)
 
 @register('urchin')
-def make_urchin(name, SCALE, F):
+def make_urchin(name, SCALE, C):
   # TODO: make armless crab version.
   VERT = 2/SCALE
   SIDE = 2/SCALE
@@ -149,7 +149,7 @@ def make_urchin(name, SCALE, F):
 
 
 @register('gingy')
-def make_gingy(name, SCALE, F):
+def make_gingy(name, SCALE, C):
   # TODO: make armless crab version.
   VERT = 10/SCALE
   SIDE = 2/SCALE
@@ -187,7 +187,7 @@ def make_gingy(name, SCALE, F):
 
 
 @register('crab')
-def make_crab(name, SCALE, F):
+def make_crab(name, SCALE, C):
   # TODO: make armless crab version.
   VERT = 12/SCALE
   SIDE = 20/SCALE
@@ -208,7 +208,7 @@ def make_crab(name, SCALE, F):
   baseMask = 0x001
   clawMask = 0x011
   categoryBits: int = 0x0020
-  if not F.all_contact:
+  if not C.all_contact:
     maskBits = 0x001
     baseMask = 0x001
   else:
@@ -235,7 +235,7 @@ def make_crab(name, SCALE, F):
     'rrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
     'rrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
   }
-  if float(F.env_version) == 0.6:
+  if float(C.env_version) == 0.6:
     joints = {
       # legs
       'lhip': Joint('root', -0.75, (-SIDE, -VERT), (0, LEG_H/2), [-1.5, 0.5]),
@@ -251,8 +251,8 @@ def make_crab(name, SCALE, F):
       'lknee': Joint('lhip', 0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
       'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
     }
-  if F.use_arms:
-    if float(F.env_version) == 0.6:
+  if C.use_arms:
+    if float(C.env_version) == 0.6:
       joints.update(**{
       # arms
       'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 3.0]),

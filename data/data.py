@@ -9,7 +9,6 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from flags import flags, args_type
 from envs.box import Box
 
 import PIL.ImageDraw as ImageDraw
@@ -18,7 +17,7 @@ from utils import A
 import utils
 
 class RolloutDataset(Dataset):
-  def __init__(self, npzfile, train=True, F=None):
+  def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile)
     obses = data['obses']
     acts = data['acts']
@@ -37,10 +36,10 @@ class RolloutDataset(Dataset):
     batch = {'o': self.obses[idx], 'a': self.acts[idx]}
     return {key: torch.as_tensor(val, dtype=torch.float32) for key, val in batch.items()}
 
-def load_ds(F):
+def load_ds(C):
   from torchvision import transforms
-  train_dset = RolloutDataset('test.npz', train=True, F=F)
-  test_dset = RolloutDataset('test.npz', train=False, F=F)
-  train_loader = DataLoader(train_dset, batch_size=F.bs, shuffle=True, pin_memory=True, num_workers=2)
-  test_loader = DataLoader(test_dset, batch_size=F.bs, shuffle=True, pin_memory=True, num_workers=2)
+  train_dset = RolloutDataset('test.npz', train=True, C=C)
+  test_dset = RolloutDataset('test.npz', train=False, C=C)
+  train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
+  test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
   return train_loader, test_loader

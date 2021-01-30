@@ -29,12 +29,12 @@ class SyncVectorEnv(VectorEnv):
       observations.
   """
 
-  def __init__(self, env_fns, observation_space=None, action_space=None, copy=True, F=None):
+  def __init__(self, env_fns, observation_space=None, action_space=None, copy=True, C=None):
     self.env_fns = env_fns
     self.envs = [env_fn() for env_fn in env_fns]
     self.copy = copy
     self.rendered = False
-    self.F = F
+    self.C = C
 
     if (observation_space is None) or (action_space is None):
       observation_space = observation_space or self.envs[0].observation_space
@@ -72,7 +72,7 @@ class SyncVectorEnv(VectorEnv):
         imgs.append(env.render())
     if not self.rendered:
       self.rendered = True
-      if self.F.vanished:
+      if self.C.vanished:
         for env in self.envs: env.viewer.window.set_visible(False)
     return np.stack(imgs)
 

@@ -21,3 +21,4 @@ name ideas:
 
 
 // TODO: add pyglet and lcd rendering side-by-side
+// TODO: rename F to something that doesn't clash with Functional, Height, Width

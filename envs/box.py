@@ -20,16 +20,16 @@ A = utils.A
 object_kwargs = dict(shape='circle', size=2.0, density=0.1)
 
 class CrabObject(B2D):
-  def __init__(self, F):
+  def __init__(self, C):
     w = World(agents=[Agent(f'{F.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
-    super().__init__(w, F)
+    super().__init__(w, C)
 
 class Box(B2D):
-  def __init__(self, F):
+  def __init__(self, C):
     gravity = [0, -9.81]
     forcetorque = 0
-    w = World(agents=[Agent(f'{F.cname}{i}') for i in range(F.num_agents)], objects=[Object(f'object{i}', **object_kwargs) for i in range(F.num_objects)], gravity=gravity, forcetorque=forcetorque)
-    super().__init__(w, F)
+    w = World(agents=[Agent(f'{F.cname}{i}') for i in range(C.num_agents)], objects=[Object(f'object{i}', **object_kwargs) for i in range(C.num_objects)], gravity=gravity, forcetorque=forcetorque)
+    super().__init__(w, C)
 
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
@@ -38,8 +38,8 @@ if __name__ == '__main__':
   for key, value in flags().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
-  F = parser.parse_args()
-  env = Box(F)
+  C = parser.parse_args()
+  env = Box(C)
   start = env.reset()
   #import ipdb; ipdb.set_trace()
   ret = 0

@@ -29,25 +29,25 @@ class CausalSelfAttention(nn.Module):
   explicit implementation here to show that there is nothing too scary here.
   """
 
-  def __init__(self, F):
+  def __init__(self, C):
     super().__init__()
-    assert F.n_embed % F.n_head == 0
+    assert C.n_embed % C.n_head == 0
     # key, query, value projections for all heads
-    self.key = nn.Linear(F.n_embed, F.n_embed)
-    self.query = nn.Linear(F.n_embed, F.n_embed)
-    self.value = nn.Linear(F.n_embed, F.n_embed)
+    self.key = nn.Linear(C.n_embed, C.n_embed)
+    self.query = nn.Linear(C.n_embed, C.n_embed)
+    self.value = nn.Linear(C.n_embed, C.n_embed)
     # output projection
-    self.proj = nn.Linear(F.n_embed, F.n_embed)
+    self.proj = nn.Linear(C.n_embed, C.n_embed)
     # causal mask to ensure that attention is only applied to the left in the input sequence
-    self.register_buffer("mask", torch.tril(torch.ones(F.block_size, F.block_size)).view(1, 1, F.block_size, F.block_size))
-    self.F = F
+    self.register_buffer("mask", torch.tril(torch.ones(C.block_size, C.block_size)).view(1, 1, C.block_size, C.block_size))
+    self.C = C
 
   def forward(self, x, layer_past=None):
     B, T, C = x.size()
     # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-    k = self.key(x).view(B, T, self.F.n_head, C // self.F.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    q = self.query(x).view(B, T, self.F.n_head, C // self.F.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    v = self.value(x).view(B, T, self.F.n_head, C // self.F.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    k = self.key(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    q = self.query(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    v = self.value(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
     # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
     att = (q @ k.transpose(-2, -1)) * (1.0 / np.sqrt(k.size(-1)))
     att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
@@ -61,15 +61,15 @@ class CausalSelfAttention(nn.Module):
 class Block(nn.Module):
   """ an unassuming Transformer block """
 
-  def __init__(self, F):
+  def __init__(self, C):
     super().__init__()
-    self.ln1 = nn.LayerNorm(F.n_embed)
-    self.ln2 = nn.LayerNorm(F.n_embed)
-    self.attn = CausalSelfAttention(F)
+    self.ln1 = nn.LayerNorm(C.n_embed)
+    self.ln2 = nn.LayerNorm(C.n_embed)
+    self.attn = CausalSelfAttention(C)
     self.mlp = nn.Sequential(
-        nn.Linear(F.n_embed, 4 * F.n_embed),
+        nn.Linear(C.n_embed, 4 * C.n_embed),
         nn.GELU(),
-        nn.Linear(4 * F.n_embed, F.n_embed),
+        nn.Linear(4 * C.n_embed, C.n_embed),
     )
 
   def forward(self, x):
@@ -77,60 +77,95 @@ class Block(nn.Module):
     x = x + self.mlp(self.ln2(x))
     return x
 
+class GaussHead(nn.Module):
+  def __init__(self, obs_n, C):
+    super().__init__()
+    self.C = C
+    self.obs_n = obs_n
+    self.layer = nn.Linear(C.n_embed, 2 * obs_n, bias=False)
+
+  def forward(self, x, past_o=None):
+    mu, log_std = self.layer(x).chunk(2, -1)
+    std = F.softplus(log_std) + self.C.min_std
+    if past_o is not None:
+      mu = mu + past_o
+    dist = tdib.Normal(mu, std)
+    return dist
+
+class MDNHead(nn.Module):
+  def __init__(self, obs_n, C):
+    super().__init__()
+    self.C = C
+    self.obs_n = obs_n
+    shape = self.C.mdn_k + 2*self.obs_n*self.C.mdn_k
+    self.layer = nn.Linear(C.n_embed, shape, bias=False)
+
+  def forward(self, x, past_o=None):
+    dx = self.C.mdn_k * self.obs_n
+    out = self.layer(x)
+    mu = out[..., :dx]
+    std = F.softplus(out[..., dx:2 * dx]) + self.C.min_std
+    logits = out[..., 2 * dx:]
+    # TODO: should this be view or something
+    mu = mu.reshape(list(mu.shape[:-1]) + [self.C.mdn_k, -1])
+    std = std.reshape(list(std.shape[:-1]) + [self.C.mdn_k, -1])
+    if past_o is not None:
+      mu = mu + past_o[...,None,:]
+    cat = tdib.Categorical(logits=logits)
+    dist = tdib.MixtureSameFamily(cat, tdib.Independent(tdib.Normal(mu, std), 1))
+    return dist
+
 class Transformer(nn.Module):
   """  the full GPT language model, with a context size of block_size """
 
-  def __init__(self, env, F):
+  def __init__(self, env, C):
     super().__init__()
+    self.C = C
     self.obs_n = env.observation_space.shape[0]
     self.shape = self.obs_n + env.action_space.shape[0] + 1
     # input embedding stem
-    self.embed = nn.Linear(self.shape, F.n_embed, bias=False)
+    self.embed = nn.Linear(self.shape, C.n_embed, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(F) for _ in range(F.n_layer)])
+    self.blocks = nn.Sequential(*[Block(C) for _ in range(C.n_layer)])
     # decoder head
-    self.ln_f = nn.LayerNorm(F.n_embed)
-    self.head = nn.Linear(F.n_embed, 2 * self.obs_n, bias=False)
+    self.ln_f = nn.LayerNorm(C.n_embed)
+    if self.C.dist_head == 'gauss':
+      self.dist_head = GaussHead(self.obs_n, C)
+    elif self.C.dist_head == 'mdn':
+      self.dist_head = MDNHead(self.obs_n, C)
     #logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
-    self.F = F
-    self.to(F.device)
+    self.to(C.device)
 
   def append_location(self, x):
     """add xy coords to every pixel"""
     X = torch.linspace(-1, 1, x.shape[-2])
     return torch.cat([x, X[None, ..., None].repeat_interleave(x.shape[0], 0).to(x.device)], -1)
 
-  def forward(self, x):
+  def forward(self, inp):
+    x = inp
     x = self.append_location(x)
     # forward the GPT model
     x = self.embed(x)
     # add padding on left so that we can't see ourself.
     x = self.blocks(x)
-    x = self.ln_f(x)
-    x = self.head(x)
-    return x
-
-  def get_dist(self, mu, log_std, past_o):
-    std = F.softplus(log_std) + self.F.min_std
-    mu = mu + past_o[..., :self.obs_n]
-    dist = tdib.Normal(mu, std)
-    return dist
+    logits = self.ln_f(x)
+    # TODO: probably return logits as well.
+    return self.dist_head(logits, past_o = inp[...,:self.obs_n] if self.C.dist_delta else None)
 
   def nll(self, batch):
     # TODO: clean this shifting to happen in model probably
     o, a = batch['o'], batch['a']
     batch_size = o.shape[0]
     x = torch.cat([o, a], -1)
-    shifted = torch.cat([torch.zeros(batch_size, 1, x.shape[-1]).to(self.F.device), x[:, :-1]], dim=1)
-    mu, log_std = self.forward(shifted).chunk(2, -1)
-    dist = self.get_dist(mu, log_std, shifted)
+    shifted = torch.cat([torch.zeros(batch_size, 1, x.shape[-1]).to(self.C.device), x[:, :-1]], dim=1)
+    dist = self.forward(shifted)
     return -dist.log_prob(o).mean()
 
   def sample(self, n, prompts=None):
     # TODO: feed act_n
     with torch.no_grad():
-      samples = torch.zeros(n, 200, self.obs_n).to(self.F.device)
-      acts = (torch.rand(samples.shape[:-1]) * 2 - 1).to(self.F.device)[..., None]
+      samples = torch.zeros(n, 200, self.obs_n).to(self.C.device)
+      acts = (torch.rand(samples.shape[:-1]) * 2 - 1).to(self.C.device)[..., None]
 
       start = 0
       if prompts is not None:
@@ -140,11 +175,10 @@ class Transformer(nn.Module):
 
       for i in range(start, 199):
         x = torch.cat([samples, acts], -1)
-        mu, log_std = self.forward(x).chunk(2, -1)
-        dist = self.get_dist(mu[:, i], log_std[:, i], past_o=samples[:, i])
-        samples[:, i + 1] = dist.mean
-        #samples[:, i + 1] = dist.sample()
+        dist = self.forward(x)
+        #samples[:, i + 1] = dist.mean[:,i]
+        samples[:, i + 1] = dist.sample()[:,i]
         if i == 198:
-          logp = self.get_dist(mu, log_std, past_o=samples)
+          logp = dist.log_prob(samples)
 
-    return samples.cpu(), logp.mean.mean().item()
+    return samples.cpu(), logp.mean().item()

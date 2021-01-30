@@ -10,7 +10,6 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from flags import flags, args_type
 from envs.box import Box
 
 import PIL.ImageDraw as ImageDraw
@@ -20,30 +19,30 @@ import utils
 from data import data
 from envs.box import Box
 
-def env_fn(F, seed=None):
+def env_fn(C, seed=None):
   def _make():
-    env = Box(F)
+    env = Box(C)
     env.seed(seed)
     return env
   return _make
 
 class Trainer:
-  def __init__(self, F):
-    self.env = Box(F)
-    self.F = F
+  def __init__(self, C):
+    self.env = Box(C)
+    self.C = C
     print('wait dataload')
     print('dataloaded')
-    F.block_size = 200
-    self.model = Transformer(self.env, F)
-    self.optimizer = Adam(self.model.parameters(), lr=F.lr)
-    self.writer = SummaryWriter(F.logdir)
-    self.logger = utils.dump_logger({}, self.writer, 0, F)
-    self.tvenv = SyncVectorEnv([env_fn(F, 0 + i) for i in range(F.num_envs)], F=F)  # test vector env
-    self.train_ds, self.test_ds = data.load_ds(F)
+    C.block_size = 200
+    self.model = Transformer(self.env, C)
+    self.optimizer = Adam(self.model.parameters(), lr=C.lr)
+    self.writer = SummaryWriter(C.logdir)
+    self.logger = utils.dump_logger({}, self.writer, 0, C)
+    self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
+    self.train_ds, self.test_ds = data.load_ds(C)
 
   def train_epoch(self, i):
     for batch in self.train_ds:
-      batch = {key: val.to(self.F.device) for key, val in batch.items()}
+      batch = {key: val.to(self.C.device) for key, val in batch.items()}
       self.optimizer.zero_grad()
       loss = self.model.nll(batch)
       loss.backward()
@@ -54,7 +53,7 @@ class Trainer:
     # TODO: make sure we are sampling correctly
     # TODO: seed it to a specific starting point.
     # EVAL
-    N = self.F.num_envs
+    N = self.C.num_envs
     reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
     rollout = [self.tvenv.reset(np.arange(N), reset_states)]
     real_imgs = [self.tvenv.render()]
@@ -81,8 +80,8 @@ class Trainer:
     fake_imgs = np.stack(fake_imgs, axis=1).transpose(0, 1, -1, 2, 3)# / 255.0
     real_imgs = np.stack(real_imgs, axis=1).transpose(0, 1, -1, 2, 3)[:,:199]# / 255.0
     error = (fake_imgs - real_imgs + 255) // 2
-    out = error
-    #out = np.concatenate([real_imgs, fake_imgs, error], 3)
+    #out = error
+    out = np.concatenate([real_imgs, fake_imgs, error], 3)
     N, T, C, H, W = out.shape
     out = out.transpose(1,2,3,0,4).reshape([T, C, H, N*W])[None]
     self.writer.add_video('error', out, i, fps=50)
@@ -93,13 +92,13 @@ class Trainer:
     total_loss = 0.0
     with torch.no_grad():
       for batch in self.test_ds:
-        batch = {key: val.to(self.F.device) for key, val in batch.items()}
+        batch = {key: val.to(self.C.device) for key, val in batch.items()}
         loss = self.model.nll(batch)
         total_loss += loss * batch['o'].shape[0]
       avg_loss = total_loss / len(self.test_ds.dataset)
     self.logger['test/bits_per_dim'] = avg_loss.item() / np.log(2)
     self.sample(i)
-    self.logger = utils.dump_logger(self.logger, self.writer, i, self.F)
+    self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
     self.writer.flush()
     self.model.train()
 

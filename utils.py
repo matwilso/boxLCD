@@ -34,16 +34,16 @@ def combined_shape(length, shape=None):
 def count_vars(module):
   return sum([np.prod(p.shape) for p in module.parameters()])
 
-def dump_logger(logger, writer, i, F):
+def dump_logger(logger, writer, i, C):
   print('=' * 30)
   print(i)
   for key in logger:
     val = np.mean(logger[key])
     writer.add_scalar(key, val, i)
     print(key, val)
-  print(F.full_cmd)
-  with open(pathlib.Path(F.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(F, f)
+  print(C.full_cmd)
+  with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
+    yaml.dump(C, f)
   print('=' * 30)
   return defaultdict(lambda: [])
 
