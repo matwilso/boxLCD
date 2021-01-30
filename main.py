@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -36,7 +37,8 @@ def draw_it(env):
     #points = ((100, 100), (200, 100), (200, 200), (100, 200), (50, 150))
     #draw.polygon((points), fill=200)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
-    image.save(f'imgs/{i:03d}.png')
+    img = 1.0*np.array(image).repeat(16, -1).repeat(16, -2)
+    plt.imsave(f'imgs/{i:03d}.png', img, cmap='gray')
     env.step(env.action_space.sample())
   import ipdb; ipdb.set_trace()
 

@@ -16,5 +16,8 @@ name ideas:
 - lcd_sim
 - mnist_sim
 
-<img src="./assets/urchin.png" alt="urchin" width="500">
-<img src="./assets/bounce.gif" alt="bouncy ball" width="500">
+![](./assets/urchin.png)
+![](./assets/bounce.gif)
+
+
+// TODO: add pyglet and lcd rendering side-by-side
