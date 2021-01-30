@@ -18,6 +18,8 @@ def flags():
   F.n_embed = 128
   F.min_std = 1e-4
   F.log_n = 1000
+  F.data_frac = 1.0
+  F.vanished = 1
 
   # ENVIRONMENT
   F.special_viewer = 0
@@ -26,7 +28,7 @@ def flags():
   F.num_objects = 1
   F.num_agents = 0
   F.use_images = 0
-  F.env_size = 64
+  F.env_size = 128
   F.env_wh_ratio = 1.0
   F.ep_len = 200
   F.env_version = '0.7'
