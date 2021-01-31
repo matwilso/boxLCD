@@ -178,8 +178,10 @@ class Transformer(nn.Module):
       for i in range(start, self.C.ep_len-1):
         x = torch.cat([samples, acts], -1)
         dist = self.forward(x)
-        samples[:, i + 1] = dist.mean[:,i]
-        #samples[:, i + 1] = dist.sample()[:,i]
+        if self.C.sample_sample:
+          samples[:, i + 1] = dist.sample()[:,i]
+        else:
+          samples[:, i + 1] = dist.mean[:,i]
         if i == self.C.ep_len-2:
           logp = dist.log_prob(samples)
 

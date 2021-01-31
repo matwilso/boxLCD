@@ -36,6 +36,8 @@ def config():
 
   C.mdn_k = 5
   C.dist_delta = 0
+  C.sample_sample = 0
+  C.skip_train = 0
 
 
 

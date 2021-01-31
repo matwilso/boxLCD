@@ -68,16 +68,25 @@ class B2D(IndexEnv):
       # TODO: add range options
       self.obs_info[f'{obj.name}:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{obj.name}:y:p'] = A[0, self.HEIGHT]
-      self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
-      self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
+      if self.C.all_corners:
+        self.obs_info[f'{obj.name}:kx:p'] = A[0, self.WIDTH]
+        self.obs_info[f'{obj.name}:ky:p'] = A[0, self.HEIGHT]
+      else:
+        self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
+        self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
+
 
     for i in range(len(self.w.agents)):
       self.w.agents[i] = agent = MAKERS[self.C.cname](self.w.agents[i].name, SCALE, self.C)
       self.cname = self.C.cname+'0'
       self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.HEIGHT]
-      self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
-      self.obs_info[f'{agent.name}:root:sin'] = A[-1, 1]
+      if self.C.all_corners:
+        self.obs_info[f'{agent.name}:kx:p'] = A[0, self.WIDTH]
+        self.obs_info[f'{agent.name}:ky:p'] = A[0, self.HEIGHT]
+      else:
+        self.obs_info[f'{agent.name}:root:cos'] = A[-1, 1]
+        self.obs_info[f'{agent.name}:root:sin'] = A[-1, 1]
 
       for joint_name, joint in agent.joints.items():
         if self.C.root_offset:
@@ -86,8 +95,13 @@ class B2D(IndexEnv):
         else:
           self.obs_info[f'{agent.name}:{joint_name}:x:p'] = A[0, self.WIDTH]
           self.obs_info[f'{agent.name}:{joint_name}:y:p'] = A[0, self.HEIGHT]
-        self.obs_info[f'{agent.name}:{joint_name}:cos'] = A[-1, 1]
-        self.obs_info[f'{agent.name}:{joint_name}:sin'] = A[-1, 1]
+
+        if self.C.all_corners:
+          self.obs_info[f'{agent.name}:{joint_name}:kx:p'] = A[0, self.WIDTH]
+          self.obs_info[f'{agent.name}:{joint_name}:ky:p'] = A[0, self.HEIGHT]
+        else:
+          self.obs_info[f'{agent.name}:{joint_name}:cos'] = A[-1, 1]
+          self.obs_info[f'{agent.name}:{joint_name}:sin'] = A[-1, 1]
 
         if joint.limits[0] != joint.limits[1]:
           # act
@@ -146,13 +160,17 @@ class B2D(IndexEnv):
       #root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
       #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
       def comp_angle(name, body, base_pos):
-        cxy = (sample(f'{name}:cx:p'), sample(f'{name}:cy:p')) - A[base_pos]
+        cxy = (sample(f'{name}:kx:p'), sample(f'{name}:ky:p')) - A[base_pos]
         base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
         offset_angle = np.arctan2(*cxy[::-1])
         ang = offset_angle - base_angle
         return np.arctan2(np.sin(ang), np.cos(ang))
 
-      root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
+      if self.C.all_corners:
+        body = root_body
+        root_angle = comp_angle(name, body, root_xy)
+      else:
+        root_angle = np.arctan2(sample(name+':sin'), sample(name+':cos'))
         
       if not agent.rand_angle:
         root_angle = 0
@@ -224,7 +242,11 @@ class B2D(IndexEnv):
       else:
         pos = A[(sample(obj.name+':x:p', -0.95), sample(obj.name+':y:p', -0.9, -0.25))]
 
-      angle = np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos'))
+      if self.C.all_corners:
+        samp = sample(obj.name+':kx:p'), sample(obj.name+':ky:p')
+        angle = np.arctan2(*(pos - samp))
+      else:
+        angle = np.arctan2(sample(obj.name+':sin'), sample(obj.name+':cos'))
 
       body = self.world.CreateDynamicBody(
         position=pos,
@@ -259,7 +281,7 @@ class B2D(IndexEnv):
     #self.world.Step(0.001/FPS, 6*30, 2*30)
     if inject_obs is not None:
       def comp_angle(name, body, base_pos):
-        cxy = (inject_obs[f'{name}:cx:p'], inject_obs[f'{name}:cy:p']) - A[base_pos]
+        cxy = (inject_obs[f'{name}:kx:p'], inject_obs[f'{name}:ky:p']) - A[base_pos]
         base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
         offset_angle = np.arctan2(*cxy[::-1])
         ang = offset_angle - base_angle
@@ -273,13 +295,22 @@ class B2D(IndexEnv):
 
       for obj in self.w.objects:
         name = obj.name
-        self.dynbodies[name].position = inject_obs[f'{name}:x:p', f'{name}:y:p']
+        body = self.dynbodies[name]
+        self.dynbodies[name].position = xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
+        if self.C.all_corners:
+          import ipdb; ipdb.set_trace() # TODO: make comp angle work with object as well
+          self.dynbodies[name].angle = comp_angle(name, body, xy)
+        else:
+          self.dynbodies[name].angle = np.arctan2(inject_obs(name+':sin'), inject_obs(name+':cos'))
 
       for agent in self.w.agents:
         name = agent.name+':root'
         self.dynbodies[f'{name}'].position = root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
 
-        self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name+':sin'), inject_obs(name+':cos'))
+        if self.C.all_corners:
+          self.dynbodies[f'{name}'].angle = root_angle = comp_angle(name, agent.root_body, root_xy)
+        else:
+          self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name+':sin'), inject_obs(name+':cos'))
         parent_angles = {}
         parent_angles[name] = root_angle
 
@@ -307,10 +338,13 @@ class B2D(IndexEnv):
           else:
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(inject_obs[name+':x:p'], inject_obs[name+':y:p'])]
 
-          offset_angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
-          if self.C.angular_offset:
-            offset_angle = root_angle + offset_angle
-            offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
+          if self.C.all_corners:
+            offset_angle = comp_angle(name, agent.bodies[name.split(':')[1]], pos)
+          else:
+            offset_angle = np.arctan2(inject_obs[name+':sin'], inject_obs[name+':cos'])
+            if self.C.angular_offset:
+              offset_angle = root_angle + offset_angle
+              offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
           self.dynbodies[name].angle = offset_angle
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.cname}:root'].position.x - self.VIEWPORT_W/SCALE/2
@@ -321,8 +355,11 @@ class B2D(IndexEnv):
     for obj in self.w.objects:
       body = self.dynbodies[obj.name]
       obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
-      obs[f'{obj.name}:cos'] = np.cos(body.angle)
-      obs[f'{obj.name}:sin'] = np.sin(body.angle)
+      if self.C.all_corners:
+        obs[f'{obj.name}:kx:p', f'{obj.name}:ky:p'] = A[body.transform*body.fixtures[0].shape.vertices[-1]]
+      else:
+        obs[f'{obj.name}:cos'] = np.cos(body.angle)
+        obs[f'{obj.name}:sin'] = np.sin(body.angle)
 
     for agent in self.w.agents:
       root = self.dynbodies[agent.name+':root']
@@ -331,8 +368,11 @@ class B2D(IndexEnv):
       if self.C.obj_offset:
         obs[f'{obj.name}:xd:p'], obs[f'{obj.name}:yd:p'] = obs[f'{obj.name}:x:p', f'{obj.name}:y:p'] - A[root_xy]
 
-      obs[f'{agent.name}:root:cos'] = np.cos(root.angle)
-      obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
+      if self.C.all_corners:
+        obs[f'{agent.name}:root:kx:p', f'{agent.name}:root:ky:p'] = A[root.transform*root.fixtures[0].shape.vertices[-1]]
+      else:
+        obs[f'{agent.name}:root:cos'] = np.cos(root.angle)
+        obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in agent.joints.items():
         jnt = self.joints[f'{agent.name}:{joint_name}']
         if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
@@ -349,8 +389,11 @@ class B2D(IndexEnv):
             angle = np.arctan2(np.sin(angle), np.cos(angle))
           else:
             angle = jnt.bodyB.transform.angle
-          obs[f'{agent.name}:{joint_name}:cos'] = np.cos(angle)
-          obs[f'{agent.name}:{joint_name}:sin'] = np.sin(angle)
+          if self.C.all_corners:
+            obs[f'{agent.name}:{joint_name}:kx:p', f'{agent.name}:{joint_name}:ky:p'] = A[jnt.bodyB.transform*jnt.bodyB.fixtures[0].shape.vertices[-1]]
+          else:
+            obs[f'{agent.name}:{joint_name}:cos'] = np.cos(angle)
+            obs[f'{agent.name}:{joint_name}:sin'] = np.sin(angle)
     return obs
 
   def step(self, vec_action):
@@ -402,7 +445,7 @@ class B2D(IndexEnv):
         oy = self.dynbodies['object0'].position.y > 0.4
         reward = 0.1*oy
       else:
-        reward = 0.0
+        reward = 0.1
     else:
       if self.C.num_agents == 0:
         reward = 0
@@ -540,7 +583,7 @@ class B2D(IndexEnv):
       enti = utils.DWrap(enti, self.obs_info)
 
       def comp_angle(name, base_pos):
-        cxy = enti[f'{name}:cx:p', f'{name}:cy:p'] - position
+        cxy = enti[f'{name}:kx:p', f'{name}:ky:p'] - position
         base_angle = np.arctan2(*self.dynbodies[name].fixtures[0].shape.vertices[-1][::-1])
         offset_angle = np.arctan2(*cxy[::-1])
         ang = offset_angle - base_angle
@@ -550,7 +593,10 @@ class B2D(IndexEnv):
         for agent in self.w.agents:
           name = agent.name+':root'
           root_position = position = enti[f'{name}:x:p', f'{name}:y:p']
-          root_angle = angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+          if self.C.all_corners:
+            root_angle = angle = comp_angle(name, root_position)
+          else:
+            root_angle = angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
           draw_it(name, self.dynbodies[name], extra, position, angle)
           base_angles = {name: root_angle}
           parent_angles = {name: root_angle}
@@ -569,11 +615,14 @@ class B2D(IndexEnv):
               position = enti[f'{name}:x:p', f'{name}:y:p']
               if self.C.root_offset:
                 position += enti[f'{agent.name}:root:x:p', f'{agent.name}:root:y:p']
-              angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
-              if self.C.angular_offset:
-                #root_angle = np.arctan2(*enti[f'{agent.name}:root:sin', f'{agent.name}:root:cos'])
-                angle = root_angle + angle
-                angle = np.arctan2(np.sin(angle), np.cos(angle))
+              if self.C.all_corners:
+                angle = comp_angle(name, position)
+              else:
+                angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+                if self.C.angular_offset:
+                  #root_angle = np.arctan2(*enti[f'{agent.name}:root:sin', f'{agent.name}:root:cos'])
+                  angle = root_angle + angle
+                  angle = np.arctan2(np.sin(angle), np.cos(angle))
             else:
               joint = agent.joints[bj_name]
               parent_name = agent.name+':'+joint.parent
@@ -618,7 +667,10 @@ class B2D(IndexEnv):
       for obj in self.w.objects:
         name = obj.name
         position = enti[f'{name}:x:p', f'{name}:y:p']
-        angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
+        if self.C.all_corners:
+          angle = comp_angle(name, position)
+        else:
+          angle = np.arctan2(*enti[f'{name}:sin', f'{name}:cos'])
         draw_it(name, self.dynbodies[name], extra, position, angle)
 
     if show_main:

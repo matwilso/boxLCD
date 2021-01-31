@@ -103,5 +103,6 @@ class Trainer(Runner):
 
   def run(self):
     for i in itertools.count():
-      self.train_epoch(i)
+      if not self.C.skip_train:
+        self.train_epoch(i)
       self.test(i)

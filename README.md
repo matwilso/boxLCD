@@ -18,6 +18,8 @@ cycles for trying out ideas, which will lower the bar to entry of working on the
 // TODO: we have purely state-based and also mixture of state and pixel-based prediction
 // TODO: make organization better
 
+// TODO: create examples of bounce, dropbox, agent with varieties. w/ both pyglet and lcd rendering.
+
 ## boxLCD Challenge 🌐 🧩
 
 Associated with boxLCD is the boxLCD Challenge.
