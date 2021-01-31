@@ -8,10 +8,13 @@ It offers a few basic sample environments and a limited wrapper around the pybox
 The goal of this project is to accelerate progress in learning world models and data-driven physics simulators (learned simulators).
 By using very low dimensional rendering, researchers can work on developing pixel-based approaches that
 can operate in the real world, while being able to iterate on ideas much more quickly.
+
 The underlying physics and logic are quite complex, with contacts, momentum, and robot actions,
 but the dimensionality shown in the gif above is only 16*32 = 512, compared to 64*128*3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
 
-Associated with boxLCD is the **boxLCD Challenge** 🌐 🧩
+## boxLCD Challenge 🌐 🧩
+
+Associated with boxLCD is the boxLCD Challenge.
 Meant to simulate as closely as possible the challenges that will be faced in developing powerful learned world models
 on real robots in the real world, while being tremendously more tractable.
 
