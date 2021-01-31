@@ -1,5 +1,4 @@
-# box2d_challenge
-
+![](./assets/sideside.gif)
 # box_lcd_challenge
 
 Box2D simulation with very simple B/W LCD rendering. And super simple graphics for low computational budgets and quick
@@ -16,9 +15,6 @@ name ideas:
 - lcd_sim
 - mnist_sim
 
-![](./assets/urchin.png)
-![](./assets/bounce.gif)
-![](./assets/sideside.gif)
 
 
 // TODO: add pyglet and lcd rendering side-by-side
