@@ -2,7 +2,17 @@ import subprocess
 import sys
 import pathlib
 import utils
+from envs.box import Box, Dropbox
 
+def env_fn(C, seed=None):
+  def _make():
+    if C.env == 'box':
+      env = Box(C)
+    elif C.env == 'dropbox':
+      env = Dropbox(C)
+    env.seed(seed)
+    return env
+  return _make
 
 def config():
   C = utils.AttrDict()
@@ -11,9 +21,10 @@ def config():
   C.weightdir = pathlib.Path('.')
   C.buffdir = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
+  C.mode = 'train'
 
-  C.bs = 256
-  C.lr = 1e-3
+  C.bs = 64
+  C.lr = 1e-4
   C.n_layer = 2
   C.n_head = 4
   C.n_embed = 128
@@ -23,8 +34,10 @@ def config():
   C.vanished = 1
   C.num_envs = 5
 
-  C.mdn_k = 1
+  C.mdn_k = 5
   C.dist_delta = 0
+
+
 
 
   C.lcd_h = 16
@@ -32,6 +45,7 @@ def config():
   C.env_size = 128
 
   # ENVIRONMENT
+  C.env = 'box'
   C.special_viewer = 0
   C.dark_mode = 0
   C.use_arms = 1

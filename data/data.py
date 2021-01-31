@@ -38,8 +38,8 @@ class RolloutDataset(Dataset):
 
 def load_ds(C):
   from torchvision import transforms
-  train_dset = RolloutDataset('test.npz', train=True, C=C)
-  test_dset = RolloutDataset('test.npz', train=False, C=C)
+  train_dset = RolloutDataset(f'{C.env}.npz', train=True, C=C)
+  test_dset = RolloutDataset(f'{C.env}.npz', train=False, C=C)
   train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
   test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
   return train_loader, test_loader

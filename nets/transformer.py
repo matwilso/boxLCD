@@ -89,7 +89,9 @@ class GaussHead(nn.Module):
     std = F.softplus(log_std) + self.C.min_std
     if past_o is not None:
       mu = mu + past_o
-    dist = tdib.Independent(tdib.Normal(mu, std), 1)
+    #dist = tdib.Independent(tdib.Normal(mu, std), 1)
+    #dist = tdib.Normal(mu, std)
+    dist = tdib.MultivariateNormal(mu, torch.diag_embed(std))
     return dist
 
 class MDNHead(nn.Module):
@@ -112,7 +114,7 @@ class MDNHead(nn.Module):
     if past_o is not None:
       mu = mu + past_o[...,None,:]
     cat = tdib.Categorical(logits=logits)
-    dist = tdib.MixtureSameFamily(cat, tdib.Independent(tdib.Normal(mu, std), 1))
+    dist = tdib.MixtureSameFamily(cat, tdib.MultivariateNormal(mu, torch.diag_embed(std)))
     return dist
 
 class Transformer(nn.Module):
@@ -159,12 +161,12 @@ class Transformer(nn.Module):
     x = torch.cat([o, a], -1)
     shifted = torch.cat([torch.zeros(batch_size, 1, x.shape[-1]).to(self.C.device), x[:, :-1]], dim=1)
     dist = self.forward(shifted)
-    return -dist.log_prob(o).mean()
+    return -dist.log_prob(o).mean(), dist
 
   def sample(self, n, prompts=None):
     # TODO: feed act_n
     with torch.no_grad():
-      samples = torch.zeros(n, 200, self.obs_n).to(self.C.device)
+      samples = torch.zeros(n, self.C.ep_len, self.obs_n).to(self.C.device)
       acts = (torch.rand(samples.shape[:-1]) * 2 - 1).to(self.C.device)[..., None]
 
       start = 0
@@ -173,12 +175,12 @@ class Transformer(nn.Module):
         samples[:n, 1:k+1, :] = torch.as_tensor(prompts, dtype=torch.float32).to(samples.device)
         start = k
 
-      for i in range(start, 199):
+      for i in range(start, self.C.ep_len-1):
         x = torch.cat([samples, acts], -1)
         dist = self.forward(x)
-        #samples[:, i + 1] = dist.mean[:,i]
-        samples[:, i + 1] = dist.sample()[:,i]
-        if i == 198:
+        samples[:, i + 1] = dist.mean[:,i]
+        #samples[:, i + 1] = dist.sample()[:,i]
+        if i == self.C.ep_len-2:
           logp = dist.log_prob(samples)
 
     return samples.cpu(), logp.mean().item()

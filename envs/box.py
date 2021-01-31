@@ -19,6 +19,11 @@ A = utils.A
 
 object_kwargs = dict(shape='circle', size=2.0, density=0.1)
 
+class Dropbox(B2D):
+  def __init__(self, C):
+    w = World(agents=[], objects=[Object('object0', shape='box', size=2.0, density=0.1)])
+    super().__init__(w, C)
+
 class CrabObject(B2D):
   def __init__(self, C):
     w = World(agents=[Agent(f'{C.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
@@ -39,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
   C = parser.parse_args()
-  env = Box(C)
+  env = Dropbox(C)
   start = env.reset()
   #import ipdb; ipdb.set_trace()
   ret = 0

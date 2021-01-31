@@ -2,7 +2,7 @@
 # 📟 boxLCD 📟
 ## box2D physics with MNIST-sized rendering
 
-boxLCD enables rendering in very low resolution binarized images to enable quick
+boxLCD renders simple 2D physics environments in very low resolution binarized images to enable quick
 iterations of ideas on low computational budgets.
 It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
 
@@ -33,6 +33,11 @@ The underlying physics and logic are quite complex, with contacts, momentum, and
 but the dimensionality shown in the gif above is only 16x32 = 512, compared to 64x128x3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
 So the task is complex and meaningful, but experiments can be run with much less compute.
 It is complex, mirrors challenges we will face in real robotics, and it should offer good signal about what really matters.
+
+There are precise rules the govern it, just like the real world.
+You can make observations about those rules.
+And you want to learn how the system works.
+
 
 Properties that will likely be useful in real world learned sims and world models:
 - merging robot proprioception with exteroception (cameras, sensors)
