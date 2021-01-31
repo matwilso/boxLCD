@@ -11,9 +11,12 @@ ultimately so that robots can learn strong predictive models and act more effect
 
 2D physics, with very-low resolution offers a crude approximation to the final task. But we think it captures
 enough of the structure of the final goal to be useful, while enabling tremendously quicker iteration
-cycles for trying out ideas and lowering the bar to entry of working on these problems.
+cycles for trying out ideas, which will lower the bar to entry of working on these problems and accelerate progress.
 
-It's called boxLCD because the rendering is reminscent of monochromatic LCD displays (and it rhymes with box2d).
+// TODO: add docs on
+// TODO: specific envs and stuff. like the options and the custom creatures you can create
+// TODO: we have purely state-based and also mixture of state and pixel-based prediction
+// TODO: make organization better
 
 ## boxLCD Challenge 🌐 🧩
 
@@ -27,7 +30,7 @@ By pushing on this metric, we will be able to develop better methods for learnin
 that will eventually be useful for enabling robots to learn to achieve more difficult tasks than is possible today.
 
 The underlying physics and logic are quite complex, with contacts, momentum, and robot actions,
-but the dimensionality shown in the gif above is only 16*32 = 512, compared to 64*128*3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
+but the dimensionality shown in the gif above is only 16x32 = 512, compared to 64x128x3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
 So the task is complex and meaningful, but experiments can be run with much less compute.
 It is complex, mirrors challenges we will face in real robotics, and it should offer good signal about what really matters.
 
@@ -38,3 +41,7 @@ Properties that will likely be useful in real world learned sims and world model
 - modeling uncertainty, making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns
 
 // convert -resize 100% -delay 2 -loop 0 *.png test.gif
+
+## FAQS
+**Why is it called boxLCD?**
+The rendering looks kind of like an LCD display. And it rhymes with 2d.
