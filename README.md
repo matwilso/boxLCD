@@ -1,16 +1,19 @@
 ![](./assets/sideside.gif)
-# boxLCD 📟 - box2D physics with MNIST-style rendering
+# 📟 boxLCD 📟
+## box2D physics with MNIST-sized rendering
 
 boxLCD enables rendering in very low resolution binarized images to enable quick
 iterations of ideas on low computational budgets.
 It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
 
-The goal of this project is to accelerate progress in learning world models and data-driven physics simulators (learned simulators).
-By using very low dimensional rendering, researchers can work on developing pixel-based approaches that
-can operate in the real world, while being able to iterate on ideas much more quickly.
+The goal of this project is to accelerate progress in learned simulator and world model research,
+ultimately so that robots can learn strong predictive models and act more effectively in the real world.
 
-The underlying physics and logic are quite complex, with contacts, momentum, and robot actions,
-but the dimensionality shown in the gif above is only 16*32 = 512, compared to 64*128*3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
+2D physics, with very-low resolution offers a crude approximation to the final task. But we think it captures
+enough of the structure of the final goal to be useful, while enabling tremendously quicker iteration
+cycles for trying out ideas and lowering the bar to entry of working on these problems.
+
+It's called boxLCD because the rendering is reminscent of monochromatic LCD displays (and it rhymes with box2d).
 
 ## boxLCD Challenge 🌐 🧩
 
@@ -23,13 +26,10 @@ And then the goal is to learn a model that predicts the future with the lowest p
 By pushing on this metric, we will be able to develop better methods for learning models of the world
 that will eventually be useful for enabling robots to learn to achieve more difficult tasks than is possible today.
 
-
-It's called boxLCD because the rendering is reminscent of monochromatic LCD displays, and it rhymes.
-
-
-I think this is a really good task because the data is really small but the process that generates the data is very complex.
-So you can run experiments with much less compute. But it is challenging and it should offer good signal about what really matters.
-Also, everything will be set up to simulate real world robot challenges well.
+The underlying physics and logic are quite complex, with contacts, momentum, and robot actions,
+but the dimensionality shown in the gif above is only 16*32 = 512, compared to 64*128*3 = 24576. So 50x less data, and smaller than MNIST (28x28=784).
+So the task is complex and meaningful, but experiments can be run with much less compute.
+It is complex, mirrors challenges we will face in real robotics, and it should offer good signal about what really matters.
 
 Properties that will likely be useful in real world learned sims and world models:
 - merging robot proprioception with exteroception (cameras, sensors)
