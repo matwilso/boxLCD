@@ -12,38 +12,26 @@ from datetime import datetime
 import argparse
 from define_config import config, args_type
 from envs.box import Box
+from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from utils import A
 import utils
 
-def draw_it(env):
+def draw_it2(env):
   obs = env.reset()
+  img = env.lcd_render()
+  big = env.render()
   for i in range(200):
-    image = Image.new("1", (16, 16))
-    draw = ImageDraw.Draw(image)
-    draw.rectangle([0, 0, 16, 16], fill=1)
-
-    obj = env.dynbodies['object0']
-    #xy = obs[...,(2,3)]
-    pos = A[obj.position]
-    print(pos)
-    rad = obj.fixtures[0].shape.radius
-    top = (pos - rad) / A[env.WIDTH, env.HEIGHT]
-    bot = (pos + rad) / A[env.WIDTH, env.HEIGHT]
-    top = (top * 16).astype(np.int)
-    bot = (bot * 16).astype(np.int)
-    draw.ellipse(top.tolist() + bot.tolist(), fill=0)
-    #draw.ellipse((8, 8, 11, 11), fill=0)
-    # points = ((1,1), (2,1), (2,2), (1,2), (0.5,1.5))
-    #points = ((100, 100), (200, 100), (200, 200), (100, 200), (50, 150))
-    #draw.polygon((points), fill=200)
-    image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
-    img = 1.0 * np.array(image).repeat(16, -1).repeat(16, -2)
-    plt.imsave(f'imgs/{i:03d}.png', img, cmap='gray')
+    img = np.array(255*img, dtype=np.uint8).repeat(8, -1).repeat(8, -2)
+    cat = np.concatenate([big[-128:], img[...,None].repeat(3,axis=-1)], 1)
+    plt.imsave(f'imgs/{i:03d}.png', cat, cmap='gray')
     env.step(env.action_space.sample())
+    img = env.lcd_render()
+    big = env.render()
   import ipdb; ipdb.set_trace()
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -51,9 +39,9 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   C = parser.parse_args()
 
-  if False:
+  if True:
     env = Box(C)
-    draw_it(env)
+    draw_it2(env)
   elif False:
     env = Box(C)
     N = 100000

@@ -3,6 +3,9 @@ import time
 import itertools
 from collections import defaultdict
 from typing import NamedTuple, List, Set, Tuple, Dict
+import PIL.ImageDraw as ImageDraw
+import PIL.Image as Image
+from utils import A
 
 import copy
 import sys, math
@@ -439,6 +442,30 @@ class B2D(IndexEnv):
     entis = [(obs, 0.8, offset)] + entis
     kwargs['entis'] = entis
     return self.render(mode='rgb_array', **kwargs)
+
+  def lcd_render(self):
+    image = Image.new("1", (self.C.lcd_w, self.C.lcd_h))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([0, 0, self.C.lcd_w, self.C.lcd_h], fill=1)
+    for name, body in self.dynbodies.items():
+      pos = A[body.position]
+      shape = body.fixtures[0].shape
+      if isinstance(shape, circleShape):
+        rad = shape.radius
+        topleft = (pos - rad) / A[self.WIDTH, self.HEIGHT]
+        botright = (pos + rad) / A[self.WIDTH, self.HEIGHT]
+        topleft = (topleft * self.C.lcd_w).astype(np.int)
+        botright = (botright * self.C.lcd_w).astype(np.int)
+        draw.ellipse(topleft.tolist() + botright.tolist(), fill=0)
+      else:
+        trans = body.transform
+        points = A[[trans*v for v in shape.vertices]] / A[self.WIDTH, self.HEIGHT]
+        points = (self.C.lcd_w*points).astype(np.int).tolist()
+        points = tuple([tuple(xy) for xy in points])
+        #points = ((10, 10), (10, 16), (16, 16), (16, 10))
+        draw.polygon(points, fill=0)
+    image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
+    return np.array(image)
 
   def render(self, mode='rgb_array', texts=[], imgs=[], shapes=[], entis=[], show_main=True, main_tilt=0.0, action=None, lines=[]):
     from envs import rendering

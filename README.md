@@ -18,7 +18,9 @@ name ideas:
 
 ![](./assets/urchin.png)
 ![](./assets/bounce.gif)
+![](./assets/sideside.gif)
 
 
 // TODO: add pyglet and lcd rendering side-by-side
 // TODO: rename F to something that doesn't clash with Functional, Height, Width
+// convert -resize 100% -delay 2 -loop 0 *.png test.gif

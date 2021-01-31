@@ -82,14 +82,14 @@ class GaussHead(nn.Module):
     super().__init__()
     self.C = C
     self.obs_n = obs_n
-    self.layer = nn.Linear(C.n_embed, 2 * obs_n, bias=False)
+    self.layer = nn.Linear(C.n_embed, 2 * obs_n)
 
   def forward(self, x, past_o=None):
     mu, log_std = self.layer(x).chunk(2, -1)
     std = F.softplus(log_std) + self.C.min_std
     if past_o is not None:
       mu = mu + past_o
-    dist = tdib.Normal(mu, std)
+    dist = tdib.Independent(tdib.Normal(mu, std), 1)
     return dist
 
 class MDNHead(nn.Module):
@@ -98,7 +98,7 @@ class MDNHead(nn.Module):
     self.C = C
     self.obs_n = obs_n
     shape = self.C.mdn_k + 2*self.obs_n*self.C.mdn_k
-    self.layer = nn.Linear(C.n_embed, shape, bias=False)
+    self.layer = nn.Linear(C.n_embed, shape)
 
   def forward(self, x, past_o=None):
     dx = self.C.mdn_k * self.obs_n
@@ -129,9 +129,9 @@ class Transformer(nn.Module):
     self.blocks = nn.Sequential(*[Block(C) for _ in range(C.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(C.n_embed)
-    if self.C.dist_head == 'gauss':
+    if self.C.mdn_k == 1:
       self.dist_head = GaussHead(self.obs_n, C)
-    elif self.C.dist_head == 'mdn':
+    else:
       self.dist_head = MDNHead(self.obs_n, C)
     #logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
     self.to(C.device)
@@ -150,7 +150,7 @@ class Transformer(nn.Module):
     x = self.blocks(x)
     logits = self.ln_f(x)
     # TODO: probably return logits as well.
-    return self.dist_head(logits, past_o = inp[...,:self.obs_n] if self.C.dist_delta else None)
+    return self.dist_head(logits, past_o=inp[...,:self.obs_n] if self.C.dist_delta else None)
 
   def nll(self, batch):
     # TODO: clean this shifting to happen in model probably

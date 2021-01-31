@@ -23,9 +23,13 @@ def config():
   C.vanished = 1
   C.num_envs = 5
 
-  C.dist_head = 'gauss'
-  C.mdn_k = 5
-  C.dist_delta = 1
+  C.mdn_k = 1
+  C.dist_delta = 0
+
+
+  C.lcd_h = 16
+  C.lcd_w = 32
+  C.env_size = 128
 
   # ENVIRONMENT
   C.special_viewer = 0
@@ -34,7 +38,6 @@ def config():
   C.num_objects = 1
   C.num_agents = 0
   C.use_images = 0
-  C.env_size = 128
   C.env_wh_ratio = 1.0
   C.ep_len = 200
   C.env_version = '0.7'

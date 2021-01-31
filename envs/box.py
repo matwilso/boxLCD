@@ -21,21 +21,21 @@ object_kwargs = dict(shape='circle', size=2.0, density=0.1)
 
 class CrabObject(B2D):
   def __init__(self, C):
-    w = World(agents=[Agent(f'{F.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
+    w = World(agents=[Agent(f'{C.cname}0')], objects=[Object('object0', shape='random', size=2.0, density=0.1)])
     super().__init__(w, C)
 
 class Box(B2D):
   def __init__(self, C):
     gravity = [0, -9.81]
     forcetorque = 0
-    w = World(agents=[Agent(f'{F.cname}{i}') for i in range(C.num_agents)], objects=[Object(f'object{i}', **object_kwargs) for i in range(C.num_objects)], gravity=gravity, forcetorque=forcetorque)
+    w = World(agents=[Agent(f'{C.cname}{i}') for i in range(C.num_agents)], objects=[Object(f'object{i}', **object_kwargs) for i in range(C.num_objects)], gravity=gravity, forcetorque=forcetorque)
     super().__init__(w, C)
 
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
-  from flags import flags, args_type
+  from define_config import config, args_type
   parser = argparse.ArgumentParser()
-  for key, value in flags().items():
+  for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
   C = parser.parse_args()
