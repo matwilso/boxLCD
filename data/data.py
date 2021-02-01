@@ -18,28 +18,25 @@ import utils
 
 class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
-    data = np.load(npzfile)
-    obses = data['obses']
-    acts = data['acts']
-    cut = int(len(obses) * 0.8)
+    data = np.load(npzfile, allow_pickle=True)
+    self.bufs = {key: data[key] for key in data.keys()}
+    cut = int(len(self.bufs['acts']) * 0.8)
     if train:
-      self.obses = obses[:cut]
-      self.acts = acts[:cut]
+      self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
     else:
-      self.obses = obses[cut:]
-      self.acts = acts[cut:]
+      self.bufs = {key: val[cut:] for key, val in self.bufs.items()}
 
   def __len__(self):
-    return len(self.obses)
+    return len(self.bufs['acts'])
 
   def __getitem__(self, idx):
-    batch = {'o': self.obses[idx], 'a': self.acts[idx]}
-    return {key: torch.as_tensor(val, dtype=torch.float32) for key, val in batch.items()}
+    elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
+    return elem
 
 def load_ds(C):
   from torchvision import transforms
-  train_dset = RolloutDataset(f'{C.env}.npz', train=True, C=C)
-  test_dset = RolloutDataset(f'{C.env}.npz', train=False, C=C)
+  train_dset = RolloutDataset(C.datapath, train=True, C=C)
+  test_dset = RolloutDataset(C.datapath, train=False, C=C)
   train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
   test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
   return train_loader, test_loader

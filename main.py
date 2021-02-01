@@ -1,3 +1,4 @@
+import time
 from sync_vector_env import SyncVectorEnv
 from runners.trainer import Trainer
 from runners.runner import Runner
@@ -33,6 +34,8 @@ def draw_it2(env):
     big = env.render()
   import ipdb; ipdb.set_trace()
 
+# TODO: handle partial obs for agent info, not just object
+# TODO [2021/02/01]: separate out links and actions and feed in separately in an MHDPA or TF block for good GNN mixing.
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -48,16 +51,21 @@ if __name__ == '__main__':
     draw_it2(env)
   elif C.mode == 'collect':
     env = env_fn(C)()
-    N = 100000
-    obses = np.zeros([N, C.ep_len, env.observation_space.shape[0]])
+    N = 1000
+    space = env.observation_space
+    obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
     acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
     for i in range(N):
+      start = time.time()
       obs = env.reset()
       for j in range(C.ep_len):
         act = env.action_space.sample()
-        obses[i, j] = obs
+        for key  in obses:
+          obses[key][i, j] = obs[key]
         acts[i, j] = act
         obs, rew, done, info = env.step(act)
         #env.render()
-      print(i)
-    data = np.savez(f'{C.env}.npz', obses=obses, acts=acts)
+        #plt.imshow(1.0*env.lcd_render()); plt.show()
+      print(f'{i} fps: {C.ep_len/(time.time()-start)}')
+    lcd = '-lcd' if C.lcd_render else ''
+    data = np.savez(f'{C.datapath}/{C.env}{lcd}.npz', acts=acts, **obses)

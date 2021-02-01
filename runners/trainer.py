@@ -1,5 +1,4 @@
 from sync_vector_env import SyncVectorEnv
-from nets.transformer import Transformer
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -18,19 +17,24 @@ from data import data
 from envs.box import Box
 from runners.runner import Runner
 from define_config import env_fn
+from nets.state import StateTransformer
+from nets.pixels import AutoWorldModel
 
 class Trainer(Runner):
   def __init__(self, C):
     super().__init__(C)
-    print('wait dataload')
-    print('dataloaded')
     C.block_size = C.ep_len
-    self.model = Transformer(self.env, C)
+    print('wait dataload')
+    self.train_ds, self.test_ds = data.load_ds(C)
+    print('dataloaded')
+    if C.lcd_render:
+      self.model = AutoWorldModel(self.env, C)
+    else:
+      self.model = StateTransformer(self.env, C)
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
     self.writer = SummaryWriter(C.logdir)
     self.logger = utils.dump_logger({}, self.writer, 0, C)
     self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
-    self.train_ds, self.test_ds = data.load_ds(C)
 
   def train_epoch(self, i):
     for batch in self.train_ds:
@@ -54,7 +58,7 @@ class Trainer(Runner):
     rollout = [self.tvenv.reset(np.arange(N), reset_states)]
     real_imgs = [self.tvenv.render()]
     acts = []
-    for _ in range(self.C.ep_len-1):
+    for _ in range(self.C.ep_len - 1):
       act = self.tvenv.action_space.sample()
       obs = self.tvenv.step(act)[0]
       real_imgs += [self.tvenv.render()]
@@ -70,20 +74,20 @@ class Trainer(Runner):
     sample, logp = self.model.sample(N, prompts=prompts)
     sample = sample.cpu().numpy()
     self.logger['sample_logp'] = logp
-    for j in range(self.C.ep_len-1):
+    for j in range(self.C.ep_len - 1):
       obs = self.tvenv.reset(np.arange(N), sample[:, j + 1])
       fake_imgs += [self.tvenv.render()]
-    fake_imgs = np.stack(fake_imgs, axis=1).transpose(0, 1, -1, 2, 3)# / 255.0
-    real_imgs = np.stack(real_imgs, axis=1).transpose(0, 1, -1, 2, 3)[:,:self.C.ep_len-1]# / 255.0
+    fake_imgs = np.stack(fake_imgs, axis=1).transpose(0, 1, -1, 2, 3)  # / 255.0
+    real_imgs = np.stack(real_imgs, axis=1).transpose(0, 1, -1, 2, 3)[:, :self.C.ep_len - 1]  # / 255.0
     error = (fake_imgs - real_imgs + 255) // 2
     #out = error
     out = np.concatenate([real_imgs, fake_imgs, error], 3)
     N, T, C, H, W = out.shape
-    out = out.transpose(1,2,3,0,4).reshape([T, C, H, N*W])[None]
+    out = out.transpose(1, 2, 3, 0, 4).reshape([T, C, H, N * W])[None]
     self.writer.add_video('error', out, i, fps=50)
     #self.writer.add_video('true', real_imgs, i, fps=50)
     #import ipdb; ipdb.set_trace()
-    delta = np.abs(rollout[:,:-1] - sample[:,1:]).mean()
+    delta = np.abs(rollout[:, :-1] - sample[:, 1:]).mean()
     self.logger['sample_delta'] = [delta]
 
   def test(self, i):

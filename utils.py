@@ -10,7 +10,9 @@ import numpy as np
 # utils
 def subdict(dict, keys): return {key: dict[key] for key in keys}
 def filter(dict, name): return {key: dict[key] for key in dict if re.match(name, key) is not None}
+def nfilter(dict, name): return {key: dict[key] for key in dict if re.match(name, key) is None}
 def lfilter(list, name): return [item for item in list if re.match(name, item) is not None]
+def nlfilter(list, name): return [item for item in list if re.match(name, item) is None]
 
 
 def sortdict(x): return subdict(x, sorted(x))

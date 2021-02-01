@@ -3,6 +3,7 @@ import sys
 import pathlib
 import utils
 from envs.box import Box, Dropbox
+from envs.wrappers import LCDEnv, NormalEnv
 
 def env_fn(C, seed=None):
   def _make():
@@ -10,6 +11,11 @@ def env_fn(C, seed=None):
       env = Box(C)
     elif C.env == 'dropbox':
       env = Dropbox(C)
+    if C.lcd_render:
+      env = LCDEnv(env)
+    else:
+      env = NormalEnv(env)
+
     env.seed(seed)
     return env
   return _make
@@ -20,6 +26,7 @@ def config():
   C.logdir = pathlib.Path('logs/')
   C.weightdir = pathlib.Path('.')
   C.buffdir = pathlib.Path('.')
+  C.datapath = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
   C.mode = 'train'
 
@@ -39,12 +46,10 @@ def config():
   C.sample_sample = 0
   C.skip_train = 0
 
-
-
-
   C.lcd_h = 16
-  C.lcd_w = 32
+  C.lcd_w = 16
   C.env_size = 128
+  C.lcd_render = 0 
 
   # ENVIRONMENT
   C.env = 'box'
@@ -65,34 +70,15 @@ def config():
   C.use_speed = 1
   C.reward_mode = 'goal'
   C.only_obj_goal = 0
-  C.only_model = 0
-  C.move_reward = 0
-  C.move_reward_weight = 0.1
 
   C.succ_check = 1
   C.all_contact = 1
-
-  C.ss_model = 0
-  C.model_diayn = 0
-  C.model_diayn_weight = 1.0
 
   C.all_corners = 0
   C.use_done = 0
   C.threshold_done = 0
   C.thres = 0.05
-  C.ent_rew = 1
   C.walls = 1
-  C.specnorm = 0
-
-
-  C.tsteps = 10
-  C.step_size = 0.1
-  C.manual_test = 0
-
-
-  C.split_q = 0
-  C.cond_layers = 0
-
 
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
