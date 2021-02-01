@@ -11,42 +11,31 @@ import torch
 from torch import distributions as tdib
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate
 
 class AutoWorldModel(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     self.C = C
     self.encoder = EncoderNet(env, C)
-    self.temporal = TemporalTransformer(64, C)
-    self.pixel = PixelTransformer(C)
-    self.to(C.device)
+    self.temporal = Transformer(size=self.C.n_embed//2, block_size=self.C.ep_len, dist='mdn', cond=False, C=C)
+    self.pixel = Transformer(size=1, block_size=self.C.lcd_h*self.C.lcd_w, dist='binary', cond=True, C=C)
   
-  def forward(self):
-    pass
-
-  def nll(self, batch):
+  def loss(self, batch):
+    BS, EPL, H, W = batch['lcd'].shape
     codes = self.encoder(batch)
-    import ipdb; ipdb.set_trace()
-    logits, dist = self.temporal(codes)
+    temporal_loss, temporal_dist = self.temporal.loss(codes)
+    pix_img = batch['lcd'].view(BS*EPL, H*W, 1)
+    timecond = codes.view(BS*EPL, self.C.n_embed//2)
+    pixel_loss, pixel_dist = self.pixel.loss(pix_img, timecond)
+    return temporal_loss + pixel_loss, (temporal_dist, pixel_dist)
 
-  def sample(self):
-    pass
-
-def aggregate(x, dim=1, catdim=-1):
-  """
-  https://arxiv.org/pdf/2004.05718.pdf
-
-  takes (BS, N, E). extra args change the axis of N
-
-  returns (BS, 4E) where 4E is min, max, std, mean aggregations.
-                   using all of these rather than just one leads to better coverage. see paper
-  """
-  min = torch.min(x, dim=dim)[0]
-  max = torch.max(x, dim=dim)[0]
-  std = torch.std(x, dim=dim)
-  mean = torch.mean(x, dim=dim)
-  return torch.cat([min, max, std, mean], dim=catdim)
+  def sample(self, n):
+    codes, code_logp = self.temporal.sample(n)
+    BS, EPL, X = codes.shape
+    timecond = codes.view(BS*EPL, self.C.n_embed//2)
+    pixels, pixel_logp = self.pixel.sample(n, cond=timecond)
+    return pixels.view(BS, EPL, 1, self.C.lcd_h, self.C.lcd_w), pixel_logp + code_logp
 
 class EncoderNet(nn.Module):
   def __init__(self, env, C):
@@ -54,144 +43,91 @@ class EncoderNet(nn.Module):
     self.C = C
     state_n = env.observation_space['state'].shape[0]
     act_n = env.action_space.shape[0]
-    self.c1 = nn.Conv2d(1, 64, kernel_size=3, stride=2, padding=1)
-    self.c2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
-    self.state_in = nn.Linear(state_n, 64)
-    self.act_in = nn.Linear(act_n, 64)
-    self.mhdpa = nn.MultiheadAttention(64, 8)
-    self.latent_out = nn.Linear(64, 16)
+    self.c1 = nn.Conv2d(1, self.C.n_embed//2, kernel_size=3, stride=2, padding=1)
+    self.c2 = nn.Conv2d(self.C.n_embed//2, self.C.n_embed//2, kernel_size=3, stride=2, padding=1)
+    self.state_in = nn.Linear(state_n, self.C.n_embed//2)
+    self.act_in = nn.Linear(act_n, self.C.n_embed//2)
+    self.mhdpa = nn.MultiheadAttention(self.C.n_embed//2, 8)
+    self.latent_out = nn.Linear(self.C.n_embed//2, self.C.n_embed//8)
+    self.ln_f = nn.LayerNorm(C.n_embed//2)
+    self.to(C.device)
 
   def forward(self, batch):
     """expects (BS, EP_LEN, *SHAPE)"""
-    BS, EP_LEN = batch['lcd'].shape[:2]
+    BS, EPL = batch['lcd'].shape[:2]
     img = batch['lcd'].view(-1, 1, self.C.lcd_h, self.C.lcd_w)
     img = self.c1(img)
     img = F.relu(img)
     img = self.c2(img).flatten(-2)
-    zs = self.state_in(batch['state']).view(-1, 64, 1)
-    za = self.act_in(batch['acts']).view(-1, 64, 1)
+    zs = self.state_in(batch['state']).view(-1, self.C.n_embed//2, 1)
+    za = self.act_in(batch['acts']).view(-1, self.C.n_embed//2, 1)
     x = torch.cat([img, zs, za], axis=-1)
     x = x.permute(2, 0, 1)  # T, BS, E
     # flatten and cat
     x = self.mhdpa(x, x, x)[0].permute(1, 0, 2) # BS, T, E
     x = self.latent_out(x)
-    agg = aggregate(x, dim=1, catdim=-1)
-    return agg.view(BS, EP_LEN, 16*4)
+    agg = aggregate(x, dim=1, catdim=-1).view(BS, EPL, self.C.n_embed//2)
+    return self.ln_f(agg)
 
-class TemporalTransformer(nn.Module):
-  def __init__(self, size, C):
+class Transformer(nn.Module):
+  def __init__(self, size, block_size, dist, cond=False, C=None):
     super().__init__()
     self.C = C
     self.size = size
+    self.block_size = block_size
+    self.cond = cond
+    self.dist = dist
     # input embedding stem
-    self.embed = nn.Linear(size+1, C.n_embed, bias=False)
+    self.embed = nn.Linear(size+1, C.n_embed//2 if cond else C.n_embed, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(C) for _ in range(C.n_layer)])
+    self.blocks = nn.Sequential(*[Block(block_size, C) for _ in range(C.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(C.n_embed)
-    if self.C.mdn_k == 1:
+    if dist == 'gauss':
       self.dist_head = GaussHead(self.size, C)
-    else:
+    elif dist == 'mdn':
       self.dist_head = MDNHead(self.size, C)
+    elif dist == 'binary':
+      self.dist_head = BinaryHead(C)
     self.to(C.device)
 
   def append_location(self, x):
-    """add xy coords to every pixel"""
+    """add loc coords to every elem"""
     X = torch.linspace(-1, 1, x.shape[-2])
     return torch.cat([x, X[None, ..., None].repeat_interleave(x.shape[0], 0).to(x.device)], -1)
 
-  def forward(self, inp):
-    x = inp
+  def forward(self, x, cond=None):
     x = self.append_location(x)
     # forward the GPT model
     x = self.embed(x)
+    if self.cond:
+      x = torch.cat([x, cond[:,None].repeat_interleave(self.block_size, 1)], -1)
     # add padding on left so that we can't see ourself.
     x = self.blocks(x)
     logits = self.ln_f(x)
     # TODO: probably return logits as well.
-    return logits, self.dist_head(logits, past_o=inp[...,:self.size] if self.C.dist_delta else None)
+    return self.dist_head(logits, past_o=inp[...,:self.size] if self.C.dist_delta else None)
 
-  def nll(self, batch):
-    # TODO: clean this shifting to happen in model probably
-    o, a = batch['o'], batch['a']
-    batch_size = o.shape[0]
-    x = torch.cat([o, a], -1)
-    shifted = torch.cat([torch.zeros(batch_size, 1, x.shape[-1]).to(self.C.device), x[:, :-1]], dim=1)
-    logits, dist = self.forward(shifted)
-    return -dist.log_prob(o).mean(), dist
+  def loss(self, x, cond=None):
+    BS, EPL, E = x.shape
+    shifted = torch.cat([torch.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
+    dist = self.forward(shifted, cond)
+    return -dist.log_prob(x).mean(), dist
 
-  def sample(self, n, prompts=None):
+  def sample(self, n, cond=None):
     # TODO: feed act_n
     with torch.no_grad():
-      samples = torch.zeros(n, self.C.ep_len, self.size).to(self.C.device)
-      acts = (torch.rand(samples.shape[:-1]) * 2 - 1).to(self.C.device)[..., None]
-
-      start = 0
-      if prompts is not None:
-        n, k, _ = prompts.shape
-        samples[:n, 1:k+1, :] = torch.as_tensor(prompts, dtype=torch.float32).to(samples.device)
-        start = k
-
-      for i in range(start, self.C.ep_len-1):
-        x = torch.cat([samples, acts], -1)
-        dist = self.forward(x)
-        if self.C.sample_sample:
+      if cond is not None:
+        n = cond.shape[0]
+      samples = torch.zeros(n, self.block_size, self.size).to(self.C.device)
+      #acts = (torch.rand(samples.shape[:-1]) * 2 - 1).to(self.C.device)[..., None]
+      for i in range(self.block_size-1):
+        dist = self.forward(samples, cond)
+        if self.C.sample_sample or self.dist == 'binary':
           samples[:, i + 1] = dist.sample()[:,i]
         else:
           samples[:, i + 1] = dist.mean[:,i]
-        if i == self.C.ep_len-2:
+        if i == self.block_size-2:
           logp = dist.log_prob(samples)
 
-    return samples.cpu(), logp.mean().item()
-
-
-class PixelTransformer(nn.Module):
-  def __init__(self, C):
-    super().__init__()
-    # input embedding stem
-    self.pixel_emb = nn.Conv2d(3, C.n_embed, kernel_size=1, stride=1)
-    # transformer
-    self.blocks = nn.Sequential(*[Block(C) for _ in range(C.n_layer)])
-    # decoder head
-    self.ln_f = nn.LayerNorm(C.n_embed)
-    self.head = nn.Conv2d(C.n_embed, 1, kernel_size=1, stride=1, bias=False)
-    #logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
-    self.C = C
-
-  def append_location(self, x):
-    """add xy coords to every pixel"""
-    XY = torch.stack(torch.meshgrid(torch.linspace(0, 1, x.shape[-2]), torch.linspace(0, 1, x.shape[-1])), 0)
-    return torch.cat([x, XY[None].repeat_interleave(x.shape[0], 0).to(x.device)], 1)
-
-  def forward(self, x):
-    batch_size = x.shape[0]
-    x = self.append_location(x)
-    # forward the GPT model
-    x = self.pixel_emb(x)
-    x = x.permute(0, 2, 3, 1).contiguous().view(batch_size, 28*28, -1)
-    # add padding on left so that we can't see ourself.
-    x = torch.cat([torch.zeros(batch_size, 1, self.C.n_embed).to(self.C.device), x[:, :-1]], dim=1)
-    x = self.blocks(x)
-    x = self.ln_f(x)
-    x = x.permute(0, 2, 1).view(batch_size, -1, 28, 28)
-    x = self.head(x)
-    return x
-
-  def nll(self, x):
-    x = x[0]
-    logits = self.forward(x)
-    return F.binary_cross_entropy_with_logits(logits, x)
-
-  def sample(self, n):
-    imgs = []
-    with torch.no_grad():
-      samples = torch.zeros(n, 1, 28, 28).to(self.C.device)
-      for r in range(28):
-        for c in range(28):
-          logits = self.forward(samples)[:, :, r, c]
-          probs = torch.sigmoid(logits)
-          samples[:, :, r, c] = torch.bernoulli(probs)
-          imgs += [samples.cpu()]
-    imgs = np.stack([img.numpy() for img in imgs], axis=1)
-    return samples.cpu(), imgs
-
+    return samples, logp.mean().item()

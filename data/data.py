@@ -19,7 +19,9 @@ import utils
 class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile, allow_pickle=True)
-    self.bufs = {key: data[key] for key in data.keys()}
+    self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
+    if C.data_mode == 'image':
+      self.bufs = {key: val.flatten(0, 1) for key, val in self.bufs.items()}
     cut = int(len(self.bufs['acts']) * 0.8)
     if train:
       self.bufs = {key: val[:cut] for key, val in self.bufs.items()}

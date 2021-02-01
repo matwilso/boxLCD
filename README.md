@@ -41,6 +41,8 @@ as we will have in the real world.
 - video prediction, integrated with robot action *and* proprioception, as will be the case in the real world
 - greater access to the simulator to enable custom scenarios, not just a fixed set of envs. but more general settings
 
+This is explicitly building to the goal of learned sims and world models.
+
 
 
 ## Expected speed gains: some back of the envelope computations

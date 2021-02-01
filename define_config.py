@@ -28,7 +28,8 @@ def config():
   C.buffdir = pathlib.Path('.')
   C.datapath = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
-  C.mode = 'train'
+  C.mode = 'image'
+  C.data_mode = 'image'
 
   C.bs = 64
   C.lr = 1e-4

@@ -12,6 +12,22 @@ from torch import distributions as tdib
 from torch import nn
 import torch.nn.functional as F
 
+def aggregate(x, dim=1, catdim=-1):
+  """
+  https://arxiv.org/pdf/2004.05718.pdf
+
+  takes (BS, N, E). extra args change the axis of N
+
+  returns (BS, 4E) where 4E is min, max, std, mean aggregations.
+                   using all of these rather than just one leads to better coverage. see paper
+  """
+  min = torch.min(x, dim=dim)[0]
+  max = torch.max(x, dim=dim)[0]
+  std = torch.std(x, dim=dim)
+  mean = torch.mean(x, dim=dim)
+  return torch.cat([min, max, std, mean], dim=catdim)
+
+
 class CausalSelfAttention(nn.Module):
   """
   A vanilla multi-head masked self-attention layer with a projection at the end.
@@ -19,8 +35,9 @@ class CausalSelfAttention(nn.Module):
   explicit implementation here to show that there is nothing too scary here.
   """
 
-  def __init__(self, C):
+  def __init__(self, block_size, C):
     super().__init__()
+    self.block_size = block_size
     assert C.n_embed % C.n_head == 0
     # key, query, value projections for all heads
     self.key = nn.Linear(C.n_embed, C.n_embed)
@@ -29,7 +46,7 @@ class CausalSelfAttention(nn.Module):
     # output projection
     self.proj = nn.Linear(C.n_embed, C.n_embed)
     # causal mask to ensure that attention is only applied to the left in the input sequence
-    self.register_buffer("mask", torch.tril(torch.ones(C.block_size, C.block_size)).view(1, 1, C.block_size, C.block_size))
+    self.register_buffer("mask", torch.tril(torch.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
     self.C = C
 
   def forward(self, x, layer_past=None):
@@ -51,11 +68,11 @@ class CausalSelfAttention(nn.Module):
 class Block(nn.Module):
   """ an unassuming Transformer block """
 
-  def __init__(self, C):
+  def __init__(self, block_size, C):
     super().__init__()
     self.ln1 = nn.LayerNorm(C.n_embed)
     self.ln2 = nn.LayerNorm(C.n_embed)
-    self.attn = CausalSelfAttention(C)
+    self.attn = CausalSelfAttention(block_size, C)
     self.mlp = nn.Sequential(
         nn.Linear(C.n_embed, 4 * C.n_embed),
         nn.GELU(),
@@ -68,17 +85,17 @@ class Block(nn.Module):
     return x
 
 class GaussHead(nn.Module):
-  def __init__(self, obs_n, C):
+  def __init__(self, input_size, z_size, C):
     super().__init__()
     self.C = C
-    self.obs_n = obs_n
-    self.layer = nn.Linear(C.n_embed, 2 * obs_n)
+    self.z_size = z_size
+    self.layer = nn.Linear(input_size, 2 * z_size)
 
-  def forward(self, x, past_o=None):
+  def forward(self, x, past_z=None):
     mu, log_std = self.layer(x).chunk(2, -1)
     std = F.softplus(log_std) + self.C.min_std
-    if past_o is not None:
-      mu = mu + past_o
+    if past_z is not None:
+      mu = mu + past_z
     #dist = tdib.Independent(tdib.Normal(mu, std), 1)
     #dist = tdib.Normal(mu, std)
     dist = tdib.MultivariateNormal(mu, torch.diag_embed(std))
@@ -89,7 +106,7 @@ class MDNHead(nn.Module):
     super().__init__()
     self.C = C
     self.obs_n = obs_n
-    shape = self.C.mdn_k + 2*self.obs_n*self.C.mdn_k
+    shape = self.C.mdn_k + 2 * self.obs_n * self.C.mdn_k
     self.layer = nn.Linear(C.n_embed, shape)
 
   def forward(self, x, past_o=None):
@@ -102,7 +119,17 @@ class MDNHead(nn.Module):
     mu = mu.reshape(list(mu.shape[:-1]) + [self.C.mdn_k, -1])
     std = std.reshape(list(std.shape[:-1]) + [self.C.mdn_k, -1])
     if past_o is not None:
-      mu = mu + past_o[...,None,:]
+      mu = mu + past_o[..., None, :]
     cat = tdib.Categorical(logits=logits)
     dist = tdib.MixtureSameFamily(cat, tdib.MultivariateNormal(mu, torch.diag_embed(std)))
     return dist
+
+class BinaryHead(nn.Module):
+  def __init__(self, C):
+    super().__init__()
+    self.C = C
+    self.layer = nn.Linear(C.n_embed, 1)
+
+  def forward(self, x, past_o=None):
+    x = self.layer(x)
+    return tdib.Bernoulli(logits=x)

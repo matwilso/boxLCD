@@ -92,8 +92,8 @@ class LCDEnv(gym.Env, EzPickle):
     def lcd_render(self):
         return self.env.lcd_render()
 
-    def reset(self):
-        state = self.env.reset()
+    def reset(self, *args, **kwargs):
+        state = self.env.reset(*args, **kwargs)
         state = state[self.pobs_idxs] if self.num_pobs != 0 else 0.0
         return {'state': state, 'lcd': self.env.lcd_render()}
 

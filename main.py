@@ -1,7 +1,5 @@
 import time
 from sync_vector_env import SyncVectorEnv
-from runners.trainer import Trainer
-from runners.runner import Runner
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -20,6 +18,8 @@ import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from utils import A
 import utils
+from runners.video_trainer import VideoTrainer
+from runners.image_trainer import ImageTrainer
 
 def draw_it2(env):
   obs = env.reset()
@@ -36,6 +36,7 @@ def draw_it2(env):
 
 # TODO: handle partial obs for agent info, not just object
 # TODO [2021/02/01]: separate out links and actions and feed in separately in an MHDPA or TF block for good GNN mixing.
+# TODO [2021/02/01]: refactor all my shit and clean it up at night
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -43,15 +44,18 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   C = parser.parse_args()
 
-  if C.mode == 'train':
-    trainer = Trainer(C)
+  if C.mode == 'image':
+    trainer = ImageTrainer(C)
+    trainer.run()
+  elif C.mode == 'video':
+    trainer = VideoTrainer(C)
     trainer.run()
   elif C.mode == 'lcd':
     env = Box(C)
     draw_it2(env)
   elif C.mode == 'collect':
     env = env_fn(C)()
-    N = 1000
+    N = 100
     space = env.observation_space
     obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
     acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
@@ -68,4 +72,5 @@ if __name__ == '__main__':
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       print(f'{i} fps: {C.ep_len/(time.time()-start)}')
     lcd = '-lcd' if C.lcd_render else ''
+    C.datapath.mkdir(exist_ok=True)
     data = np.savez(f'{C.datapath}/{C.env}{lcd}.npz', acts=acts, **obses)
