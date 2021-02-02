@@ -30,6 +30,7 @@ def config():
   C.device = 'cuda' # 'cuda', 'cpu'
   C.mode = 'video'
   #C.data_mode = 'image'
+  C.amp = 1
 
   C.bs = 64
   C.lr = 1e-4

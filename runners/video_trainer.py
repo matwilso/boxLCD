@@ -28,21 +28,24 @@ class VideoTrainer(Trainer):
     else:
       self.model = StateTransformer(self.env, C)
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
+    self.scaler = torch.cuda.amp.GradScaler(enabled=C.amp)
 
   def train_epoch(self, i):
-    ct = 0
     self.optimizer.zero_grad()
     for batch in self.train_ds:
-      ct += 1
       batch = {key: val.to(self.C.device) for key, val in batch.items()}
-      loss, dist = self.model.loss(batch)
-      loss.backward()
-      if ct % 10 == 0:
-        self.optimizer.step()
-        self.optimizer.zero_grad()
+      if self.C.amp:
+        with torch.cuda.amp.autocast():
+          loss, dist = self.model.loss(batch)
+      else:
+          loss, dist = self.model.loss(batch)
+      self.scaler.scale(loss).backward()
+      self.scaler.step(self.optimizer)
+      self.scaler.update()
+      #loss.backward()
+      #self.optimizer.step()
+      self.optimizer.zero_grad()
       self.logger['loss'] += [loss.detach().cpu()]
-      if ct % 10 == 0:
-        print(loss.item())
       #std = dist.stddev.detach()
       #self.logger['std/mean'] += [std.mean().cpu()]
       #self.logger['std/min'] += [std.min().cpu()]
@@ -53,6 +56,8 @@ class VideoTrainer(Trainer):
     N = self.C.num_envs
     sample, logp = self.model.sample(N)
     self.logger['sample_logp'] = logp
+    shape = sample.shape
+    sample = torch.roll(sample.view(200, 16*16), -1, -1).view(*shape)
     self.writer.add_video('samples', sample, i, fps=50)
 
     if False:
