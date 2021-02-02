@@ -18,7 +18,6 @@ from envs.box import Box
 from runners.trainer import Trainer
 from define_config import env_fn
 from nets.state import StateTransformer
-from nets.pixels import AutoWorldModel
 from nets.pixel_vae import PixelVAE
 
 class ImageTrainer(Trainer):

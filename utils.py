@@ -41,7 +41,8 @@ def dump_logger(logger, writer, i, C):
   print(i)
   for key in logger:
     val = np.mean(logger[key])
-    writer.add_scalar(key, val, i)
+    if writer is not None:
+      writer.add_scalar(key, val, i)
     print(key, val)
   print(C.full_cmd)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
@@ -146,3 +147,15 @@ def write_video(name, frames, fps=20):
   writer.release()
   copyfile(name, str(pathlib.Path(f'~/Desktop/{name}').expanduser()))
   # print(time.time()-start)
+
+
+def force_shape(out):
+  """take one right before video and force it's shape"""
+  #out = np.array(out)
+  # TODO: add borders around and between images for easier viz
+  N, T, C, H, W = out.shape
+  if isinstance(out, np.ndarray):
+    out = out.transpose(1, 2, 3, 0, 4).reshape(T, C, H, N * W)[None]
+  else:
+    out = out.permute(1, 2, 3, 0, 4).flatten(-2)[None]
+  return out

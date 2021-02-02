@@ -74,7 +74,6 @@ class LCDEnv(gym.Env, EzPickle):
     @property
     def observation_space(self):
         spaces = {}
-        import ipdb; ipdb.set_trace()
         partial_obs_keys = utils.nlfilter(self.env.obs_keys, 'object')
         self.num_pobs = len(partial_obs_keys)
         self.pobs_idxs = [self.env.obs_keys.index(x) for x in partial_obs_keys]

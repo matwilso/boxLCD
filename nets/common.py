@@ -102,15 +102,15 @@ class GaussHead(nn.Module):
     return dist
 
 class MDNHead(nn.Module):
-  def __init__(self, obs_n, C):
+  def __init__(self, in_n, out_n, C):
     super().__init__()
     self.C = C
-    self.obs_n = obs_n
-    shape = self.C.mdn_k + 2 * self.obs_n * self.C.mdn_k
-    self.layer = nn.Linear(C.n_embed, shape)
+    self.out_n = out_n
+    shape = self.C.mdn_k + 2 * self.out_n * self.C.mdn_k
+    self.layer = nn.Linear(in_n, shape)
 
   def forward(self, x, past_o=None):
-    dx = self.C.mdn_k * self.obs_n
+    dx = self.C.mdn_k * self.out_n
     out = self.layer(x)
     mu = out[..., :dx]
     std = F.softplus(out[..., dx:2 * dx]) + self.C.min_std
@@ -166,3 +166,20 @@ class CustomEmbed(nn.Module):
     x = self.c2(x)
     x = x.reshape(BS, LEN, -1)
     return x
+
+class MultiHead(nn.Module):
+  def __init__(self, in_n, out_n, split, C):
+    super().__init__()
+    self.C = C
+    self.in_n = in_n
+    self.out_n = out_n
+    self.split = split
+    self.layer = nn.Linear(in_n, in_n*2)
+    self.binary = BinaryHead(in_n, self.split, C)
+    self.mdn = MDNHead(in_n, out_n-self.split, C)
+
+  def forward(self, x, past_o=None):
+    xb, xm = self.layer(x).chunk(2, -1)
+    bin = self.binary(xb)
+    mdn = self.mdn(xm)
+    return bin, mdn

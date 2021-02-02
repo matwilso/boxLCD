@@ -14,17 +14,6 @@ import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate
 from nets.gpt import GPT
 
-class Decode(nn.Module):
-  def __init__(self, env, C):
-    super().__init__()
-    self.C = C
-    self.c1 = nn.Conv2d(1, self.C.n_embed//2, kernel_size=3, stride=2, padding=1)
-    self.c2 = nn.Conv2d(self.C.n_embed//2, self.C.n_embed//16, kernel_size=3, stride=2, padding=1)
-    self.to(C.device)
-
-  def forward(self, codes):
-    import ipdb; ipdb.set_trace()
-
 class AutoWorld2(nn.Module):
   def __init__(self, env, C):
     super().__init__()

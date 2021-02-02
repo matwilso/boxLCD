@@ -18,7 +18,6 @@ from envs.box import Box
 from runners.runner import Runner
 from define_config import env_fn
 from nets.state import StateTransformer
-from nets.pixels import AutoWorldModel
 
 class Trainer(Runner):
   def __init__(self, C):

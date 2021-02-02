@@ -28,11 +28,12 @@ def config():
   C.buffdir = pathlib.Path('.')
   C.datapath = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
-  C.mode = 'video'
+  C.mode = 'world'
   #C.data_mode = 'image'
   C.amp = 1
 
   C.decode = 'binary'
+  C.collect_n = 100
 
   C.bs = 64
   C.lr = 1e-4
@@ -53,7 +54,7 @@ def config():
   C.lcd_h = 16
   C.lcd_w = 16
   C.env_size = 128
-  C.lcd_render = 0 
+  C.lcd_render = 1 
 
   # ENVIRONMENT
   C.env = 'box'

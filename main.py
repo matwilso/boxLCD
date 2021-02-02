@@ -1,3 +1,4 @@
+import yaml
 import time
 from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
@@ -20,6 +21,7 @@ from utils import A
 import utils
 from runners.video_trainer import VideoTrainer
 from runners.image_trainer import ImageTrainer
+from runners.world_trainer import WorldTrainer
 
 def draw_it2(env):
   obs = env.reset()
@@ -42,6 +44,17 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
+  temp_cfg = parser.parse_args()
+  load_path = temp_cfg.datapath / 'hps.yaml'
+  defaults = {}
+  ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weights_dir']
+  if load_path.exists():
+    with load_path.open('r') as f:
+      load_cfg = yaml.load(f, Loader=yaml.Loader)
+    for key in load_cfg.__dict__.keys():
+      if key in ignore: continue
+      defaults[key] = load_cfg.__dict__[key]
+  parser.set_defaults(**defaults)
   C = parser.parse_args()
 
   if C.mode == 'image':
@@ -50,12 +63,15 @@ if __name__ == '__main__':
   elif C.mode == 'video':
     trainer = VideoTrainer(C)
     trainer.run()
+  elif C.mode == 'world':
+    trainer = WorldTrainer(C)
+    trainer.run()
   elif C.mode == 'lcd':
     env = Box(C)
     draw_it2(env)
   elif C.mode == 'collect':
     env = env_fn(C)()
-    N = 10000
+    N = C.collect_n
     space = env.observation_space
     obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
     acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
@@ -68,9 +84,11 @@ if __name__ == '__main__':
           obses[key][i, j] = obs[key]
         acts[i, j] = act
         obs, rew, done, info = env.step(act)
-        env.render()
+        #plt.imshow(obs['lcd']);plt.show()
+        #env.render()
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       print(f'{i} fps: {C.ep_len/(time.time()-start)}')
     lcd = '-lcd' if C.lcd_render else ''
-    C.datapath.mkdir(exist_ok=True)
-    data = np.savez(f'{C.datapath}/{C.env}{lcd}.npz', acts=acts, **obses)
+    C.logdir.mkdir(parents=True, exist_ok=True)
+    data = np.savez(f'{C.logdir}/{C.env}{lcd}.npz', acts=acts, **obses)
+    utils.dump_logger({}, None, 0, C)
