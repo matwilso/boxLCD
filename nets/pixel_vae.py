@@ -25,12 +25,12 @@ class EncoderNet(nn.Module):
     self.mhdpa = nn.MultiheadAttention(self.C.n_embed // 2, 8)
     self.latent_out = nn.Linear(self.C.n_embed // 2, self.C.n_embed // 4)
     #self.ln_f = nn.LayerNorm(C.n_embed // 2)
-    self.head = GaussHead(self.C.n_embed, self.C.n_embed, self.C)
+    self.head = GaussHead(self.C.n_embed, self.C.n_embed//2, self.C)
     #self.post_agg = nn.Linear(self.C.n_embed // 2, 2*self.C.n_embed)
     self.to(C.device)
 
   def forward(self, batch):
-    """expects (BS, EP_LEN, *SHAPE)"""
+    """expects (BS, H, W)"""
     BS = batch['lcd'].shape[0]
     img = batch['lcd'].view(-1, 1, self.C.lcd_h, self.C.lcd_w)
     img = self.c1(img)
@@ -51,9 +51,7 @@ class PixelVAE(nn.Module):
     super().__init__()
     self.C = C
     self.encoder = EncoderNet(env, C)
-    self.decoder = GPT(env, C)
-
-    WAS HERE TRYING TO FIGURE OUT HOW TO PLUG IN PIXELCNN HERE
+    self.decoder = GPT(size=1, block_size=self.C.lcd_h*self.C.lcd_w, dist='binary', cond=self.C.n_embed//2, C=C)
     self.to(C.device)
 
   #def forward(self, batch):
@@ -61,9 +59,16 @@ class PixelVAE(nn.Module):
   #  import ipdb; ipdb.set_trace()
 
   def loss(self, batch):
-    dist = self.encoder(batch)
-    import ipdb; ipdb.set_trace()
+    BS, H, W = batch['lcd'].shape
+    enc_dist = self.encoder(batch)
+    samples = enc_dist.mean
+    #samples = enc_dist.rsample()
+    recon_loss, dist = self.decoder.loss(batch['lcd'].view(BS, H*W, 1), cond=samples)
+    recon_loss = recon_loss.mean((1,2))
+    #prior = tdib.MultivariateNormal(torch.zeros_like(enc_dist.mean), torch.diag_embed(torch.ones_like(enc_dist.stddev)))
+    #prior_loss = tdib.kl_divergence(enc_dist, prior)
+    prior_loss = 0.0
+    return (recon_loss + prior_loss).mean(), dist
 
-  def sample(self):
+  def sample(self, n):
     pass
-

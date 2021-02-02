@@ -35,7 +35,7 @@ class VideoTrainer(Trainer):
     for batch in self.train_ds:
       ct += 1
       batch = {key: val.to(self.C.device) for key, val in batch.items()}
-      loss, dist = self.model.nll(batch)
+      loss, dist = self.model.loss(batch)
       loss.backward()
       if ct % 10 == 0:
         self.optimizer.step()
@@ -99,7 +99,7 @@ class VideoTrainer(Trainer):
     with torch.no_grad():
       for batch in self.test_ds:
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
-        loss, dist = self.model.nll(batch)
+        loss, dist = self.model.loss(batch)
         total_loss += loss * batch['acts'].shape[0]
       avg_loss = total_loss / len(self.test_ds.dataset)
     self.logger['test/bits_per_dim'] = avg_loss.item() / np.log(2)

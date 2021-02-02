@@ -32,7 +32,7 @@ class ImageTrainer(Trainer):
     for batch in self.train_ds:
       batch = {key: val.to(self.C.device) for key, val in batch.items()}
       self.optimizer.zero_grad()
-      loss = self.model.loss(batch)
+      loss, dist = self.model.loss(batch)
       loss.backward()
       self.optimizer.step()
       self.logger['loss'] += [loss.detach().cpu()]
@@ -59,11 +59,18 @@ class ImageTrainer(Trainer):
     with torch.no_grad():
       for batch in self.test_ds:
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
-        loss, dist = self.model.nll(batch)
+        loss, dist = self.model.loss(batch)
         total_loss += loss * batch['acts'].shape[0]
       avg_loss = total_loss / len(self.test_ds.dataset)
     self.logger['test/bits_per_dim'] = avg_loss.item() / np.log(2)
-    self.sample(i)
+    real = batch['lcd'].cpu().detach().view(self.C.bs, 1, 16, 16)[:8]
+    sample = dist.sample().cpu().detach().view(self.C.bs, 1, 16, 16)[:8]
+    error = (sample - real + 1.0) / 2.0
+    out = np.concatenate([real, sample, error], 2)
+    self.writer.add_images('samples', out, i)
+
+    #self.sample(i)
+
     self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
     self.writer.flush()
     self.model.train()

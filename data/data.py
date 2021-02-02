@@ -20,7 +20,7 @@ class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile, allow_pickle=True)
     self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
-    if C.data_mode == 'image':
+    if C.mode == 'image':
       self.bufs = {key: val.flatten(0, 1) for key, val in self.bufs.items()}
     cut = int(len(self.bufs['acts']) * 0.8)
     if train:
@@ -33,12 +33,13 @@ class RolloutDataset(Dataset):
 
   def __getitem__(self, idx):
     elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
+    elem['lcd'] /= 255.0
     return elem
 
 def load_ds(C):
   from torchvision import transforms
   train_dset = RolloutDataset(C.datapath, train=True, C=C)
   test_dset = RolloutDataset(C.datapath, train=False, C=C)
-  train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
-  test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2)
+  train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   return train_loader, test_loader

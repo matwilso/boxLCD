@@ -55,7 +55,7 @@ if __name__ == '__main__':
     draw_it2(env)
   elif C.mode == 'collect':
     env = env_fn(C)()
-    N = 100
+    N = 1000
     space = env.observation_space
     obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
     acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
