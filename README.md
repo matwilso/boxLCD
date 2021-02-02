@@ -1,6 +1,6 @@
 ![](./assets/sideside.gif)
-# 📟 boxLCD 📟
-## box2D physics with MNIST-sized rendering
+# boxLCD 📟
+## *box2D physics with very low-res binarized rendering*
 
 boxLCD renders simple 2D physics environments in very low resolution binarized images to enable quick
 iterations of ideas on low computational budgets.
@@ -12,6 +12,9 @@ ultimately so that robots can learn strong predictive models and act more effect
 2D physics, with very-low resolution offers a crude approximation to the final task. But we think it captures
 enough of the structure of the final goal to be useful, while enabling tremendously quicker iteration
 cycles for trying out ideas, which will lower the bar to entry of working on these problems and accelerate progress.
+
+Think of it like an MNIST for learning world models.
+The images are actually generally smaller than MNIST, but it is much more interesting.
 
 // TODO: add docs on
 // TODO: specific envs and stuff. like the options and the custom creatures you can create
@@ -42,6 +45,8 @@ as we will have in the real world.
 - greater access to the simulator to enable custom scenarios, not just a fixed set of envs. but more general settings
 
 This is explicitly building to the goal of learned sims and world models.
+
+Background knowledge pointer to faq
 
 
 
@@ -117,4 +122,12 @@ Properties that will likely be useful in real world learned sims and world model
 
 ## FAQS
 **Why is it called boxLCD?**
-The rendering looks kind of like an LCD display. And it rhymes with 2d.
+LCD as in Liquid Crystal Display, which are generally pixelated and monochromatic.
+And it rhymes with 2d.
+
+**Background knowledge**
+unsupervised learning / generative models course
+go through autoregs and understand the code. see my repo with explanations.
+then karpathy's minGPT implementation is pretty clean.
+I ripped that out and masacred it a bit to make it simpler in some ways
+so I could add messy code complexity in other ways.

@@ -32,6 +32,8 @@ def config():
   #C.data_mode = 'image'
   C.amp = 1
 
+  C.decode = 'binary'
+
   C.bs = 64
   C.lr = 1e-4
   C.n_layer = 2

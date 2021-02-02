@@ -74,9 +74,11 @@ class LCDEnv(gym.Env, EzPickle):
     @property
     def observation_space(self):
         spaces = {}
+        import ipdb; ipdb.set_trace()
         partial_obs_keys = utils.nlfilter(self.env.obs_keys, 'object')
         self.num_pobs = len(partial_obs_keys)
-        self.pobs_idxs = [self.env.obs_keys.index(x) for k in partial_obs_keys]
+        self.pobs_idxs = [self.env.obs_keys.index(x) for x in partial_obs_keys]
+
         if self.num_pobs == 0:
             spaces['state'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
         else:
@@ -86,7 +88,7 @@ class LCDEnv(gym.Env, EzPickle):
 
     def step(self, action):
         state, rew, done, info = self.env.step(action)
-        state = state[self.pobs_idxs] if self.num_pobs != 0 else 0.0
+        state = state[self.pobs_idxs] if self.num_pobs != 0 else np.zeros(1)
         return {'state': state, 'lcd': self.env.lcd_render()}, rew, done, info
 
     def lcd_render(self):
@@ -94,8 +96,12 @@ class LCDEnv(gym.Env, EzPickle):
 
     def reset(self, *args, **kwargs):
         state = self.env.reset(*args, **kwargs)
-        state = state[self.pobs_idxs] if self.num_pobs != 0 else 0.0
+        state = state[self.pobs_idxs] if self.num_pobs != 0 else np.zeros(1)
         return {'state': state, 'lcd': self.env.lcd_render()}
+        
+    @property
+    def viewer(self):
+        return self.env.viewer
 
     def render(self, mode='rgb_array'):
         return self.env.render(mode=mode)

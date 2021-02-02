@@ -55,7 +55,7 @@ if __name__ == '__main__':
     draw_it2(env)
   elif C.mode == 'collect':
     env = env_fn(C)()
-    N = 1000
+    N = 10000
     space = env.observation_space
     obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
     acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
@@ -68,7 +68,7 @@ if __name__ == '__main__':
           obses[key][i, j] = obs[key]
         acts[i, j] = act
         obs, rew, done, info = env.step(act)
-        #env.render()
+        env.render()
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       print(f'{i} fps: {C.ep_len/(time.time()-start)}')
     lcd = '-lcd' if C.lcd_render else ''

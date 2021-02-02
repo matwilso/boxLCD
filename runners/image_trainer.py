@@ -45,7 +45,7 @@ class ImageTrainer(Trainer):
     # TODO: prompt to a specific point and sample from there. to compare against ground truth.
     N = self.C.num_envs
     sample, logp = self.model.sample(N)
-    self.logger['sample_logp'] = logp
+    self.logger['sample_nlogp'] = -logp
     self.writer.add_video('samples', sample, i, fps=50)
     #error = (fake_imgs - real_imgs + 255) // 2
     #out = np.concatenate([real_imgs, fake_imgs, error], 3)
@@ -63,8 +63,8 @@ class ImageTrainer(Trainer):
         total_loss += loss * batch['acts'].shape[0]
       avg_loss = total_loss / len(self.test_ds.dataset)
     self.logger['test/bits_per_dim'] = avg_loss.item() / np.log(2)
-    real = batch['lcd'].cpu().detach().view(self.C.bs, 1, 16, 16)[:8]
-    sample = dist.sample().cpu().detach().view(self.C.bs, 1, 16, 16)[:8]
+    real = batch['lcd'].cpu().detach().reshape(self.C.bs, 1, 16, 16)[:8]
+    sample = dist.sample().cpu().detach().reshape(self.C.bs, 1, 16, 16)[:8]
     error = (sample - real + 1.0) / 2.0
     out = np.concatenate([real, sample, error], 2)
     self.writer.add_images('samples', out, i)

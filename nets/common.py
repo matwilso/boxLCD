@@ -125,11 +125,44 @@ class MDNHead(nn.Module):
     return dist
 
 class BinaryHead(nn.Module):
-  def __init__(self, C):
+  def __init__(self, in_n, out_n, C):
     super().__init__()
     self.C = C
-    self.layer = nn.Linear(C.n_embed, 1)
+    self.layer = nn.Linear(in_n, out_n)
 
   def forward(self, x, past_o=None):
     x = self.layer(x)
     return tdib.Bernoulli(logits=x)
+
+class CustomHead(nn.Module):
+  def __init__(self, in_n, out_n, C):
+    super().__init__()
+    self.C = C
+    self.d1 = nn.ConvTranspose2d(128, 64, 7, stride=2)
+    self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=2)
+    # TODO: try a version like I have below. where it is just in place. perhaps that could smooth things out
+
+  def forward(self, x, past_o=None):
+    BS, LEN, C = x.shape
+    x = x.reshape(BS*LEN, -1, 1, 1)
+    x = self.d1(x)
+    x = F.relu(x)
+    x = self.d2(x)
+    x = x.reshape(BS, LEN, -1)
+    return tdib.Bernoulli(logits=x)
+
+class CustomEmbed(nn.Module):
+  def __init__(self, in_n, out_n, C):
+    super().__init__()
+    self.C = C
+    self.c1 = nn.Conv2d(1, 64, 3, stride=1, padding=1)
+    self.c2 = nn.Conv2d(64, 1, 3, stride=1, padding=1)
+
+  def forward(self, x, past_o=None):
+    BS, LEN, C = x.shape
+    x = x.reshape(BS*LEN, -1, 16, 16)
+    x = self.c1(x)
+    x = F.relu(x)
+    x = self.c2(x)
+    x = x.reshape(BS, LEN, -1)
+    return x
