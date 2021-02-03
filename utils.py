@@ -155,7 +155,10 @@ def force_shape(out):
   # TODO: add borders around and between images for easier viz
   N, T, C, H, W = out.shape
   if isinstance(out, np.ndarray):
-    out = out.transpose(1, 2, 3, 0, 4).reshape(T, C, H, N * W)[None]
+    out = out.transpose(1, 2, 3, 0, 4)
+    out = np.concatenate([out,np.zeros(out.shape[:-1], dtype=out.dtype)[...,None]], -1)
   else:
-    out = out.permute(1, 2, 3, 0, 4).flatten(-2)[None]
+    out = out.permute(1, 2, 3, 0, 4)
+    out = torch.cat([out,torch.zeros(out.shape[:-1])[...,None]], -1)
+  out = out.reshape(T, C, H, N * (W+1))[None]
   return out

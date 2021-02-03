@@ -31,10 +31,13 @@ def config():
   C.mode = 'world'
   #C.data_mode = 'image'
   C.amp = 1
+  C.cheap_render = 1
 
   C.decode = 'binary'
   C.collect_n = 100
   C.grad_clip = 10.0
+
+  C.subset = 'image+state'
 
   C.bs = 64
   C.lr = 1e-4
@@ -47,7 +50,7 @@ def config():
   C.vanished = 1
   C.num_envs = 5
 
-  C.mdn_k = 5
+  C.mdn_k = 10
   C.dist_delta = 0
   C.sample_sample = 0
   C.skip_train = 0

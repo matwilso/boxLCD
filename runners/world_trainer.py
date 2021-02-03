@@ -1,3 +1,4 @@
+import copy
 from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
@@ -32,10 +33,14 @@ class WorldTrainer(Trainer):
       batch = {key: val.to(self.C.device) for key, val in batch.items()}
       if self.C.amp:
         with torch.cuda.amp.autocast():
-          loss, dist = self.model.loss(batch)
+          loss, metrics = self.model.loss(batch)
       else:
-          loss, dist = self.model.loss(batch)
+          loss, metrics = self.model.loss(batch)
+      for key in metrics:
+        self.logger[key] += [metrics[key].cpu().detach()]
       self.scaler.scale(loss).backward()
+      self.scaler.unscale_(self.optimizer)
+      self.logger['grad_norm'] += [torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.C.grad_clip).cpu()]
       self.scaler.step(self.optimizer)
       self.scaler.update()
       self.optimizer.zero_grad()
@@ -46,13 +51,23 @@ class WorldTrainer(Trainer):
     N = self.C.num_envs
     if True:
       acts = (torch.rand(N, self.C.ep_len, self.env.action_space.shape[0])*2 - 1).to(self.C.device)
-      sample, logp = self.model.sample(N, cond=acts)
-      sample = sample['lcd']
-      self.logger['sample_nlogp'] = -logp
-      #shape = sample.shape
-      #sample = torch.roll(sample.reshape(200, 16*16), -1, -1).reshape(*shape)
-      sample = sample.cpu().detach().repeat_interleave(4,-1).repeat_interleave(4,-2)[:,1:]
-      self.writer.add_video('samples', utils.force_shape(sample), i, fps=50)
+      sample, sample_loss = self.model.sample(N, cond=acts)
+      if 'image' in self.C.subset:
+        lcd = sample['lcd']
+        self.logger['sample_loss'] += [sample_loss]
+        lcd = lcd.cpu().detach().repeat_interleave(4,-1).repeat_interleave(4,-2)[:,1:]
+        self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
+      if 'state' in self.C.subset:
+        state = sample['state'].cpu()
+        state_img = []
+        for j in range(state.shape[1]):
+          obs = self.big_tvenv.reset(np.arange(self.C.num_envs), state[:,j])
+          if self.C.cheap_render:
+            state_img += [obs['lcd'][...,None]]
+          else:
+            state_img += [self.big_tvenv.render()]
+        state_img = np.stack(state_img, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
+        self.writer.add_video('state_samples', utils.force_shape(state_img), i, fps=50)
 
     if True:
       # EVAL
@@ -61,36 +76,67 @@ class WorldTrainer(Trainer):
       else:
         reset_states = [None]*N
       obses = {key: [] for key in self.env.observation_space.spaces}
+      big_obses = {key: [] for key in self.env.observation_space.spaces}
       for key, val in self.tvenv.reset(np.arange(N), reset_states).items():
         obses[key] += [val]
-      #real_imgs = [self.tvenv.render()]
+      for key, val in self.big_tvenv.reset(np.arange(N), obses['state'][0]).items():
+        big_obses[key] += [val]
+
+      if not self.C.cheap_render:
+        real_imgs = [self.tvenv.render()]
       acts = []
       for _ in range(self.C.ep_len - 1):
         act = self.tvenv.action_space.sample()
         obs = self.tvenv.step(act)[0]
         for key, val in obs.items(): obses[key] += [val]
-        #real_imgs += [self.tvenv.render()]
+        big_obs = self.big_tvenv.reset(np.arange(N), obs['state'])
+        for key, val in big_obs.items(): big_obses[key] += [val]
+        if not self.C.cheap_render:
+          real_imgs += [self.tvenv.render()]
         acts += [act]
       acts += [np.zeros_like(act)]
       obses = {key: np.stack(val, 1) for key, val in obses.items()}
+      big_obses = {key: np.stack(val, 1) for key, val in big_obses.items()}
       acts = np.stack(acts, 1)
       acts = torch.as_tensor(acts, dtype=torch.float32).to(self.C.device)
       prompts = {key: torch.as_tensor(1.0*val[:,:5]).to(self.C.device) for key, val in obses.items()}
-      prompted_samples, logp = self.model.sample(N, cond=acts, prompts=prompts)
-      prompted_samples = prompted_samples['lcd']
-      prompted_samples = prompted_samples.cpu().detach().numpy()
-      lcd = obses['lcd'][:,:,None]
-      error = (prompted_samples - lcd + 1.0) / 2.0
-      out = np.concatenate([lcd, prompted_samples, error], 3)
-      out = out.repeat(4, -1).repeat(4,-2)
-      self.writer.add_video('prompted', utils.force_shape(out), i, fps=50)
+      prompted_samples, prompt_loss = self.model.sample(N, cond=acts, prompts=prompts)
+      self.logger['prompt_sample_loss'] += [prompt_loss]
+      real_lcd = obses['lcd'][:,:,None]
+      if 'image' in self.C.subset:
+        lcd_psamp = prompted_samples['lcd']
+        lcd_psamp = lcd_psamp.cpu().detach().numpy()
+        error = (lcd_psamp - real_lcd + 1.0) / 2.0
+        out = np.concatenate([real_lcd, lcd_psamp, error], 3)
+        out = out.repeat(4, -1).repeat(4,-2)
+        self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
+      if 'state' in self.C.subset:
+        state_psamp = prompted_samples['state'].cpu()
+        imgs = []
+        for j in range(state_psamp.shape[1]):
+          obs = self.big_tvenv.reset(np.arange(self.C.num_envs), state_psamp[:,j])
+          if self.C.cheap_render:
+            imgs += [obs['lcd'][...,None]]
+          else:
+            imgs += [self.big_tvenv.render()]
+        imgs = np.stack(imgs, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
+        if self.C.cheap_render:
+          real_imgs = big_obses['lcd'][:,:,None]
+        else:
+          real_imgs = np.stack(real_imgs, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
+        if imgs.dtype == np.uint8:
+          error = (real_imgs - imgs + 255) // 2
+        else:
+          error = (1.0*real_imgs - 1.0*imgs + 1.0) / 2.0
+        out = np.concatenate([real_imgs, imgs, error], 3)
+        self.writer.add_video('prompted_state', utils.force_shape(out), i, fps=50)
 
   def test(self, i):
     self.model.eval()
     with torch.no_grad():
       for batch in self.test_ds:
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
-        loss, dist = self.model.loss(batch)
+        loss, metrics = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
     self.sample(i)
     self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)

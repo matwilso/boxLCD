@@ -21,12 +21,18 @@ class AutoWorld(nn.Module):
     self.C = C
     self.imsize = self.C.lcd_h*self.C.lcd_w
     self.act_n = env.action_space.shape[0]
-    self.block_size = self.C.ep_len
-    self.temporal = GPTWorld(size=self.C.lcd_h*self.C.lcd_w, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
-    #self.temporal = GPTWorld(size=self.C.lcd_h*self.C.lcd_w + 128, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
-    #self.temporal = GPT(size=self.C.lcd_h*self.C.lcd_w, block_size=self.C.ep_len, dist=self.C.decode, C=C)
     self.state_n = env.observation_space.spaces['state'].shape[0]
-    lcd_n = C.lcd_h*C.lcd_w
+    self.block_size = self.C.ep_len
+
+    self.size = 0
+    self.gpt_size = 0
+    if 'image' in self.C.subset:
+      self.size += self.imsize
+      self.gpt_size += self.imsize
+    if 'state' in self.C.subset:
+      self.size += self.state_n
+      self.gpt_size += 128
+    self.temporal = GPTWorld(size=self.gpt_size, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
     self.linear_up = nn.Linear(self.state_n, 128)
     self.to(C.device)
 
@@ -35,19 +41,29 @@ class AutoWorld(nn.Module):
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
     state = batch['state']
     acts = batch['acts']
-    zstate = self.linear_up(state)
-    x = torch.cat([lcd, zstate], -1)
-    # should the dist here be independent? prolly not
-    bindist, mdndist = self.temporal.forward(lcd, cond=acts)
-    #bindist, mdndist = self.temporal.forward(x, cond=acts)
+    if 'state' == self.C.subset:
+      zstate = self.linear_up(state)
+      x = zstate
+    if 'image' == self.C.subset:
+      x = lcd
+    if 'image' in self.C.subset and 'state' in self.C.subset:
+      zstate = self.linear_up(state)
+      x = torch.cat([lcd, zstate], -1)
+
+    bindist, mdndist = self.temporal.forward(x, cond=acts)
     return bindist, mdndist
 
   def loss(self, batch):
+    BS, EPL,*HW = batch['lcd'].shape
     bindist, mdndist = self.forward(batch)
-    lcd_loss = -bindist.log_prob(batch['lcd'].flatten(-2)).mean()
+    lcd_loss = -bindist.log_prob(batch['lcd'].reshape(BS, EPL, np.prod(HW))).mean()
     state_loss = -mdndist.log_prob(batch['state']).mean()
-    return lcd_loss, bindist
-    #return lcd_loss+state_loss, bindist
+    loss = 0.0
+    if 'image' in self.C.subset:
+      loss += lcd_loss
+    if 'state' in self.C.subset:
+      loss += state_loss
+    return loss, {'loss/state': state_loss, 'loss/image': lcd_loss}
 
   def sample(self, n, cond=None, prompts=None):
     # TODO: feed act_n
@@ -72,7 +88,7 @@ class AutoWorld(nn.Module):
         batch['state'][:, i+1] = mdndist.sample()[:,i]
 
         if i == self.block_size-2:
-          logp = bindist.log_prob(batch['lcd'])
+          sample_loss = self.loss(batch)[0]
 
     batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
-    return batch, logp.mean().item()
+    return batch, sample_loss.mean().cpu().detach()

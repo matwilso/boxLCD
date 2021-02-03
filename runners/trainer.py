@@ -1,3 +1,4 @@
+import copy
 from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
@@ -29,3 +30,8 @@ class Trainer(Runner):
     self.writer = SummaryWriter(C.logdir)
     self.logger = utils.dump_logger({}, self.writer, 0, C)
     self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
+
+    bigC = copy.deepcopy(C)
+    bigC.lcd_h *= 4
+    bigC.lcd_w *= 4
+    self.big_tvenv = SyncVectorEnv([env_fn(bigC, 0 + i) for i in range(C.num_envs)], C=bigC)  # test vector env
