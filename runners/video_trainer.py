@@ -41,6 +41,9 @@ class VideoTrainer(Trainer):
       else:
           loss, dist = self.model.loss(batch)
       self.scaler.scale(loss).backward()
+      self.scaler.unscale_(self.optimizer)
+      self.logger['grad_norm'] += [torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.C.grad_clip).cpu()]
+
       self.scaler.step(self.optimizer)
       self.scaler.update()
       #loss.backward()
@@ -65,7 +68,10 @@ class VideoTrainer(Trainer):
 
     if True:
       # EVAL
-      reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
+      if self.C.num_agents == 0:
+        reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
+      else:
+        reset_states = [None]*N
       obses = {key: [] for key in self.env.observation_space.spaces}
       for key, val in self.tvenv.reset(np.arange(N), reset_states).items():
         obses[key] += [val]

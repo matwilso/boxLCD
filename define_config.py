@@ -34,6 +34,7 @@ def config():
 
   C.decode = 'binary'
   C.collect_n = 100
+  C.grad_clip = 10.0
 
   C.bs = 64
   C.lr = 1e-4

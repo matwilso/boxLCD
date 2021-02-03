@@ -22,7 +22,8 @@ class AutoWorld(nn.Module):
     self.imsize = self.C.lcd_h*self.C.lcd_w
     self.act_n = env.action_space.shape[0]
     self.block_size = self.C.ep_len
-    self.temporal = GPTWorld(size=self.C.lcd_h*self.C.lcd_w + 128, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
+    self.temporal = GPTWorld(size=self.C.lcd_h*self.C.lcd_w, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
+    #self.temporal = GPTWorld(size=self.C.lcd_h*self.C.lcd_w + 128, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
     #self.temporal = GPT(size=self.C.lcd_h*self.C.lcd_w, block_size=self.C.ep_len, dist=self.C.decode, C=C)
     self.state_n = env.observation_space.spaces['state'].shape[0]
     lcd_n = C.lcd_h*C.lcd_w
@@ -37,14 +38,16 @@ class AutoWorld(nn.Module):
     zstate = self.linear_up(state)
     x = torch.cat([lcd, zstate], -1)
     # should the dist here be independent? prolly not
-    bindist, mdndist = self.temporal.forward(x, cond=acts)
+    bindist, mdndist = self.temporal.forward(lcd, cond=acts)
+    #bindist, mdndist = self.temporal.forward(x, cond=acts)
     return bindist, mdndist
 
   def loss(self, batch):
     bindist, mdndist = self.forward(batch)
     lcd_loss = -bindist.log_prob(batch['lcd'].flatten(-2)).mean()
     state_loss = -mdndist.log_prob(batch['state']).mean()
-    return lcd_loss + state_loss, bindist
+    return lcd_loss, bindist
+    #return lcd_loss+state_loss, bindist
 
   def sample(self, n, cond=None, prompts=None):
     # TODO: feed act_n

@@ -87,14 +87,11 @@ class WorldTrainer(Trainer):
 
   def test(self, i):
     self.model.eval()
-    total_loss = 0.0
     with torch.no_grad():
       for batch in self.test_ds:
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
         loss, dist = self.model.loss(batch)
-        total_loss += loss * batch['acts'].shape[0]
-      avg_loss = total_loss / len(self.test_ds.dataset)
-    self.logger['test/bits_per_dim'] = avg_loss.item() / np.log(2)
+        self.logger['test_loss'] += [loss.mean().detach().cpu()]
     self.sample(i)
     self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
     self.writer.flush()
