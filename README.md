@@ -1,13 +1,89 @@
 ![](./assets/sideside.gif)
 # boxLCD 📟
-## *box2D physics with low-res binarized images*
+## *box2D physics with low-res (16x32) binarized rendering*
+
+The aim of this project is to accelerate progress in [learned simulator and world model research](link to my post),
+by providing a testbed that enables us to develop useful approaches, but with much quicker iteration speed and smaller computational budgets.
+
+To this end, boxLCD renders box2d physics in extremely low-resolution images (16x32, smaller than MNIST-sized images). As shown in the gif, this is a simple but rich space for displaying physical motion.
+
+
+
+
+This enables trying generative modeling techniques that operate in pixel space, and
+trying ideas that would normally be slow to iterate on or prohibitively expensive. 
+
+In the best case, we get useful research that enables future progress on real world real robot tasks.
+In the worst case, it is useful for me to quickly try out ideas and get up to speed on learning world models.
+
+
+
+
+
+In the best case, this is used to develop methods that end up becoming useful for learning models of the real world.
+Operating on high-res images from robots in the real world is expensive.
+So here then we aim to create the closest possible analog to the problems we will face in the
+future while keeping it extremely tractable.
+
+
+
+
+
+
+While I think 
+
+The generative modeling task and learning the simulator seem extremely rich and challenging,
+and contain a lot of the meat of the problem.
+
+I suspect this will have more action bechmarks later. But I think this is somewhat
+already covered. And that generative modeling of this world itself is likely to lead
+to ideas useful for MBRL and other work.
+
+It helps to focus on subsets of the full challenge. And I think world modeling itself
+is a very large and challenging subset of the full challenge.
+
+
+
+
+
+
+
+Specifically we are focused on predictive learning / generative modeling. Given a set of environments
+with similar underlying physics, can we learn a good predictive model of this data?
+Can we effectively learn to clone the physics simulator using neural network models?
+
+Such abilities have huge implications for being able to train 
+
+
+If we can, this has
+
+
+
+
+
+For now, we are focusing on how well you can learn to predict this data.
+
+
+
+
+
+The testbed is to learn to accurately predict the behavior of a few 
+
+
+
+
+We expect that learning large predictive models of the world is going to be critical
+to the future success of robot learning.
+
+Operating on video is extremely expensive and can make research progress and iteration
+speed slow, especially for those with limited budgets.
+
+
 
 boxLCD renders simple 2D physics environments in very low resolution binarized images to enable quick
 iterations of ideas on low computational budgets.
 It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
 
-The goal of this project is to accelerate progress in learned simulator and world model research,
-ultimately so that robots can learn strong predictive models and act more effectively in the real world.
 
 2D physics, with very-low resolution offers a crude approximation to the final task. But we think it captures
 enough of the structure of the final goal to be useful, while enabling tremendously quicker iteration
