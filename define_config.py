@@ -34,6 +34,8 @@ def config():
   C.cheap_render = 1
   C.done_n = 1000000
   C.full_state = 0
+  C.num_vars = 0
+
 
   C.decode = 'binary'
   C.collect_n = 100

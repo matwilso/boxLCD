@@ -28,6 +28,7 @@ class WorldTrainer(Trainer):
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
     self.scaler = torch.cuda.amp.GradScaler(enabled=C.amp)
     self.C.num_vars = self.num_vars = utils.count_vars(self.model)
+    print('num vars', self.num_vars)
 
   def train_epoch(self, i):
     self.optimizer.zero_grad()

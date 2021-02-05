@@ -47,6 +47,7 @@ def dump_logger(logger, writer, i, C):
       #  writer.add_scalar('neg/'+key, -val, i)
     print(key, val)
   print(C.full_cmd)
+  print(C.num_vars)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
     yaml.dump(C, f)
   print('=' * 30)

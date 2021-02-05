@@ -1,0 +1,6 @@
+#python main.py --mode=world --datapath=logs/durchin/1e5/ --bs=128 --num_envs=4 --lr=1e-3 --logdir=logs/urchin/100k/image1e-3_big --subset=image+state --decode=multi --done_n=30 --n_layer=3 --n_head=16 --n_embed=512
+#python main.py --mode=world --datapath=logs/durchin/1e5/ --bs=256 --num_envs=4 --lr=1e-3 --logdir=logs/urchin/100k/image1e-3_big --subset=image+state --decode=multi --done_n=30
+#python main.py --mode=world --datapath=logs/durchin/10000/ --bs=128 --num_envs=4 --lr=1e-4 --logdir=logs/urchin/10k/image_4 --subset=image --decode=multi --done_n=30 --n_layer=4 --n_head=16 --n_embed=512
+python main.py --mode=world --datapath=logs/durchin/10000/ --bs=128 --num_envs=4 --lr=5e-5 --logdir=logs/urchin/10k/image_3_5e-5 --subset=image --decode=multi --done_n=30 --n_layer=3 --n_head=16 --n_embed=1024
+#python main.py --mode=world --datapath=logs/durchin/10000/ --bs=128 --num_envs=4 --lr=1e-4 --logdir=logs/urchin/10k/image_5 --subset=image --decode=multi --done_n=30 --n_layer=5 --n_head=16 --n_embed=512
+#python main.py --mode=world --datapath=logs/durchin/10000/ --bs=128 --num_envs=4 --lr=1e-4 --logdir=logs/urchin/10k/image_6 --subset=image --decode=multi --done_n=30 --n_layer=6 --n_head=16 --n_embed=512
