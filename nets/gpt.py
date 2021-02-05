@@ -26,9 +26,9 @@ class GPT(nn.Module):
     # decoder head
     self.ln_f = nn.LayerNorm(C.n_embed)
     if dist == 'gauss':
-      self.dist_head = GaussHead(self.size, C)
+      self.dist_head = GaussHead(C.n_embed, self.size, C)
     elif dist == 'mdn':
-      self.dist_head = MDNHead(self.size, C)
+      self.dist_head = MDNHead(C.n_embed, self.size, C)
     elif dist == 'binary':
       self.dist_head = BinaryHead(C.n_embed, self.size, C)
     elif dist == 'custom':

@@ -156,6 +156,28 @@ This is explicitly building to the goal of learned sims and world models.
 Background knowledge pointer to faq
 
 
+https://haozhi.io/RPIN/
+
+https://phyre.ai/
+This one you set the state of the environment and then you see it roll out.
+This is unlike robotics where you act at every timestep.
+It is a narrow setting where you take one action and see what happens for many steps.
+
+Also taking actions at every step is way harder to learn.
+This creates many possible ways states can diverge. You can't rely
+on them following a sequence, which is much easier.
+
+Ilya bouncing balls. Back in the day though, these were not binarized, slightly larger.
+And the RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces results that are not crisp.
+The balls move, but the collisions are gooey (in supplementary, compare 1.gif,2.gif with the training data 5.gif).
+https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html
+
+Basically the point is this project is trying to approximate something very specific.
+No previous work are trying to learn simulators or world models like this.
+And the details and what you aim for matter. 
+We think this aims most closely at an interesting goal
+We think this has the greatest pareto front / product / AUC of aiming to the goal and being more approachable with small budgets.
+
 
 ## Expected speed gains: some back of the envelope computations 🖩
 

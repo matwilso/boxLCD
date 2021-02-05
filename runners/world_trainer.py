@@ -1,3 +1,4 @@
+import time
 import copy
 from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
@@ -26,6 +27,7 @@ class WorldTrainer(Trainer):
     self.model = AutoWorld(self.env, C)
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
     self.scaler = torch.cuda.amp.GradScaler(enabled=C.amp)
+    self.C.num_vars = self.num_vars = utils.count_vars(self.model)
 
   def train_epoch(self, i):
     self.optimizer.zero_grad()
@@ -52,9 +54,9 @@ class WorldTrainer(Trainer):
     if True:
       acts = (torch.rand(N, self.C.ep_len, self.env.action_space.shape[0])*2 - 1).to(self.C.device)
       sample, sample_loss = self.model.sample(N, cond=acts)
+      self.logger['sample_loss'] += [sample_loss]
       if 'image' in self.C.subset:
         lcd = sample['lcd']
-        self.logger['sample_loss'] += [sample_loss]
         lcd = lcd.cpu().detach().repeat_interleave(4,-1).repeat_interleave(4,-2)[:,1:]
         self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
       if 'state' in self.C.subset:
@@ -106,8 +108,10 @@ class WorldTrainer(Trainer):
       if 'image' in self.C.subset:
         lcd_psamp = prompted_samples['lcd']
         lcd_psamp = lcd_psamp.cpu().detach().numpy()
+
         error = (lcd_psamp - real_lcd + 1.0) / 2.0
-        out = np.concatenate([real_lcd, lcd_psamp, error], 3)
+        blank = np.zeros_like(real_lcd)[...,:1,:]
+        out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
         out = out.repeat(4, -1).repeat(4,-2)
         self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
       if 'state' in self.C.subset:
@@ -128,7 +132,10 @@ class WorldTrainer(Trainer):
           error = (real_imgs - imgs + 255) // 2
         else:
           error = (1.0*real_imgs - 1.0*imgs + 1.0) / 2.0
-        out = np.concatenate([real_imgs, imgs, error], 3)
+
+        blank = np.zeros_like(real_imgs)[...,:1,:]
+        out = np.concatenate([real_imgs, blank, imgs, blank, error], 3)
+        self.logger['prompt_state_img_delta_metric'] = 1e3*((1.0*real_imgs - 1.0*imgs)**2).mean()
         self.writer.add_video('prompted_state', utils.force_shape(out), i, fps=50)
 
   def test(self, i):
@@ -138,7 +145,10 @@ class WorldTrainer(Trainer):
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
         loss, metrics = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
+    sample_start = time.time()
     self.sample(i)
+    self.logger['dt/sample'] = [time.time()-sample_start]
+    self.logger['num_vars'] = self.num_vars
     self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
     self.writer.flush()
     self.model.train()
@@ -148,3 +158,6 @@ class WorldTrainer(Trainer):
       if not self.C.skip_train:
         self.train_epoch(i)
       self.test(i)
+
+      if i >= self.C.done_n:
+        break

@@ -43,6 +43,8 @@ def dump_logger(logger, writer, i, C):
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
+      #if 'loss' in key:
+      #  writer.add_scalar('neg/'+key, -val, i)
     print(key, val)
   print(C.full_cmd)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:

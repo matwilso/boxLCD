@@ -1,3 +1,5 @@
+from define_config import env_fn
+from nets.flows import RealNVP, AffineTransform, MixtureCDFFLowCoupling
 import sys
 from collections import defaultdict
 import numpy as np
@@ -9,6 +11,7 @@ from torch.optim import Adam
 from itertools import chain, count
 import torch
 from torch import distributions as tdib
+import torch.distributions.transforms as tran
 from torch import nn
 import torch.nn.functional as F
 
@@ -144,7 +147,7 @@ class CustomHead(nn.Module):
 
   def forward(self, x, past_o=None):
     BS, LEN, C = x.shape
-    x = x.reshape(BS*LEN, -1, 1, 1)
+    x = x.reshape(BS * LEN, -1, 1, 1)
     x = self.d1(x)
     x = F.relu(x)
     x = self.d2(x)
@@ -160,26 +163,35 @@ class CustomEmbed(nn.Module):
 
   def forward(self, x, past_o=None):
     BS, LEN, C = x.shape
-    x = x.reshape(BS*LEN, -1, 16, 16)
+    x = x.reshape(BS * LEN, -1, 16, 16)
     x = self.c1(x)
     x = F.relu(x)
     x = self.c2(x)
     x = x.reshape(BS, LEN, -1)
-    return x
 
-class MultiHead(nn.Module):
-  def __init__(self, in_n, out_n, split, C):
+class FlowHead(nn.Module):
+  def __init__(self, in_n, out_n, C):
     super().__init__()
+    env = env_fn(C)()
     self.C = C
     self.in_n = in_n
     self.out_n = out_n
-    self.split = split
-    self.layer = nn.Linear(in_n, in_n*2)
-    self.binary = BinaryHead(in_n, self.split, C)
-    self.mdn = MDNHead(in_n, out_n-self.split, C)
+    kwargs = dict(cond_size=self.in_n, n_hidden=2, hidden_size=256, C=self.C)
+    rng = np.random.RandomState(0)
+    masks = []
+    for i in range(2):
+      if i % 2 == 0:
+        masks += [np.r_[np.ones(8), np.zeros(8)]]
+      else:
+        masks += [np.r_[np.zeros(8), np.ones(8)]]
+      #masks += [rng.choice(np.arange(self.out_n), size=8, replace=False)]
+    self.transforms = [MixtureCDFFLowCoupling(self.out_n, masks[i], **kwargs) for i in range(len(masks))]
+    #self.transforms = [AffineTransform(self.out_n, masks[i], **kwargs) for i in range(len(masks))]
 
   def forward(self, x, past_o=None):
-    xb, xm = self.layer(x).chunk(2, -1)
-    bin = self.binary(xb)
-    mdn = self.mdn(xm)
-    return bin, mdn
+    realnvp = RealNVP(self.out_n, self.transforms, cond=x, C=self.C).to(self.C.device)
+    import ipdb; ipdb.set_trace()
+    realnvp.sample()
+    #import ipdb; ipdb.set_trace()
+    return realnvp
+

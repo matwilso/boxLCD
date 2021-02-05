@@ -23,6 +23,8 @@ class RolloutDataset(Dataset):
     if C.mode == 'image':
       self.bufs = {key: val.flatten(0, 1) for key, val in self.bufs.items()}
     cut = int(len(self.bufs['acts']) * 0.8)
+    #if C.full_state:
+    #  self.bufs['state'] = self.bufs.pop('full_state')
     if train:
       self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
     else:

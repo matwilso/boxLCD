@@ -32,6 +32,8 @@ def config():
   #C.data_mode = 'image'
   C.amp = 1
   C.cheap_render = 1
+  C.done_n = 1000000
+  C.full_state = 0
 
   C.decode = 'binary'
   C.collect_n = 100
@@ -50,7 +52,7 @@ def config():
   C.vanished = 1
   C.num_envs = 5
 
-  C.mdn_k = 10
+  C.mdn_k = 5
   C.dist_delta = 0
   C.sample_sample = 0
   C.skip_train = 0
@@ -84,9 +86,6 @@ def config():
   C.all_contact = 1
 
   C.all_corners = 0
-  C.use_done = 0
-  C.threshold_done = 0
-  C.thres = 0.05
   C.walls = 1
 
   # extra info that we set here for convenience and don't modify 
