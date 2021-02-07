@@ -43,6 +43,8 @@ def dump_logger(logger, writer, i, C):
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
+      if key == 'loss':
+        writer.add_scalar('logx/'+key, val, int(np.log(1e5*i)))
       #if 'loss' in key:
       #  writer.add_scalar('neg/'+key, -val, i)
     print(key, val)

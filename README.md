@@ -1,13 +1,21 @@
 ![](./assets/sideside.gif)
 # boxLCD 📟
-## *box2D physics with low-res (16x32) binarized rendering*
+## *box2D physics with low-res binarized rendering*
 
 The aim of this project is to accelerate progress in [learned simulator and world model research](link to my post),
 by providing a testbed that enables us to develop useful approaches, but with much quicker iteration speed and smaller computational budgets.
 
+prototyping and demonstrating hte ideas that will b euseful in the real case.
+so that we can work out ideas and so that we can prove the potential value of future reasearch.
+
+
+boxLCD is a hackable testbed which usings simple bo2d physics rendering at extremely low-resolution.
+
 To this end, boxLCD renders box2d physics in extremely low-resolution images (16x32, smaller than MNIST-sized images). As shown in the gif, this is a simple but rich space for displaying physical motion.
 
 
+
+I'm starting with a pretty basic set of tasks, but it can be extended to handle more.
 
 
 This enables trying generative modeling techniques that operate in pixel space, and
@@ -19,10 +27,10 @@ In the worst case, it is useful for me to quickly try out ideas and get up to sp
 
 
 
+ 
 
-In the best case, this is used to develop methods that end up becoming useful for learning models of the real world.
 Operating on high-res images from robots in the real world is expensive.
-So here then we aim to create the closest possible analog to the problems we will face in the
+So here then we aim to create the closest possible aGnalog to the problems we will face in the
 future while keeping it extremely tractable.
 
 
@@ -179,6 +187,15 @@ We think this aims most closely at an interesting goal
 We think this has the greatest pareto front / product / AUC of aiming to the goal and being more approachable with small budgets.
 
 
+
+https://github.com/greydanus/mnist1d
+https://greydanus.github.io/2020/12/01/scaling-down/
+
+This is not that similar, but has the shared goal of focusing on iteration speed.
+We should focus on things that will scale. It may not help a ton for what actually ends
+up scaling, but it gives a good place to build intuitions and fundamentals.
+
+
 ## Expected speed gains: some back of the envelope computations 🖩
 
 ### Bits 📲
@@ -236,3 +253,6 @@ go through autoregs and understand the code. see my repo with explanations.
 then karpathy's minGPT implementation is pretty clean.
 I ripped that out and masacred it a bit to make it simpler in some ways
 so I could add messy code complexity in other ways.
+
+
+TODO:

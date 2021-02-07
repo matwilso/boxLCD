@@ -33,11 +33,13 @@ def config():
   C.amp = 1
   C.cheap_render = 1
   C.done_n = 1000000
+  C.save_n = 5
   C.full_state = 0
   C.num_vars = 0
 
 
   C.decode = 'binary'
+  C.conv_io = 0
   C.collect_n = 100
   C.grad_clip = 10.0
 

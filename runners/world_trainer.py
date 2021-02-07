@@ -160,5 +160,11 @@ class WorldTrainer(Trainer):
         self.train_epoch(i)
       self.test(i)
 
+      if (self.C.logdir / 'pause.marker').exists():
+        import ipdb; ipdb.set_trace()
+
+      if i % self.C.save_n == 0:
+        torch.save(self.model.state_dict(), self.C.logdir / 'weights.pt')
+
       if i >= self.C.done_n:
         break

@@ -6,7 +6,7 @@ import torch
 from torch import distributions as tdib
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, CustomHead, CustomEmbed
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, ConvBinHead, ConvEmbed
 
 class GPT(nn.Module):
   def __init__(self, size, block_size, dist, cond=None, C=None):
@@ -32,8 +32,8 @@ class GPT(nn.Module):
     elif dist == 'binary':
       self.dist_head = BinaryHead(C.n_embed, self.size, C)
     elif dist == 'custom':
-      self.dist_head = CustomHead(C.n_embed, self.size, C)
-      self.custom_embed = CustomEmbed(size, C.n_embed//2 if cond is not None else C.n_embed, C)
+      self.dist_head = ConvBinHead(C.n_embed, self.size, C)
+      self.custom_embed = ConvEmbed(size, C.n_embed//2 if cond is not None else C.n_embed, C)
     self.to(C.device)
 
   def append_location(self, x):

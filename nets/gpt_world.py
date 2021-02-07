@@ -7,7 +7,7 @@ import torch
 from torch import distributions as tdib
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, CustomHead, CustomEmbed, FlowHead
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, ConvBinHead, ConvEmbed, FlowHead
 from nets.gpt import GPT
 
 class GPTDist(nn.Module):
@@ -31,7 +31,10 @@ class MultiHead(nn.Module):
     self.out_n = out_n
     self.split = split
     self.layer = nn.Linear(in_n, in_n * 2)
-    self.binary = BinaryHead(in_n, self.split, C)
+    if self.C.conv_io:
+      self.binary = ConvBinHead(in_n, self.split, C)
+    else:
+      self.binary = BinaryHead(in_n, self.split, C)
     #self.state = FlowHead(in_n, out_n - self.split, C)
     #self.state = GaussHead(in_n, out_n-self.split, C) 
     self.state = MDNHead(in_n, out_n-self.split, C) 
@@ -68,11 +71,17 @@ class GPTWorld(nn.Module):
       self.dist_head = MDNHead(self.size, C)
     elif dist == 'binary':
       self.dist_head = BinaryHead(C.n_embed, self.size, C)
-    elif dist == 'custom':
-      self.dist_head = CustomHead(C.n_embed, self.size, C)
-      self.custom_embed = CustomEmbed(size, C.n_embed//2 if cond is not None else C.n_embed, C)
+    #elif dist == 'custom':
+    #  self.dist_head = CustomHead(C.n_embed, self.size, C)
+    #  self.custom_embed = ConvEmbed(size, C.n_embed//2 if cond is not None else C.n_embed, C)
     elif dist == 'multi':
-      self.dist_head = MultiHead(C.n_embed, C.state_n+self.imsize, self.imsize, C)
+      if self.C.conv_io:
+        self.dist_head = MultiHead(C.n_embed, 256, 128, C)
+      else:
+        self.dist_head = MultiHead(C.n_embed, C.state_n+self.imsize, self.imsize, C)
+    if self.C.conv_io:
+      self.custom_embed = ConvEmbed(self.imsize, C.n_embed//2 if cond is not None else C.n_embed, C)
+
     self.to(C.device)
 
   def append_location(self, x):
@@ -86,7 +95,7 @@ class GPTWorld(nn.Module):
     x = torch.cat([torch.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
     #x = self.append_location(x)
     # forward the GPT model
-    if self.dist == 'custom':
+    if self.C.conv_io:
       x = self.custom_embed(x)
 
     x = self.embed(x)

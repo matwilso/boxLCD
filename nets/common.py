@@ -137,24 +137,31 @@ class BinaryHead(nn.Module):
     x = self.layer(x)
     return tdib.Bernoulli(logits=x)
 
-class CustomHead(nn.Module):
+class ConvBinHead(nn.Module):
   def __init__(self, in_n, out_n, C):
     super().__init__()
     self.C = C
-    self.d1 = nn.ConvTranspose2d(128, 64, 7, stride=2)
-    self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=2)
+    self.in_n = in_n
+    self.out_n = out_n
+    H = self.C.lcd_h
+    W = self.C.lcd_w
+    self.shape = W//H
+    #self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 7, stride=2)
+    #self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=2)
+    self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 4, stride=4)
+    self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=4)
     # TODO: try a version like I have below. where it is just in place. perhaps that could smooth things out
 
   def forward(self, x, past_o=None):
     BS, LEN, C = x.shape
-    x = x.reshape(BS * LEN, -1, 1, 1)
+    x = x.reshape(BS * LEN, -1, self.shape, 1)
     x = self.d1(x)
     x = F.relu(x)
     x = self.d2(x)
     x = x.reshape(BS, LEN, -1)
     return tdib.Bernoulli(logits=x)
 
-class CustomEmbed(nn.Module):
+class ConvEmbed(nn.Module):
   def __init__(self, in_n, out_n, C):
     super().__init__()
     self.C = C
@@ -163,11 +170,12 @@ class CustomEmbed(nn.Module):
 
   def forward(self, x, past_o=None):
     BS, LEN, C = x.shape
-    x = x.reshape(BS * LEN, -1, 16, 16)
+    x = x.reshape(BS * LEN, -1, self.C.lcd_h, self.C.lcd_w)
     x = self.c1(x)
     x = F.relu(x)
     x = self.c2(x)
     x = x.reshape(BS, LEN, -1)
+    return x
 
 class FlowHead(nn.Module):
   def __init__(self, in_n, out_n, C):
@@ -194,4 +202,3 @@ class FlowHead(nn.Module):
     realnvp.sample()
     #import ipdb; ipdb.set_trace()
     return realnvp
-

@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
   C = parser.parse_args()
-  env = Dropbox(C)
+  env = Box(C)
   start = env.reset()
   #import ipdb; ipdb.set_trace()
   ret = 0
