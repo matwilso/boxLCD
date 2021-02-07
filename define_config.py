@@ -29,6 +29,9 @@ def config():
   C.datapath = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
   C.mode = 'world'
+  C.model = 'frame_token'
+  C.ipython_mode = 0
+
   #C.data_mode = 'image'
   C.amp = 1
   C.cheap_render = 1

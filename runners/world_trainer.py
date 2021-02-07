@@ -24,7 +24,6 @@ from nets.world import AutoWorld
 class WorldTrainer(Trainer):
   def __init__(self, C):
     super().__init__(C)
-    self.model = AutoWorld(self.env, C)
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
     self.scaler = torch.cuda.amp.GradScaler(enabled=C.amp)
     self.C.num_vars = self.num_vars = utils.count_vars(self.model)

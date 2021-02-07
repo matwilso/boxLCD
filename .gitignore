@@ -3,6 +3,7 @@
 *.npz
 logs/
 *.gif
+*.mp4
 *.png
 
 # Byte-compiled / optimized / DLL files

@@ -79,6 +79,12 @@ class AutoWorld(nn.Module):
     loss = lcd_loss + 1e-4*state_loss
     return loss, metrics
 
+  def onestep(self, batch, i):
+    bindist, statedist = self.forward(batch)
+    if 'image' in self.C.subset:
+      batch['lcd'][:, i+1] = bindist.sample()[:,i]
+    return batch
+
   def sample(self, n, cond=None, prompts=None):
     # TODO: feed act_n
     with torch.no_grad():

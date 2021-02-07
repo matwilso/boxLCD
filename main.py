@@ -19,9 +19,7 @@ import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from utils import A
 import utils
-from runners.video_trainer import VideoTrainer
-from runners.image_trainer import ImageTrainer
-from runners.world_trainer import WorldTrainer
+import runners
 
 def draw_it2(env):
   obs = env.reset()
@@ -45,27 +43,38 @@ if __name__ == '__main__':
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   temp_cfg = parser.parse_args()
-  load_path = temp_cfg.datapath / 'hps.yaml'
+  data_yaml = temp_cfg.datapath / 'hps.yaml'
+  weight_yaml = temp_cfg.weightdir / 'hps.yaml'
   defaults = {}
-  ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weights_dir']
-  if load_path.exists():
-    with load_path.open('r') as f:
+  ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weightdir']
+  if data_yaml.exists():
+    with data_yaml.open('r') as f:
       load_cfg = yaml.load(f, Loader=yaml.Loader)
     for key in load_cfg.__dict__.keys():
       if key in ignore: continue
       defaults[key] = load_cfg.__dict__[key]
+  if weight_yaml.exists():
+    with weight_yaml.open('r') as f:
+      weight_cfg = yaml.load(f, Loader=yaml.Loader)
+    for key in weight_cfg.__dict__.keys():
+      if key in ignore: continue
+      defaults[key] = weight_cfg.__dict__[key]
   parser.set_defaults(**defaults)
   C = parser.parse_args()
 
-  if C.mode == 'image':
-    trainer = ImageTrainer(C)
+  if C.mode == 'world':
+    trainer = runners.WorldTrainer(C)
     trainer.run()
-  elif C.mode == 'video':
-    trainer = VideoTrainer(C)
-    trainer.run()
-  elif C.mode == 'world':
-    trainer = WorldTrainer(C)
-    trainer.run()
+  elif C.mode == 'viz':
+    vizer = runners.Vizer(C)
+    if C.ipython_mode:
+      import IPython
+      from traitlets.config import Config
+      c = Config()
+      c.InteractiveShellApp.exec_lines = ['vizer.run()']
+      c.TerminalInteractiveShell.banner2 = '***Welcome to Quick Iter Mode***'
+      IPython.start_ipython(config=c, user_ns=locals())
+    vizer.run()
   elif C.mode == 'lcd':
     env = Box(C)
     draw_it2(env)
