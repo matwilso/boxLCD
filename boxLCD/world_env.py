@@ -1,19 +1,10 @@
 from gym.envs.classic_control import rendering
 from boxLCD.world_defs import FPS, SCALE, MAKERS
-from boxLCD.index_env import IndexEnv
-import pyglet
 import time
-import itertools
-from collections import defaultdict
-from typing import NamedTuple, List, Set, Tuple, Dict
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 
-import copy
-import sys
-import math
 import numpy as np
-
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 
@@ -22,9 +13,8 @@ from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
 A = utils.A  # np.array[]
-
-C = utils.AttrDict()
 # ENVIRONMENT DEFAULT CONFIG
+C = utils.AttrDict()
 C.lcd_h = 16
 C.lcd_w = 16
 C.env_size = 128
@@ -46,14 +36,25 @@ C.all_contact = 1
 C.all_corners = 0
 C.walls = 1
 
-class B2D(IndexEnv):
+class WorldEnv(gym.Env, EzPickle):
+  """
+  enables flexible specification of a box2d environment
+  You pass in a world def and a configuration.
+
+  Then this behaves like a regular env given that configuration.
+  But it additionally has lcd_render.
+  """
   metadata = {
       'render.modes': ['human', 'rgb_array'],
       'video.frames_per_second': FPS
   }
 
   def __init__(self, world_def, _C):
-    """world, Config"""
+    """
+    args:
+      world_def: description of what components you want in the world.
+      C: things you might set as cmd line arguments
+    """
     EzPickle.__init__(self)
     # env definitions
     self.world_def = world_def
@@ -66,11 +67,11 @@ class B2D(IndexEnv):
     self.viewer = None
     self.statics = {}
     self.dynbodies = {}
-    self.world = Box2D.b2World(gravity=self.world_def.gravity)
-    # OBSERVATION + ACTION
+    self.b2_world = Box2D.b2World(gravity=self.world_def.gravity)
+
+    # OBSERVATION + ACTION specification
     self.obs_info = {}
     self.act_info = {}
-
     for obj in self.world_def.objects:
       self.obs_info[f'{obj.name}:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{obj.name}:y:p'] = A[0, self.HEIGHT]
@@ -117,85 +118,56 @@ class B2D(IndexEnv):
 
     if len(self.world_def.agents) == 0:  # because having a zero shaped array makes things break
       self.act_info['dummy'] = A[-1, 1]
-    self.pack_info()
 
+    # take self.obs_info and self.act_info and pack them into the gym interface
+    self.obs_info = utils.sortdict(self.obs_info)
+    self.obs_size = len(self.obs_info)
+    self.obs_keys = list(self.obs_info.keys())
+    self.observation_space = spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
+    self.act_info = utils.sortdict(self.act_info)
+    self.act_size = len(self.act_info)
+    self.act_keys = list(self.act_info.keys())
+    self.action_space = spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
     self.seed()
-
-  @property
-  def WIDTH(self):
-    return int(self.C.env_wh_ratio * 10)
-
-  @property
-  def HEIGHT(self):
-    return 10
-
-  @property
-  def FPS(self):
-    return FPS
-
-  @property
-  def SCALE(self):
-    return SCALE
 
   def _destroy(self):
     for name, body in {**self.statics, **self.dynbodies}.items():
-      self.world.DestroyBody(body)
+      self.b2_world.DestroyBody(body)
     self.statics = {}
     self.dynbodies = {}
 
   def _reset_bodies(self):
     self.dynbodies = {}
     self.joints = {}
-    # bodies
-
-    def sample(namex, lr=-1.0, ur=None):
-      if ur is None:
-        ur = -lr
-      return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
 
     for agent in self.world_def.agents:
       color = (0.9, 0.4, 0.4, 1.0), (0.5, 0.3, 0.5, 1.0)
-      # TODO: maybe create root first, and then add each of the body-joint pairs onto that.
-      # this way we know where they should go. but first, let's get food.
-      # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
       root_body = agent.root_body
-
       fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = agent.name + ':root'
+      import ipdb; ipdb.set_trace()  # TODO: move range setting out of here. or else computed automatically
       if self.cname == 'crab0' or self.cname == 'urchin0':
         if self.C.env_wh_ratio == 2:
-          root_xy = A[sample(name + ':x:p', -0.9, 0.95), sample(name + ':y:p', -0.7, -0.7)]
+          root_xy = A[self._sample(name + ':x:p', -0.9, 0.95), self._sample(name + ':y:p', -0.7, -0.7)]
         elif self.C.env_wh_ratio < 1:
           rat = self.C.env_wh_ratio
-          root_xy = A[sample(name + ':x:p', -0.7 * rat, 0.8 * rat), sample(name + ':y:p', -0.7, -0.70)]
+          root_xy = A[self._sample(name + ':x:p', -0.7 * rat, 0.8 * rat), self._sample(name + ':y:p', -0.7, -0.70)]
         else:
-          root_xy = A[sample(name + ':x:p', -0.7, 0.8), sample(name + ':y:p', -0.7, -0.70)]
+          root_xy = A[self._sample(name + ':x:p', -0.7, 0.8), self._sample(name + ':y:p', -0.7, -0.70)]
       elif self.cname == 'luxo0':
-        root_xy = A[sample(name + ':x:p', -0.7, 0.7), sample(name + ':y:p', -0.6, -0.60)]
+        root_xy = A[self._sample(name + ':x:p', -0.7, 0.7), self._sample(name + ':y:p', -0.6, -0.60)]
       else:
-        root_xy = A[sample(name + ':x:p', *agent.rangex), sample(name + ':y:p', *agent.rangey)]
-
-      #root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.75, -0.70)]
-      #root_xy = A[sample(name+':x:p', -0.85, -0.8), sample(name+':y:p', -0.50, -0.50)]
-      #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.85, 0.80)
-      #root_xy = A[sample(name+':x:p', -0.7), sample(name+':y:p', -0.75, -0.70)]
-      #root_xy = sample(name+':x:p', -0.85), sample(name+':y:p', -0.75, -0.70)
-      def comp_angle(name, body, base_pos):
-        cxy = (sample(f'{name}:kx:p'), sample(f'{name}:ky:p')) - A[base_pos]
-        base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
-        offset_angle = np.arctan2(*cxy[::-1])
-        ang = offset_angle - base_angle
-        return np.arctan2(np.sin(ang), np.cos(ang))
+        root_xy = A[self._sample(name + ':x:p', *agent.rangex), self._sample(name + ':y:p', *agent.rangey)]
 
       if self.C.all_corners:
         body = root_body
-        root_angle = comp_angle(name, body, root_xy)
+        root_angle = self._comp_angle(name, body, root_xy)
       else:
-        root_angle = np.arctan2(sample(name + ':sin'), sample(name + ':cos'))
+        root_angle = np.arctan2(self._sample(name + ':sin'), self._sample(name + ':cos'))
 
       if not agent.rand_angle:
         root_angle = 0
-      dyn = self.world.CreateDynamicBody(
+      dyn = self.b2_world.CreateDynamicBody(
           position=root_xy,
           angle=root_angle,
           fixtures=fixture,
@@ -228,7 +200,7 @@ class B2D(IndexEnv):
         ab_delta = A[joint.anchorB]
         rot = utils.make_rot(mangle)
         ab_delta = rot.dot(ab_delta)
-        dyn = self.world.CreateDynamicBody(
+        dyn = self.b2_world.CreateDynamicBody(
             position=self.dynbodies[parent_name].position + aa_delta - ab_delta,
             angle=mangle,
             fixtures=fixture)
@@ -247,8 +219,8 @@ class B2D(IndexEnv):
             lowerAngle=joint.limits[0],
             upperAngle=joint.limits[1],
         )
-        self.joints[name] = jnt = self.world.CreateJoint(rjd)
-        #self.joints[name].bodyB.transform.angle = sample(name+':theta')
+        self.joints[name] = jnt = self.b2_world.CreateJoint(rjd)
+        #self.joints[name].bodyB.transform.angle = self._sample(name+':theta')
 
     for obj in self.world_def.objects:
       obj_size = obj.size * self.HEIGHT / 30.00
@@ -259,17 +231,17 @@ class B2D(IndexEnv):
       shape = obj_shapes[shape_name]
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=0 if shape_name == 'box' else 0.7)
       if len(self.world_def.agents) == 0:
-        pos = A[(sample(obj.name + ':x:p', -0.90, 0.90), sample(obj.name + ':y:p', -0.90, 0.90))]
+        pos = A[(self._sample(obj.name + ':x:p', -0.90, 0.90), self._sample(obj.name + ':y:p', -0.90, 0.90))]
       else:
-        pos = A[(sample(obj.name + ':x:p', -0.95), sample(obj.name + ':y:p', -0.9, -0.25))]
+        pos = A[(self._sample(obj.name + ':x:p', -0.95), self._sample(obj.name + ':y:p', -0.9, -0.25))]
 
       if self.C.all_corners:
-        samp = sample(obj.name + ':kx:p'), sample(obj.name + ':ky:p')
+        samp = self._sample(obj.name + ':kx:p'), self._sample(obj.name + ':ky:p')
         angle = np.arctan2(*(pos - samp))
       else:
-        angle = np.arctan2(sample(obj.name + ':sin'), sample(obj.name + ':cos'))
+        angle = np.arctan2(self._sample(obj.name + ':sin'), self._sample(obj.name + ':cos'))
 
-      body = self.world.CreateDynamicBody(
+      body = self.b2_world.CreateDynamicBody(
           position=pos,
           angle=angle,
           fixtures=fixture,
@@ -286,22 +258,15 @@ class B2D(IndexEnv):
     self.statics = {}
     if self.C.walls:
       X = 0.6
-      self.statics['wall1'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
-      self.statics['wall2'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT + X)]))
-      self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH + X, 0), (self.WIDTH + X, self.HEIGHT)]))
-      self.statics['wall4'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT + X), (self.WIDTH + X, self.HEIGHT + X)]))
+      self.statics['wall1'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
+      self.statics['wall2'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT + X)]))
+      self.statics['wall3'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH + X, 0), (self.WIDTH + X, self.HEIGHT)]))
+      self.statics['wall4'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT + X), (self.WIDTH + X, self.HEIGHT + X)]))
     else:
-      self.statics['floor'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
+      self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
-    #self.world.Step(0.001/FPS, 6*30, 2*30)
+    #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
     if inject_obs is not None:
-      def comp_angle(name, body, base_pos):
-        cxy = (inject_obs[f'{name}:kx:p'], inject_obs[f'{name}:ky:p']) - A[base_pos]
-        base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
-        offset_angle = np.arctan2(*cxy[::-1])
-        ang = offset_angle - base_angle
-        return np.arctan2(np.sin(ang), np.cos(ang))
-
       inject_obs = utils.WrappedArray(np.array(inject_obs).astype(np.float), self.obs_info)
 
       if len(self.world_def.agents) != 0:
@@ -314,7 +279,7 @@ class B2D(IndexEnv):
         self.dynbodies[name].position = xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
         if self.C.all_corners:
           import ipdb; ipdb.set_trace()  # TODO: make comp angle work with object as well
-          self.dynbodies[name].angle = comp_angle(name, body, xy)
+          self.dynbodies[name].angle = self._comp_angle(name, body, xy)
         else:
           self.dynbodies[name].angle = np.arctan2(inject_obs(name + ':sin'), inject_obs(name + ':cos'))
 
@@ -323,7 +288,7 @@ class B2D(IndexEnv):
         self.dynbodies[f'{name}'].position = root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
 
         if self.C.all_corners:
-          self.dynbodies[f'{name}'].angle = root_angle = comp_angle(name, agent.root_body, root_xy)
+          self.dynbodies[f'{name}'].angle = root_angle = self._comp_angle(name, agent.root_body, root_xy)
         else:
           self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name + ':sin'), inject_obs(name + ':cos'))
         parent_angles = {}
@@ -352,7 +317,7 @@ class B2D(IndexEnv):
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(inject_obs[name + ':x:p'], inject_obs[name + ':y:p'])]
 
           if self.C.all_corners:
-            offset_angle = comp_angle(name, agent.bodies[name.split(':')[1]], pos)
+            offset_angle = self._comp_angle(name, agent.bodies[name.split(':')[1]], pos)
           else:
             offset_angle = np.arctan2(inject_obs[name + ':sin'], inject_obs[name + ':cos'])
             if self.C.angular_offset:
@@ -407,6 +372,17 @@ class B2D(IndexEnv):
             obs[f'{agent.name}:{joint_name}:sin'] = np.sin(angle)
     return obs
 
+  def get_act_dict(self, act_vec, do_map=True):
+    """convert vector action to dictionary action
+    (-1, 1) in vec shape --> (-act_bounds, act_bounds) in dict shape
+    """
+    act_dict = {}
+    for i, key in enumerate(self.act_keys):
+      bounds = self.act_info[key]
+      act_dict[key] = utils.mapto(act_vec[i], bounds) if map else act_vec[i]
+    assert sorted(act_dict) == list(act_dict.keys())
+    return act_dict
+
   def step(self, vec_action):
     self.ep_t += 1
     action = self.get_act_dict(vec_action)
@@ -446,7 +422,7 @@ class B2D(IndexEnv):
         body.ApplyTorque(theta, wake=True)
     #self.end_positions = {key: A[self.dynbodies[key].position] for key in self.dynbodies}
     # RUN SIM STEP
-    self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
+    self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
     obs = self._get_obs()
     #bodies = [self.dynbodies[key] for key in self.dynbodies if self.cname in key]
     if not self.C.walls:
@@ -456,16 +432,6 @@ class B2D(IndexEnv):
     reward = 0.0  # no reward swag
     done = self.ep_t >= self.C.ep_len
     return obs.arr, reward, done, info
-
-  def visualize_obs(self, obs, *args, **kwargs):
-    if 'offset' in kwargs:
-      offset = kwargs.pop('offset')
-    else:
-      offset = (1, 0)
-    entis = kwargs.get('entis', [])
-    entis = [(obs, 0.8, offset)] + entis
-    kwargs['entis'] = entis
-    return self.render(mode='rgb_array', **kwargs)
 
   def lcd_render(self):
     image = Image.new("1", (self.C.lcd_w, self.C.lcd_h))
@@ -536,3 +502,31 @@ class B2D(IndexEnv):
     if self.viewer is not None:
       self.viewer.close()
       self.viewer = None
+
+  def _comp_angle(name, body, base_pos):
+    cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
+    base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
+    offset_angle = np.arctan2(*cxy[::-1])
+    ang = offset_angle - base_angle
+    return np.arctan2(np.sin(ang), np.cos(ang))
+
+  def _sample(namex, lr=-1.0, ur=None):
+    if ur is None:
+      ur = -lr
+    return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
+
+  @property
+  def WIDTH(self):
+    return int(self.C.env_wh_ratio * 10)
+
+  @property
+  def HEIGHT(self):
+    return 10
+
+  @property
+  def FPS(self):
+    return FPS
+
+  @property
+  def SCALE(self):
+    return SCALE

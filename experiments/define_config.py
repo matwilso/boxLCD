@@ -64,7 +64,6 @@ def config():
   C.sample_sample = 0
   C.skip_train = 0
 
-
   C.env = 'box'
 
   # extra info that we set here for convenience and don't modify 
