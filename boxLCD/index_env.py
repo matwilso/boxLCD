@@ -12,7 +12,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
-import utils
+from boxLCD import utils
 
 class IndexEnv(gym.Env, EzPickle):
   """

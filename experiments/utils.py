@@ -37,9 +37,6 @@ def dump_logger(logger, writer, i, C):
   print('=' * 30)
   return defaultdict(lambda: [])
 
-class AttrDict(dict):
-  __setattr__ = dict.__setitem__
-  __getattr__ = dict.__getitem__
 
 
 def write_gif(name, frames, fps=20):

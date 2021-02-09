@@ -8,7 +8,7 @@ import gym
 import numpy as np
 from PIL import Image
 from gym.utils import seeding, EzPickle
-import utils
+from boxLCD import utils
 
 class NormalEnv(gym.Env, EzPickle):
   def __init__(self, env):

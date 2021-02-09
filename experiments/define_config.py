@@ -1,7 +1,7 @@
 import subprocess
 import sys
 import pathlib
-import utils
+from boxLCD import utils
 from envs.box import Box, Dropbox
 from envs.wrappers import LCDEnv, NormalEnv
 
@@ -64,36 +64,8 @@ def config():
   C.sample_sample = 0
   C.skip_train = 0
 
-  C.lcd_h = 16
-  C.lcd_w = 16
-  C.env_size = 128
-  C.lcd_render = 1 
 
-  # ENVIRONMENT
   C.env = 'box'
-  C.special_viewer = 0
-  C.dark_mode = 0
-  C.use_arms = 1
-  C.num_objects = 1
-  C.num_agents = 0
-  C.use_images = 0
-  C.env_wh_ratio = 1.0
-  C.ep_len = 200
-  C.env_version = '0.7'
-  C.angular_offset = 0
-  C.root_offset = 0
-  C.obj_offset = 0
-  C.cname = 'urchin'
-  C.compact_obs = 0
-  C.use_speed = 1
-  C.reward_mode = 'goal'
-  C.only_obj_goal = 0
-
-  C.succ_check = 1
-  C.all_contact = 1
-
-  C.all_corners = 0
-  C.walls = 1
 
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

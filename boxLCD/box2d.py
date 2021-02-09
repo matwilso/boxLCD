@@ -8,7 +8,6 @@ from collections import defaultdict
 from typing import NamedTuple, List, Set, Tuple, Dict
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
-from utils import A
 
 import copy
 import sys
@@ -21,8 +20,31 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
-import utils
-A = utils.A # np.array[]
+from boxLCD import utils
+A = utils.A  # np.array[]
+
+C = utils.AttrDict()
+# ENVIRONMENT DEFAULT CONFIG
+C.lcd_h = 16
+C.lcd_w = 16
+C.env_size = 128
+C.lcd_render = 1
+C.special_viewer = 0
+C.dark_mode = 0
+C.use_arms = 1
+C.num_objects = 1
+C.num_agents = 0
+C.use_images = 0
+C.env_wh_ratio = 1.0
+C.ep_len = 200
+C.angular_offset = 0
+C.root_offset = 0
+C.obj_offset = 0
+C.compact_obs = 0
+C.use_speed = 1
+C.all_contact = 1
+C.all_corners = 0
+C.walls = 1
 
 class B2D(IndexEnv):
   metadata = {
@@ -30,46 +52,26 @@ class B2D(IndexEnv):
       'video.frames_per_second': FPS
   }
 
-  @property
-  def WIDTH(self):
-    return int(self.C.env_wh_ratio * 10)
-
-  @property
-  def HEIGHT(self):
-    return 10
-
-  def __init__(self, w, C):
-    """world, Hps"""
+  def __init__(self, world_def, _C):
+    """world, Config"""
     EzPickle.__init__(self)
-    self.w = w
-    self.C = C
-    self.SCALE = SCALE
-    self.FPS = FPS
+    # env definitions
+    self.world_def = world_def
+    self.C = _C  # CONFIG
+    # box2D stuff
     self.scroll = 0.0
     self.VIEWPORT_H = self.C.env_size
     self.VIEWPORT_W = int(self.C.env_wh_ratio * self.C.env_size)
     self.scale = 320 / self.VIEWPORT_H
-    self.SPEEDS = defaultdict(lambda: 8) if self.C.use_speed else defaultdict(lambda: 6)
-    self.MOTORS_TORQUE = defaultdict(lambda: 150) if float(self.C.env_version) < 0.3 or float(self.C.env_version) >= 0.6 else defaultdict(lambda: 100)
-    if float(self.C.env_version) >= 0.6:
-      self.MOTORS_TORQUE = defaultdict(lambda: 100)
-      self.SPEEDS = defaultdict(lambda: 6)
-      self.SPEEDS['hip'] = 10
-      self.SPEEDS['knee'] = 10
-      self.MOTORS_TORQUE['hip'] = 150
-      self.MOTORS_TORQUE['knee'] = 150
-
-    self.world = Box2D.b2World(gravity=self.w.gravity)
-    self.seed()
     self.viewer = None
     self.statics = {}
     self.dynbodies = {}
+    self.world = Box2D.b2World(gravity=self.world_def.gravity)
     # OBSERVATION + ACTION
     self.obs_info = {}
     self.act_info = {}
-    #self.obs_info['pad'] = [-1,1]
-    for obj in self.w.objects:
-      # TODO: add range options
+
+    for obj in self.world_def.objects:
       self.obs_info[f'{obj.name}:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{obj.name}:y:p'] = A[0, self.HEIGHT]
       if self.C.all_corners:
@@ -79,8 +81,8 @@ class B2D(IndexEnv):
         self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
         self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
 
-    for i in range(len(self.w.agents)):
-      self.w.agents[i] = agent = MAKERS[self.C.cname](self.w.agents[i].name, SCALE, self.C)
+    for i in range(len(self.world_def.agents)):
+      self.world_def.agents[i] = agent = MAKERS[self.C.cname](self.world_def.agents[i].name, SCALE, self.C)
       self.cname = self.C.cname + '0'
       self.obs_info[f'{agent.name}:root:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{agent.name}:root:y:p'] = A[0, self.HEIGHT]
@@ -113,9 +115,27 @@ class B2D(IndexEnv):
           else:
             self.act_info[f'{agent.name}:{joint_name}:force'] = A[-1, 1]
 
-    if len(self.w.agents) == 0:  # because having a zero shaped array makes things break
+    if len(self.world_def.agents) == 0:  # because having a zero shaped array makes things break
       self.act_info['dummy'] = A[-1, 1]
     self.pack_info()
+
+    self.seed()
+
+  @property
+  def WIDTH(self):
+    return int(self.C.env_wh_ratio * 10)
+
+  @property
+  def HEIGHT(self):
+    return 10
+
+  @property
+  def FPS(self):
+    return FPS
+
+  @property
+  def SCALE(self):
+    return SCALE
 
   def _destroy(self):
     for name, body in {**self.statics, **self.dynbodies}.items():
@@ -133,18 +153,14 @@ class B2D(IndexEnv):
         ur = -lr
       return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
 
-    for agent in self.w.agents:
+    for agent in self.world_def.agents:
       color = (0.9, 0.4, 0.4, 1.0), (0.5, 0.3, 0.5, 1.0)
       # TODO: maybe create root first, and then add each of the body-joint pairs onto that.
       # this way we know where they should go. but first, let's get food.
       # like root body, then everything else is a body and a joint. joint specifies how the body attachs.
       root_body = agent.root_body
 
-      if float(self.C.env_version) >= 0.4:
-        fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
-      else:
-        fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits)
-
+      fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = agent.name + ':root'
       if self.cname == 'crab0' or self.cname == 'urchin0':
         if self.C.env_wh_ratio == 2:
@@ -234,7 +250,7 @@ class B2D(IndexEnv):
         self.joints[name] = jnt = self.world.CreateJoint(rjd)
         #self.joints[name].bodyB.transform.angle = sample(name+':theta')
 
-    for obj in self.w.objects:
+    for obj in self.world_def.objects:
       obj_size = obj.size * self.HEIGHT / 30.00
       color = (0.5, 0.4, 0.9, 1.0), (0.3, 0.3, 0.5, 1.0)
       #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
@@ -242,7 +258,7 @@ class B2D(IndexEnv):
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
       shape = obj_shapes[shape_name]
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=0 if shape_name == 'box' else 0.7)
-      if len(self.w.agents) == 0:
+      if len(self.world_def.agents) == 0:
         pos = A[(sample(obj.name + ':x:p', -0.90, 0.90), sample(obj.name + ':y:p', -0.90, 0.90))]
       else:
         pos = A[(sample(obj.name + ':x:p', -0.95), sample(obj.name + ':y:p', -0.9, -0.25))]
@@ -269,17 +285,11 @@ class B2D(IndexEnv):
     self._destroy()
     self.statics = {}
     if self.C.walls:
-      if float(self.C.env_version) <= 0.1:
-        self.statics['wall1'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH, 0)]))
-        self.statics['wall2'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT)]))
-        self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH, 0), (self.WIDTH, self.HEIGHT)]))
-        self.statics['wall4'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT), (self.WIDTH, self.HEIGHT)]))
-      else:
-        X = 0.6
-        self.statics['wall1'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
-        self.statics['wall2'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT + X)]))
-        self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH + X, 0), (self.WIDTH + X, self.HEIGHT)]))
-        self.statics['wall4'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT + X), (self.WIDTH + X, self.HEIGHT + X)]))
+      X = 0.6
+      self.statics['wall1'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
+      self.statics['wall2'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT + X)]))
+      self.statics['wall3'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH + X, 0), (self.WIDTH + X, self.HEIGHT)]))
+      self.statics['wall4'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT + X), (self.WIDTH + X, self.HEIGHT + X)]))
     else:
       self.statics['floor'] = self.world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
@@ -294,11 +304,11 @@ class B2D(IndexEnv):
 
       inject_obs = utils.WrappedArray(np.array(inject_obs).astype(np.float), self.obs_info)
 
-      if len(self.w.agents) != 0:
-        name = self.w.agents[0].name + ':root'
+      if len(self.world_def.agents) != 0:
+        name = self.world_def.agents[0].name + ':root'
         root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
 
-      for obj in self.w.objects:
+      for obj in self.world_def.objects:
         name = obj.name
         body = self.dynbodies[name]
         self.dynbodies[name].position = xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
@@ -308,7 +318,7 @@ class B2D(IndexEnv):
         else:
           self.dynbodies[name].angle = np.arctan2(inject_obs(name + ':sin'), inject_obs(name + ':cos'))
 
-      for agent in self.w.agents:
+      for agent in self.world_def.agents:
         name = agent.name + ':root'
         self.dynbodies[f'{name}'].position = root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
 
@@ -323,8 +333,6 @@ class B2D(IndexEnv):
           name = agent.name + ':' + bj_name
           body = agent.bodies[bj_name]
           joint = agent.joints[bj_name]
-          if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
-            continue
           parent_name = agent.name + ':' + joint.parent
           mangle = root_angle + joint.angle
           mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
@@ -357,7 +365,7 @@ class B2D(IndexEnv):
 
   def _get_obs(self):
     obs = utils.WrappedArray(np.zeros(self.obs_size), self.obs_info)
-    for obj in self.w.objects:
+    for obj in self.world_def.objects:
       body = self.dynbodies[obj.name]
       obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
       if self.C.all_corners:
@@ -366,7 +374,7 @@ class B2D(IndexEnv):
         obs[f'{obj.name}:cos'] = np.cos(body.angle)
         obs[f'{obj.name}:sin'] = np.sin(body.angle)
 
-    for agent in self.w.agents:
+    for agent in self.world_def.agents:
       root = self.dynbodies[agent.name + ':root']
       obs[f'{agent.name}:root:x:p'], obs[f'{agent.name}:root:y:p'] = root_xy = root.position
 
@@ -380,8 +388,6 @@ class B2D(IndexEnv):
         obs[f'{agent.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in agent.joints.items():
         jnt = self.joints[f'{agent.name}:{joint_name}']
-        if (float(self.C.env_version) < 0.5 and float(self.C.env_version) >= 0.3) and joint.limits[0] == joint.limits[1]:
-          continue
         if self.C.compact_obs:
           obs[f'{agent.name}:{joint_name}:angle'] = jnt.angle
         else:
@@ -405,7 +411,7 @@ class B2D(IndexEnv):
     self.ep_t += 1
     action = self.get_act_dict(vec_action)
     # TORQUE CONTROL
-    if not self.w.forcetorque:
+    if not self.world_def.forcetorque:
       for name in action:
         if name == 'dummy':
           continue
@@ -425,7 +431,7 @@ class B2D(IndexEnv):
           self.joints[key].maxMotorTorque = float(torque * np.clip(np.abs(action[name]), 0, 1))
     else:
       # APPLY FORCE AND TORQUE
-      for agent in self.w.agents:
+      for agent in self.world_def.agents:
         key = agent.name + ':root'
         body = self.dynbodies[key]
         mag = 20 * action[f'{key}:force']
@@ -447,7 +453,7 @@ class B2D(IndexEnv):
       self.scroll = self.dynbodies[f'{self.cname}:root'].position.x - self.VIEWPORT_W / SCALE / 2
 
     info = {}
-    reward = 0.0 # no reward swag
+    reward = 0.0  # no reward swag
     done = self.ep_t >= self.C.ep_len
     return obs.arr, reward, done, info
 

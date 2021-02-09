@@ -10,7 +10,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
-import utils
+from boxLCD import utils
 from envs.world_defs import World, Agent, Object
 from envs.box2d import B2D
 import pyglet

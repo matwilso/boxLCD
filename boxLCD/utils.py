@@ -1,6 +1,10 @@
 import re
 import numpy as np
 
+class AttrDict(dict):
+  __setattr__ = dict.__setitem__
+  __getattr__ = dict.__getitem__
+
 class X:
   """
   Singleton object to be able to easily create numpy arrays without having to type as much

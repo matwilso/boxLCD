@@ -1,11 +1,21 @@
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 from typing import NamedTuple, List, Set, Tuple, Dict
-import utils
+from boxLCD import utils
 A = utils.A
 
 FPS  = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
+
+self.SPEEDS = defaultdict(lambda: 8) if self.C.use_speed else defaultdict(lambda: 6)
+self.MOTORS_TORQUE = defaultdict(lambda: 150) if float(self.C.env_version) < 0.3 or float(self.C.env_version) >= 0.6 else defaultdict(lambda: 100)
+if float(self.C.env_version) >= 0.6:
+  self.MOTORS_TORQUE = defaultdict(lambda: 100)
+  self.SPEEDS = defaultdict(lambda: 6)
+  self.SPEEDS['hip'] = 10
+  self.SPEEDS['knee'] = 10
+  self.MOTORS_TORQUE['hip'] = 150
+  self.MOTORS_TORQUE['knee'] = 150
 
 class Object(NamedTuple):
   name: str
