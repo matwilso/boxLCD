@@ -1,3 +1,4 @@
+from collections import defaultdict
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 from typing import NamedTuple, List, Set, Tuple, Dict
@@ -6,16 +7,6 @@ A = utils.A
 
 FPS  = 50
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
-
-self.SPEEDS = defaultdict(lambda: 8) if self.C.use_speed else defaultdict(lambda: 6)
-self.MOTORS_TORQUE = defaultdict(lambda: 150) if float(self.C.env_version) < 0.3 or float(self.C.env_version) >= 0.6 else defaultdict(lambda: 100)
-if float(self.C.env_version) >= 0.6:
-  self.MOTORS_TORQUE = defaultdict(lambda: 100)
-  self.SPEEDS = defaultdict(lambda: 6)
-  self.SPEEDS['hip'] = 10
-  self.SPEEDS['knee'] = 10
-  self.MOTORS_TORQUE['hip'] = 150
-  self.MOTORS_TORQUE['knee'] = 150
 
 class Object(NamedTuple):
   name: str
@@ -41,38 +32,57 @@ class Joint(NamedTuple):
   anchorB: list
   limits: List[float]
   limited: bool = True
+  speed: float = 8
+  torque: float = 150
 
-# TODO: add drawing options and such
-# TODO: add collision options, like different masks
-class Agent(NamedTuple):
+class Robot(NamedTuple):
+  type: str
   name: str
   root_body: Body = None
   bodies: Dict[str, Body] = None
   joints: Dict[str, Joint] = None
   rangex: Tuple[float, float] = (-0.9, 0.9)
-  rangey: Tuple[float, float] = (-0.9, 0.9)
+  rangey: Tuple[float, float] = (-0.8, -0.5)
   rand_angle: int = 0
   angularDamping: float = 0
   linearDamping: float = 0
 
-HOUSE_POLY = A[(-20, -16), (-20, +16), (0, +30), (+20, +16), (+20, -16)]
-
-
-class World(NamedTuple):
-  agents: List[Agent] = []
+class WorldDef(NamedTuple):
+  robots: List[Robot] = []
   objects: List[Object] = [] 
   gravity: List[float] = [0, -9.81]
   forcetorque: int = 0
 
+# TODO: add drawing options and such
+# TODO: add collision options, like different masks
 
-MAKERS = {}
+ROBOT_FILLER = {}
 def register(name):
   def _reg(func):
-    MAKERS[name] = func
+    ROBOT_FILLER[name] = func
     def wrapper(*args, **kwargs):
       return func(*args, **kwargs)
     return wrapper
   return _reg
+
+@register('urchin')
+def make_urchin(robot, SCALE, C):
+  LEG_W, LEG_H = 8/SCALE, 40/SCALE
+  SHAPES = {}
+  SHAPES['root'] = circleShape(radius=LEG_W)
+  SHAPES['leg'] = polygonShape(box=(LEG_W/2, LEG_H/2))
+  bodies = {
+    'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+  }
+  joints = {
+    'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
+    'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
+    'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
+  }
+  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints)
+
 
 # TODO: make armed walker
 @register('walker')
@@ -90,7 +100,7 @@ def make_walker(name, SCALE, C):
   SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
   SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LEG_H/2))
 
-  return Agent(
+  return Robot(
     name=name,
     root_body=Body(SHAPES['root']),
     bodies = {
@@ -118,7 +128,7 @@ def make_luxo(name, SCALE, C):
   SHAPES['hip'] = polygonShape(box=(LEG_W/2, LEG_H/2))
   SHAPES['knee'] = polygonShape(box=(0.8*LEG_W/2, LL_H/2))
   SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W/2))
-  return Agent(
+  return Robot(
     name=name,
     root_body=Body(SHAPES['root'], density=0.1),
     bodies = {
@@ -132,30 +142,6 @@ def make_luxo(name, SCALE, C):
       'lfoot': Joint('lknee', 0.0, (0, -LEG_H/2), (0, LEG_W/2), [-0.5, 0.9]),
       },)
 
-@register('urchin')
-def make_urchin(name, SCALE, C):
-  # TODO: make armless crab version.
-  VERT = 2/SCALE
-  SIDE = 2/SCALE
-  #LEG_W, LEG_H = 8/SCALE, 16/SCALE
-  LEG_W, LEG_H = 8/SCALE, 40/SCALE
-  HEAD_POLY = 0.8*A[(-15,+0), (-10,+15), (+10,+15), (+15,+0), (+10,-15), (-10, -15) ]
-  SHAPES = {}
-  #SHAPES['root'] = polygonShape(vertices=[ (x/SCALE,y/SCALE) for x,y in HEAD_POLY])
-  #SHAPES['root'] = polygonShape(box=(LEG_W, LEG_W))
-  SHAPES['root'] = circleShape(radius=LEG_W)
-  SHAPES['leg'] = polygonShape(box=(LEG_W/2, LEG_H/2))
-  bodies = {
-    'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-    'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-    'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-  }
-  joints = {
-    'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
-    'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
-    'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
-  }
-  return Agent(name=name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints)
 
 
 @register('gingy')
@@ -193,11 +179,18 @@ def make_gingy(name, SCALE, C):
     'lleg': Joint('body', 1.0, (-SIDE, -2*VERT), (0, LEG_H/2), [-0.1, 0.1]),
     'rleg': Joint('body', -1.0, (SIDE, -2*VERT), (0, LEG_H/2), [-0.1, 0.1]),
   }
-  return Agent(name=name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints)
+  return Robot(name=name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints)
 
 
 @register('crab')
 def make_crab(name, SCALE, C):
+  SPEEDS = defaultdict(lambda: 8)
+  MOTORS_TORQUE = defaultdict(lambda: 150)
+  SPEEDS = defaultdict(lambda: 6)
+  SPEEDS['hip'] = 10
+  SPEEDS['knee'] = 10
+  MOTORS_TORQUE['hip'] = 150
+  MOTORS_TORQUE['knee'] = 150
   # TODO: make armless crab version.
   VERT = 12/SCALE
   SIDE = 20/SCALE
@@ -298,4 +291,4 @@ def make_crab(name, SCALE, C):
       'rrclaw0': Joint('relbow', -2.25, (0, ARM_H/2), (0, -CLAW_H/2), [-1.0, 2.0]),
       'rrclaw1': Joint('rrclaw0', -3.75, (0, CLAW_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
       },)
-  return Agent(name=name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints)
+  return Robot(name=name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints)

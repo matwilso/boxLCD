@@ -11,19 +11,16 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
-from envs.world_defs import World, Agent, Object
-from envs.box2d import B2D
+from boxLCD import Box, C
 import pyglet
 KEY = pyglet.window.key
 A = utils.A
 
-
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
-  from define_config import config, args_type
   parser = argparse.ArgumentParser()
-  for key, value in config().items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
+  for key, value in C.items():
+    parser.add_argument(f'--{key}', type=utils.args_type(value), default=value)
   parser.set_defaults(**{'env_size': 320})
   C = parser.parse_args()
   env = Box(C)
@@ -99,7 +96,7 @@ if __name__ == '__main__':
       #  env.render(action=act)
       #  if key_handler[KEY.RIGHT]: break
       obs, rew, done, info = env.step(act)
-      dobs = utils.WrappedArray(obs, env.obs_info, map=False)
+      dobs = utils.WrappedArray(obs, env.obs_info, do_map=False)
       #print(dobs['object0:x:p'])
       #omax = max(omax, np.max(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v']))
       #print(omax)
@@ -116,7 +113,7 @@ if __name__ == '__main__':
         ret = 0
         start = obs = env.reset()
       # print only the obs data that comes from object0
-      #print(rew, utils.filter(env.get_obs_dict(obs, map=False), 'object0'))
+      #print(rew, utils.filter(env.get_obs_dict(obs, do_map=False), 'object0'))
       #print(obs.max(), env.obs_keys[obs.argmax()])
     bf = time.time()
     img = env.render()

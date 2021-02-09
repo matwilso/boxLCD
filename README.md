@@ -110,9 +110,16 @@ The images are actually generally smaller than MNIST, but it is much more intere
 // TODO: we have purely state-based and also mixture of state and pixel-based prediction
 // TODO: make organization better
 
-// TODO: create examples of bounce, dropbox, agent with varieties. w/ both pyglet and lcd rendering.
+// TODO: create examples of bounce, dropbox, robots with varieties. w/ both pyglet and lcd rendering.
 
 I think framing this, building this, and working on it will end up being valuable.
+
+
+## Setup
+
+`pip install -e .`
+
+(Maybe not require cloning)
 
 ## boxLCD Challenge 🌐 🧩
 

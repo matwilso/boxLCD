@@ -1,9 +1,16 @@
+import pathlib
 import re
 import numpy as np
 
 class AttrDict(dict):
   __setattr__ = dict.__setitem__
   __getattr__ = dict.__getitem__
+
+def args_type(default):
+  if isinstance(default, bool): return lambda x: bool(['False', 'True'].index(x))
+  if isinstance(default, int): return lambda x: float(x) if ('e' in x or '.' in x) else int(x)
+  if isinstance(default, pathlib.Path): return lambda x: pathlib.Path(x).expanduser()
+  return type(default)
 
 class X:
   """
@@ -46,7 +53,7 @@ class WrappedArray():
 
   def _name2idx(self, name):
     """get the index of an element in the array"""
-    return self.arr_info['keys'].index(name)
+    return list(self.arr_info.keys()).index(name)
 
   def __call__(self, key):
     """support parenthes as well"""

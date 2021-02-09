@@ -37,6 +37,7 @@ def draw_it2(env):
 # TODO: handle partial obs for agent info, not just object
 # TODO [2021/02/01]: separate out links and actions and feed in separately in an MHDPA or TF block for good GNN mixing.
 # TODO [2021/02/01]: refactor all my shit and clean it up at night
+# TODO [2021/02/09]: add some episode writer stuff. so you can write things more chunked then 1e6 rollouts.
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

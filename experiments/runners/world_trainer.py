@@ -73,7 +73,7 @@ class WorldTrainer(Trainer):
 
     if True:
       # EVAL
-      if self.C.num_agents == 0:
+      if self.C.num_robots == 0:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
         reset_states = [None]*N
