@@ -1,3 +1,4 @@
+from functools import partial
 from gym.envs.classic_control import rendering
 from boxLCD.world_defs import FPS, SCALE, ROBOT_FILLER
 import time
@@ -15,17 +16,14 @@ from boxLCD import utils
 A = utils.A  # np.array[]
 # ENVIRONMENT DEFAULT CONFIG
 C = utils.AttrDict()
-C.lcd_h = 16
-C.lcd_w = 16
-C.env_size = 128
+
+C.base_dim = 5
+C.wh_ratio = 1.0
+C.lcd_base = 16
 C.lcd_render = 1
-C.special_viewer = 0
 C.dark_mode = 0
 C.use_arms = 1
-C.num_objects = 1
-C.num_robots = 0
 C.use_images = 0
-C.env_wh_ratio = 1.0
 C.ep_len = 200
 C.angular_offset = 0
 C.root_offset = 0
@@ -49,6 +47,22 @@ class WorldEnv(gym.Env, EzPickle):
       'video.frames_per_second': FPS
   }
 
+  @property
+  def WIDTH(self):
+    return int(self.C.wh_ratio * self.C.base_dim)
+
+  @property
+  def HEIGHT(self):
+    return self.C.base_dim
+
+  @property
+  def VIEWPORT_H(self):
+    return 30*self.HEIGHT
+
+  @property
+  def VIEWPORT_W(self):
+    return 30*self.WIDTH
+
   def __init__(self, world_def, _C):
     """
     args:
@@ -61,9 +75,6 @@ class WorldEnv(gym.Env, EzPickle):
     self.C = _C  # CONFIG
     # box2D stuff
     self.scroll = 0.0
-    self.VIEWPORT_H = self.C.env_size
-    self.VIEWPORT_W = int(self.C.env_wh_ratio * self.C.env_size)
-    self.scale = 320 / self.VIEWPORT_H
     self.viewer = None
     self.statics = {}
     self.dynbodies = {}
@@ -149,7 +160,7 @@ class WorldEnv(gym.Env, EzPickle):
       root_body = robot.root_body
       fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = robot.name + ':root'
-      rat = self.C.env_wh_ratio
+      rat = self.C.wh_ratio
       root_xy = A[self._sample(name + ':x:p', *robot.rangex), self._sample(name + ':y:p', *robot.rangey)]
 
       if self.C.all_corners:
@@ -181,7 +192,6 @@ class WorldEnv(gym.Env, EzPickle):
         mangle = root_angle + joint.angle
         mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
         parent_angles[name] = mangle
-
         fixture = fixtureDef(shape=body.shape, density=1, restitution=0.0, categoryBits=body.categoryBits, maskBits=body.maskBits, friction=body.friction)
 
         # parent rot
@@ -216,7 +226,7 @@ class WorldEnv(gym.Env, EzPickle):
         #self.joints[name].bodyB.transform.angle = self._sample(name+':theta')
 
     for obj in self.world_def.objects:
-      obj_size = obj.size * self.HEIGHT / 30.00
+      obj_size = obj.size
       color = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
@@ -250,7 +260,7 @@ class WorldEnv(gym.Env, EzPickle):
     self._destroy()
     self.statics = {}
     if self.C.walls:
-      X = 0.6
+      X = 0.0
       self.statics['wall1'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
       self.statics['wall2'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (0, self.HEIGHT + X)]))
       self.statics['wall3'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(self.WIDTH + X, 0), (self.WIDTH + X, self.HEIGHT)]))
@@ -384,10 +394,10 @@ class WorldEnv(gym.Env, EzPickle):
       for jname, joint in robot.joints.items():
         name = f'{robot.name}:{jname}'
         if self.C.use_speed:
-          self.joints[name].motorSpeed = float(joint.speed * np.clip(action[name+':speed'], -1, 1))
+          self.joints[name].motorSpeed = float(joint.speed * np.clip(action[name + ':speed'], -1, 1))
         else:
-          self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name+':torque']))
-          self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name+':torque']), 0, 1))
+          self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name + ':torque']))
+          self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
 
     # RUN SIM STEP
     self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
@@ -402,33 +412,36 @@ class WorldEnv(gym.Env, EzPickle):
     return obs.arr, reward, done, info
 
   def lcd_render(self):
-    image = Image.new("1", (self.C.lcd_w, self.C.lcd_h))
+    h = self.C.lcd_base
+    w = int(self.C.lcd_base*self.C.wh_ratio)
+    image = Image.new("1", (w, h))
     draw = ImageDraw.Draw(image)
-    draw.rectangle([0, 0, self.C.lcd_w, self.C.lcd_h], fill=1)
+    draw.rectangle([0, 0, w, h], fill=1)
     for name, body in self.dynbodies.items():
       pos = A[body.position]
       shape = body.fixtures[0].shape
       if isinstance(shape, circleShape):
         rad = shape.radius
-        topleft = (pos - rad) / A[self.WIDTH, self.HEIGHT]
-        botright = (pos + rad) / A[self.WIDTH, self.HEIGHT]
-        topleft = (topleft * self.C.lcd_w).astype(np.int)
-        botright = (botright * self.C.lcd_w).astype(np.int)
+        topleft = (pos - rad) / self.WIDTH
+        botright = (pos + rad) / self.WIDTH
+        topleft = (topleft * w)
+        botright = (botright * w)
         draw.ellipse(topleft.tolist() + botright.tolist(), fill=0)
       else:
         trans = body.transform
-        points = A[[trans * v for v in shape.vertices]] / A[self.WIDTH, self.HEIGHT]
-        points = (self.C.lcd_w * points).astype(np.int).tolist()
+        points = A[[trans * v for v in shape.vertices]] / self.WIDTH
+        points = (w * points).tolist()
         points = tuple([tuple(xy) for xy in points])
-        #points = ((10, 10), (10, 16), (16, 16), (16, 10))
         draw.polygon(points, fill=0)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     return np.array(image)
 
-  def render(self, mode='rgb_array'):
+  def render(self, mode='rgb_array', lcd=None):
     if self.viewer is None:
       self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H)
-    self.viewer.set_bounds(self.scroll, self.scale * self.VIEWPORT_W / (SCALE) + self.scroll, 0, self.scale * self.VIEWPORT_H / (SCALE))
+      self.viewer.render = partial(utils.monkey_patch_render, self.viewer)
+
+    self.viewer.set_bounds(self.scroll, self.VIEWPORT_W / (SCALE) + self.scroll, 0, self.VIEWPORT_H / (SCALE))
 
     def draw_face(position, angle, color):
       """draw a smiley face on the root body :)"""
@@ -459,19 +472,16 @@ class WorldEnv(gym.Env, EzPickle):
         if 'root' in name:
           draw_face(body.position, body.angle, color2)
 
-    S = self.C.env_size / SCALE
-    SS = S * self.scale
-    self.viewer.draw_line((0, SS), (SS, SS), color=(0, 0, 0))
-    self.viewer.draw_line((SS, 0), (SS, SS), color=(0, 0, 0))
-    self.viewer.draw_line((0, 0), (0, SS), color=(0, 0, 0))
-    return self.viewer.render(return_rgb_array=mode == 'rgb_array')
+    #self.viewer.draw_line((self.WIDTH,0), (self.WIDTH,self.HEIGHT,), color=(0,0,0)) # right boundary
+    #self.viewer.draw_line((0,0), (0,1,), color=(1,1,1)) # white line on bottom. fixes image gets tinted by last color used
+    return self.viewer.render(return_rgb_array=mode == 'rgb_array', lcd=lcd)
 
   def close(self):
     if self.viewer is not None:
       self.viewer.close()
       self.viewer = None
 
-  def _comp_angle(name, body, base_pos):
+  def _comp_angle(self, name, body, base_pos):
     cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
     base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
     offset_angle = np.arctan2(*cxy[::-1])
@@ -482,14 +492,6 @@ class WorldEnv(gym.Env, EzPickle):
     if ur is None:
       ur = -lr
     return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
-
-  @property
-  def WIDTH(self):
-    return int(self.C.env_wh_ratio * 10)
-
-  @property
-  def HEIGHT(self):
-    return 10
 
   @property
   def FPS(self):

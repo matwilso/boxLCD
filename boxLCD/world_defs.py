@@ -11,7 +11,7 @@ SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted 
 class Object(NamedTuple):
   name: str
   shape: str = 'box'
-  size: float = 1.0
+  size: float = 0.5
   damping: float = 0.0
   density: float = 1.0
   friction: float = 0.5
@@ -41,8 +41,8 @@ class Robot(NamedTuple):
   root_body: Body = None
   bodies: Dict[str, Body] = None
   joints: Dict[str, Joint] = None
-  rangex: Tuple[float, float] = (-0.9, 0.9)
-  rangey: Tuple[float, float] = (-0.8, -0.5)
+  rangex: Tuple[float, float] = (-0.8, 0.8)
+  rangey: Tuple[float, float] = (-0.5, -0.5)
   rand_angle: int = 0
   angularDamping: float = 0
   linearDamping: float = 0
@@ -81,7 +81,7 @@ def make_urchin(robot, SCALE, C):
     'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
     'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H/2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints)
+  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root']), bodies=bodies, joints=joints, rand_angle=1)
 
 
 # TODO: make armed walker

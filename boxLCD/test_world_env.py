@@ -1,4 +1,5 @@
 import time
+from pyglet.gl import glClearColor
 import argparse
 import itertools
 from collections import defaultdict
@@ -21,7 +22,6 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in C.items():
     parser.add_argument(f'--{key}', type=utils.args_type(value), default=value)
-  parser.set_defaults(**{'env_size': 320})
   C = parser.parse_args()
   env = Box(C)
   start = env.reset()
@@ -29,16 +29,9 @@ if __name__ == '__main__':
   ret = 0
   env.render()
   key_handler = KEY.KeyStateHandler()
-  env.viewer.window.push_handlers(key_handler)
+  # monkey patch the env window
   window = env.viewer.window
-
-  @window.event
-  def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
-    print()
-    print(x,y,dx,dy, buttons, modifiers)
-    cp = env.SCALE*env.dynbodies['crab0:root'].position
-    if np.linalg.norm(A[cp] - A[x,y]) < 100:
-      env.dynbodies['crab0:root'].position += (dx/env.SCALE,dy/env.SCALE)
+  window.push_handlers(key_handler)
 
   paused = False
   traj = []
@@ -116,9 +109,22 @@ if __name__ == '__main__':
       #print(rew, utils.filter(env.get_obs_dict(obs, do_map=False), 'object0'))
       #print(obs.max(), env.obs_keys[obs.argmax()])
     bf = time.time()
-    img = env.render()
+    lcd = env.lcd_render()
+    lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1)#.repeat(9, -2).repeat(9,-3)
+    #lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(9, -2).repeat(9,-3)
+    img = env.render(lcd=lcd)
+    #img = pyglet.image.ImageData(lcd.shape[1], lcd.shape[0], 'RGB', lcd.tobytes(), pitch=lcd.shape[1]*-3)
+    #glClearColor(1,1,1,1)
+    #window.clear()
+    #window.switch_to()
+    #window.dispatch_events()
+    #img.blit(300,0)
+    #window.flip()
+
     dr = time.time()-bf
     #print(dr)
     if plotting:
       plt.imshow(img); plt.show()
     past_keys = {key: val for key, val in curr_keys.items()}
+
+

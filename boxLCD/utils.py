@@ -108,3 +108,54 @@ def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), n
 def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
 # map from bounds to -1,1
 def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
+
+
+from pyglet.gl import glClearColor
+import pyglet
+set_width = False
+# this is a really bad idea if the underlying code changes.
+# i really should make my own rendering class to copy the gym.envs.classic_control.rendering code.
+def monkey_patch_render(self, return_rgb_array=False, lcd=None):
+    global set_width
+    glClearColor(1,1,1,1)
+    if not set_width:
+      self.window.width *= 2
+      set_width = True
+    if lcd is not None:
+      dw = (self.window.width/2) / 30.0
+      img = pyglet.image.ImageData(lcd.shape[1], lcd.shape[0], 'RGB', lcd.tobytes(), pitch=lcd.shape[1]*-3)
+      h, w = A[lcd.shape[:2]]/30.0
+      self.draw_line((dw, 0), (dw,h*2), color=(0,0,0)) # right boundary
+      #self.draw_line((0,0), (0,1,), color=(1,1,1)) # white line on bottom. fixes image gets tinted by last color used
+      self.draw_line((dw, 0), (dw, h), color=(0,0,0))
+      self.draw_line((dw, h), (dw+w, h), color=(0,0,0))
+      self.draw_line((dw+w, 0), (dw+w, h), color=(0,0,0))
+      self.draw_line((0, 0), (0, 1), color=(1,1,1))
+    self.window.clear()
+    self.window.switch_to()
+    self.window.dispatch_events()
+    if lcd is not None:
+      img.blit(self.window.width//2,0)
+
+    self.transform.enable()
+    for geom in self.geoms:
+        geom.render()
+    for geom in self.onetime_geoms:
+        geom.render()
+    self.transform.disable()
+    arr = None
+    if return_rgb_array:
+        buffer = pyglet.image.get_buffer_manager().get_color_buffer()
+        image_data = buffer.get_image_data()
+        arr = np.frombuffer(image_data.get_data(), dtype=np.uint8)
+        # In https://github.com/openai/gym-http-api/issues/2, we
+        # discovered that someone using Xmonad on Arch was having
+        # a window of size 598 x 398, though a 600 x 400 window
+        # was requested. (Guess Xmonad was preserving a pixel for
+        # the boundary.) So we use the buffer height/width rather
+        # than the requested one.
+        arr = arr.reshape(buffer.height, buffer.width, 4)
+        arr = arr[::-1,:,0:3]
+    self.window.flip()
+    self.onetime_geoms = []
+    return arr if return_rgb_array else self.isopen
