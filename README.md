@@ -35,6 +35,11 @@ future while keeping it extremely tractable.
 
 
 
+This is in alpha stages, and I don't really expect to have a ton of users so I will probably
+be improving and breaking things a lot and redesigning. But if you are using it, let me know and I 
+can try not to mess up your stuff. And also improve stuff.
+This is mostly just to test out ideas and prototype. So I expect to make this much better.
+
 
 
 

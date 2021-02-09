@@ -117,7 +117,7 @@ if __name__ == '__main__':
       #  env.render(action=act)
       #  if key_handler[KEY.RIGHT]: break
       obs, rew, done, info = env.step(act)
-      dobs = utils.DWrap(obs, env.obs_info, map=False)
+      dobs = utils.WrappedArray(obs, env.obs_info, map=False)
       #print(dobs['object0:x:p'])
       #omax = max(omax, np.max(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v']))
       #print(omax)
