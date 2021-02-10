@@ -95,7 +95,7 @@ class WorldEnv(gym.Env, EzPickle):
 
     for i in range(len(self.world_def.robots)):
       robot = self.world_def.robots[i]
-      self.world_def.robots[i] = robot = ROBOT_FILLER[robot.type](robot, SCALE, self.C)
+      self.world_def.robots[i] = robot = ROBOT_FILLER[robot.type](robot, self.C)
       self.obs_info[f'{robot.name}:root:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{robot.name}:root:y:p'] = A[0, self.HEIGHT]
       if self.C.all_corners:
@@ -328,7 +328,7 @@ class WorldEnv(gym.Env, EzPickle):
               offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
           self.dynbodies[name].angle = offset_angle
     if not self.C.walls:
-      self.scroll = self.dynbodies[f'{robot.type}:root'].position.x - self.VIEWPORT_W / SCALE / 2
+      self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
     return self._get_obs().arr
 
   def _get_obs(self):
@@ -393,6 +393,8 @@ class WorldEnv(gym.Env, EzPickle):
     for robot in self.world_def.robots:
       for jname, joint in robot.joints.items():
         name = f'{robot.name}:{jname}'
+        if joint.limits[0] == joint.limits[1]:
+          continue
         if self.C.use_speed:
           self.joints[name].motorSpeed = float(joint.speed * np.clip(action[name + ':speed'], -1, 1))
         else:
@@ -404,7 +406,7 @@ class WorldEnv(gym.Env, EzPickle):
     obs = self._get_obs()
     #bodies = [self.dynbodies[key] for key in self.dynbodies if robot.type in key]
     if not self.C.walls:
-      self.scroll = self.dynbodies[f'{robot.type}:root'].position.x - self.VIEWPORT_W / SCALE / 2
+      self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
 
     info = {}
     reward = 0.0  # no reward swag
