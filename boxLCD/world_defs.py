@@ -140,7 +140,7 @@ def make_crab(robot, C):
     'rrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
     'rrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
   }
-  if True:
+  if False:
     joints = {
       # legs
       'lhip': Joint('root', -0.75, (-SIDE, -VERT), (0, LEG_H/2), [-1.5, 0.5]),
@@ -157,7 +157,7 @@ def make_crab(robot, C):
       'rknee': Joint('rhip', -0.5, (0, -LEG_H/2), (0, LL_H/2), [-0.5, 0.5]),
     }
   if C.use_arms:
-    if True:
+    if False:
       joints.update(**{
       # arms
       'lshoulder': Joint('root', 1.0, (-SIDE, VERT), (0, -ARM_H/2), [-1.0, 3.0]),
@@ -194,7 +194,6 @@ def make_crab(robot, C):
       'rrclaw1': Joint('rrclaw0', -3.75, (0, CLAW_H/2), (0, -CLAW_H/2), [0.0, 0.0]),
       },)
   return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, rangey=[0.0,0.0])
-
 
 # TODO: make armed walker
 @register('walker')

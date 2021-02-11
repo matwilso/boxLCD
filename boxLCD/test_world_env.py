@@ -27,7 +27,7 @@ if __name__ == '__main__':
   start = env.reset()
   #import ipdb; ipdb.set_trace()
   ret = 0
-  env.render()
+  env.render(mode='human')
   key_handler = KEY.KeyStateHandler()
   # monkey patch the env window
   window = env.viewer.window
@@ -44,7 +44,7 @@ if __name__ == '__main__':
   while True:
     action = env.action_space.sample()
     action = np.zeros_like(action)
-    act_dict = env.get_act_dict(action)
+    daction = utils.WrappedArray(action, env.act_info, do_map=False)
     curr_keys = defaultdict(lambda: False)
     curr_keys.update({key: val for key, val in key_handler.items()})
     check = lambda x: curr_keys[x] and not past_keys[x]
@@ -53,14 +53,6 @@ if __name__ == '__main__':
       start = env.reset()
       time.sleep(0.1)
       traj = []
-    if check(KEY.UP):
-      act_dict['object0:force'] = 1.0
-    if check(KEY.DOWN):
-      act_dict['object0:force'] = -1.0
-    if check(KEY.LEFT):
-      act_dict['object0:theta'] = 0.5
-    if check(KEY.RIGHT):
-      act_dict['object0:theta'] = -0.5
     if check(KEY.SPACE):
       paused = not paused
     if check(KEY.P):
@@ -100,7 +92,7 @@ if __name__ == '__main__':
       #print(dobs['object0:x:v', 'object0:y:v', 'object0:ang:v'])
       #print(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v'])
       ret += rew
-      #obs, rew, done, info = env.step(env.get_act_vec(act_dict))
+      #obs, rew, done, info = env.step(env.get_act_vec(daction))
       if done and dor:
         print(ret)
         ret = 0
@@ -109,10 +101,8 @@ if __name__ == '__main__':
       #print(rew, utils.filter(env.get_obs_dict(obs, do_map=False), 'object0'))
       #print(obs.max(), env.obs_keys[obs.argmax()])
     bf = time.time()
-    lcd = env.lcd_render()
-    #lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1)#.repeat(9, -2).repeat(9,-3)
-    lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(9, -2).repeat(9,-3)
-    img = env.render(lcd=lcd)
+    #lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(9, -2).repeat(9,-3)
+    img = env.render(mode='human')
     #img = pyglet.image.ImageData(lcd.shape[1], lcd.shape[0], 'RGB', lcd.tobytes(), pitch=lcd.shape[1]*-3)
     #glClearColor(1,1,1,1)
     #window.clear()

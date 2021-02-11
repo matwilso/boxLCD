@@ -13,6 +13,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
+from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
 # ENVIRONMENT DEFAULT CONFIG
 C = utils.AttrDict()
@@ -38,7 +39,6 @@ class WorldEnv(gym.Env, EzPickle):
   """
   enables flexible specification of a box2d environment
   You pass in a world def and a configuration.
-
   Then this behaves like a regular env given that configuration.
   But it additionally has lcd_render.
   """
@@ -46,23 +46,6 @@ class WorldEnv(gym.Env, EzPickle):
       'render.modes': ['human', 'rgb_array'],
       'video.frames_per_second': FPS
   }
-
-  @property
-  def WIDTH(self):
-    return int(self.C.wh_ratio * self.C.base_dim)
-
-  @property
-  def HEIGHT(self):
-    return self.C.base_dim
-
-  @property
-  def VIEWPORT_H(self):
-    return 30*self.HEIGHT
-
-  @property
-  def VIEWPORT_W(self):
-    return 30*self.WIDTH
-
   def __init__(self, world_def, _C):
     """
     args:
@@ -141,9 +124,50 @@ class WorldEnv(gym.Env, EzPickle):
     self.action_space = spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
     self.seed()
 
+  @property
+  def WIDTH(self):
+    return int(self.C.wh_ratio * self.C.base_dim)
+
+  @property
+  def HEIGHT(self):
+    return self.C.base_dim
+
+  @property
+  def VIEWPORT_H(self):
+    return 30*self.HEIGHT
+
+  @property
+  def VIEWPORT_W(self):
+    return 30*self.WIDTH
+
+  @property
+  def FPS(self):
+    return FPS
+
+  @property
+  def SCALE(self):
+    return SCALE
+
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
     return [seed]
+
+  def _sample(self, namex, lr=-1.0, ur=None):
+    if ur is None: ur = -lr
+    return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
+    
+  def _comp_angle(self, name, body, base_pos):
+    import ipdb; ipdb.set_trace()
+    cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
+    base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
+    offset_angle = np.arctan2(*cxy[::-1])
+    ang = offset_angle - base_angle
+    return np.arctan2(np.sin(ang), np.cos(ang))
+
+  def close(self):
+    if self.viewer is not None:
+      self.viewer.window.close()
+      self.viewer = None
 
   def _destroy(self):
     for name, body in {**self.statics, **self.dynbodies}.items():
@@ -375,20 +399,9 @@ class WorldEnv(gym.Env, EzPickle):
             obs[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
     return obs
 
-  def get_act_dict(self, act_vec, do_map=True):
-    """convert vector action to dictionary action
-    (-1, 1) in vec shape --> (-act_bounds, act_bounds) in dict shape
-    """
-    act_dict = {}
-    for i, key in enumerate(self.act_keys):
-      bounds = self.act_info[key]
-      act_dict[key] = utils.mapto(act_vec[i], bounds) if map else act_vec[i]
-    assert sorted(act_dict) == list(act_dict.keys())
-    return act_dict
-
-  def step(self, vec_action):
+  def step(self, action):
     self.ep_t += 1
-    action = self.get_act_dict(vec_action)
+    action = utils.WrappedArray(action, self.act_info, do_map=True)
     # TORQUE CONTROL
     for robot in self.world_def.robots:
       for jname, joint in robot.joints.items():
@@ -404,21 +417,22 @@ class WorldEnv(gym.Env, EzPickle):
     # RUN SIM STEP
     self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
     obs = self._get_obs()
-    #bodies = [self.dynbodies[key] for key in self.dynbodies if robot.type in key]
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
-
     info = {}
     reward = 0.0  # no reward swag
     done = self.ep_t >= self.C.ep_len
     return obs.arr, reward, done, info
 
-  def lcd_render(self):
-    h = self.C.lcd_base
-    w = int(self.C.lcd_base*self.C.wh_ratio)
-    image = Image.new("1", (w, h))
+  def lcd_render(self, width=None, height=None):
+    """render the env using PIL at potentially very low resolution
+    """
+    if width is None and height is None:
+      width = int(self.C.lcd_base*self.C.wh_ratio)
+      height = self.C.lcd_base
+    image = Image.new("1", (width, height))
     draw = ImageDraw.Draw(image)
-    draw.rectangle([0, 0, w, h], fill=1)
+    draw.rectangle([0, 0, width, height], fill=1)
     for name, body in self.dynbodies.items():
       pos = A[body.position]
       shape = body.fixtures[0].shape
@@ -426,79 +440,33 @@ class WorldEnv(gym.Env, EzPickle):
         rad = shape.radius
         topleft = (pos - rad) / self.WIDTH
         botright = (pos + rad) / self.WIDTH
-        topleft = (topleft * w)
-        botright = (botright * w)
+        topleft = (topleft * width)
+        botright = (botright * width)
         draw.ellipse(topleft.tolist() + botright.tolist(), fill=0)
       else:
         trans = body.transform
         points = A[[trans * v for v in shape.vertices]] / self.WIDTH
-        points = (w * points).tolist()
+        points = (width * points).tolist()
         points = tuple([tuple(xy) for xy in points])
         draw.polygon(points, fill=0)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
-    return np.array(image)
+    lcd = np.array(image)
+    return lcd
+    #TODO: deal with scrolling
 
-  def render(self, mode='rgb_array', lcd=None):
-    if self.viewer is None:
-      self.viewer = rendering.Viewer(self.VIEWPORT_W, self.VIEWPORT_H)
-      self.viewer.render = partial(utils.monkey_patch_render, self.viewer)
-
-    self.viewer.set_bounds(self.scroll, self.VIEWPORT_W / (SCALE) + self.scroll, 0, self.VIEWPORT_H / (SCALE))
-
-    def draw_face(position, angle, color):
-      """draw a smiley face on the root body :)"""
-      X = 0.1; X2 = 0.2
-      rot = utils.make_rot(angle); pos = position
-      # eyes
-      t = rendering.Transform(translation=pos + rot.dot(A[X2, +X])); self.viewer.draw_circle(X, 20, color=color).add_attr(t)
-      t = rendering.Transform(translation=pos + rot.dot(A[-X2, +X])); self.viewer.draw_circle(X, 20, color=color).add_attr(t)
-      # smiley
-      t = rendering.Transform(translation=pos + rot.dot(A[0.0, -X2]), rotation=angle)
-      self.viewer.draw_line((0, 0), (X2, X), color=color).add_attr(t)
-      self.viewer.draw_line((0, 0), (-X2, X), color=color).add_attr(t)
-
-    for name in self.dynbodies.keys():
-      body = self.dynbodies[name]
-      color1, color2 = body.color1, body.color2
-      for f in body.fixtures:
-        trans = f.body.transform
-        if type(f.shape) is circleShape:
-          t = rendering.Transform(translation=trans * f.shape.pos)
-          self.viewer.draw_circle(f.shape.radius, 20, color=color1).add_attr(t)
-          self.viewer.draw_circle(f.shape.radius, 20, color=color2, filled=False, linewidth=2).add_attr(t)
-        else:
-          path = [trans * v for v in f.shape.vertices]
-          self.viewer.draw_polygon(A[path], color=color1)
-          path.append(path[0])
-          self.viewer.draw_polyline(A[path], color=color2, linewidth=self.VIEWPORT_H / 100)
-        if 'root' in name:
-          draw_face(body.position, body.angle, color2)
-
-    #self.viewer.draw_line((self.WIDTH,0), (self.WIDTH,self.HEIGHT,), color=(0,0,0)) # right boundary
-    #self.viewer.draw_line((0,0), (0,1,), color=(1,1,1)) # white line on bottom. fixes image gets tinted by last color used
-    return self.viewer.render(return_rgb_array=mode == 'rgb_array', lcd=lcd)
-
-  def close(self):
-    if self.viewer is not None:
-      self.viewer.close()
-      self.viewer = None
-
-  def _comp_angle(self, name, body, base_pos):
-    cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
-    base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
-    offset_angle = np.arctan2(*cxy[::-1])
-    ang = offset_angle - base_angle
-    return np.arctan2(np.sin(ang), np.cos(ang))
-
-  def _sample(self, namex, lr=-1.0, ur=None):
-    if ur is None:
-      ur = -lr
-    return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
-
-  @property
-  def FPS(self):
-    return FPS
-
-  @property
-  def SCALE(self):
-    return SCALE
+  def render(self, mode='rgb_array'):
+    width = int(self.C.lcd_base*self.C.wh_ratio)
+    height = self.C.lcd_base
+    lcd = self.lcd_render(width, height)
+    if mode == 'rgb_array':
+      return lcd
+    elif mode == 'human':
+      # use a pyglet viewer to show the images to the user in realtime.
+      if self.viewer is None:
+        self.viewer = Viewer(width*8, height*8, self.C)
+      high_res = self.lcd_render(width*8, height*8)
+      high_res = 255*high_res[...,None].astype(np.uint8).repeat(3,-1)
+      low_res = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(8, -2).repeat(8,-3)
+      img = np.concatenate([high_res, np.zeros_like(low_res)[:2], low_res], axis=0)
+      self.viewer.render(img)
+      return lcd
