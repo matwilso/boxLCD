@@ -18,9 +18,10 @@ class Viewer:
     self.window.dispatch_events()
     img = pyglet.image.ImageData(image.shape[1], image.shape[0], 'RGB', image.tobytes(), pitch=image.shape[1] * -3)
     img.blit(0, 0)
-    label1 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.width}x{self.height}x3)</font>', x=self.width/2, y=3*self.height/4, anchor_x='center', anchor_y='center')
+    #-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji
+    label1 = pyglet.text.HTMLLabel(f'<font face="Helvetica" size=10">{self.height}x{self.width}x3 (RGB 0-255)</font>', x=self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
     label1.draw()
-    label2 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.lcd_w}x{self.lcd_h})</font>', x=3*self.width/2, y=3*self.height/4, anchor_x='center', anchor_y='center')
+    label2 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">{self.lcd_h}x{self.lcd_w} (BINARY 0-1)</font>', x=3*self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
     label2.draw()
     arr = None
     if return_rgb_array:
