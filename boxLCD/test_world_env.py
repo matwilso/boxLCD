@@ -12,7 +12,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
-from boxLCD import Box, C
+from boxLCD import Box, C, Dropbox
 import pyglet
 KEY = pyglet.window.key
 A = utils.A
@@ -24,27 +24,35 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=utils.args_type(value), default=value)
   C = parser.parse_args()
   env = Box(C)
+  #env = Dropbox(C)
   start = env.reset()
-  #import ipdb; ipdb.set_trace()
-  ret = 0
   env.render(mode='human')
   key_handler = KEY.KeyStateHandler()
-  # monkey patch the env window
+  # monkey patch the env window to get keyboard input
   window = env.viewer.window
   window.push_handlers(key_handler)
-
+  # set up variables
   paused = False
-  traj = []
   past_keys = {}
-  delay = 0.1*1/16
-  dor = False
+  reset_on_done = False
   plotting = False
+  obs_log = False
   omax = 0.0
+  ret = 0
 
-  while True:
+  # KEY BINDINGS
+  # 0 - reset env
+  # 1 - toggle automatic reset on done
+  # SPACE - pause
+  # P - plot
+  # O - print obs
+  # ESC - quit
+
+  # RUN THE ENV AND RENDER IT
+  for i in itertools.count(0):
     action = env.action_space.sample()
     action = np.zeros_like(action)
-    daction = utils.WrappedArray(action, env.act_info, do_map=False)
+    daction = utils.NamedArray(action, env.act_info, do_map=False)
     curr_keys = defaultdict(lambda: False)
     curr_keys.update({key: val for key, val in key_handler.items()})
     check = lambda x: curr_keys[x] and not past_keys[x]
@@ -52,69 +60,40 @@ if __name__ == '__main__':
     if check(KEY._0) or check(KEY.NUM_0):
       start = env.reset()
       time.sleep(0.1)
-      traj = []
     if check(KEY.SPACE):
       paused = not paused
     if check(KEY.P):
       plotting = not plotting
+    if check(KEY.O):
+      obs_log = not obs_log
     if check(KEY._1):
-      dor = not dor
-
-    if check(KEY.S):
-      delay *= 2.0 
-    if check(KEY.F):
-      delay *= 0.5
-    time.sleep(delay)
-
-    if check(KEY.NUM_4):
-      pass
-      # TODO: add support for rendering past images in traj
-
+      reset_on_done = not reset_on_done
     if check(KEY.ESCAPE): 
       exit()
 
-    if not paused or check(KEY.NUM_6):
-      #obs, rew, done, info = env.step(np.zeros_like(env.action_space.sample()))
+    if not paused or check(KEY.RIGHT):
       act = env.action_space.sample()
-      #print(act)
-      #while True:
-      #  env.render(action=act)
-      #  if key_handler[KEY.RIGHT]: break
       obs, rew, done, info = env.step(act)
-      dobs = utils.WrappedArray(obs, env.obs_info, do_map=False)
-      #print(dobs['object0:x:p'])
-      #omax = max(omax, np.max(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v']))
-      #print(omax)
-      #print(np.linalg.norm(start[env.gixs] - obs[env.gixs], axis=-1) / len(env.gixs)**0.5)
-      #print(env.get_obs_dict(obs))
-      print(obs)
-      #print()
-      #print(dobs['object0:x:v', 'object0:y:v', 'object0:ang:v'])
-      #print(dobs['luxo0:root:x:v', 'luxo0:root:y:v', 'luxo0:root:ang:v'])
+      nobs = utils.NamedArray(obs, env.obs_info, do_map=False)
+      if obs_log:
+        print(nobs.todict())
       ret += rew
-      #obs, rew, done, info = env.step(env.get_act_vec(daction))
-      if done and dor:
-        print(ret)
+      if done and reset_on_done:
+        print('episode return',  ret)
         ret = 0
         start = obs = env.reset()
-      # print only the obs data that comes from object0
-      #print(rew, utils.filter(env.get_obs_dict(obs, do_map=False), 'object0'))
-      #print(obs.max(), env.obs_keys[obs.argmax()])
-    bf = time.time()
-    #lcd = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(9, -2).repeat(9,-3)
     img = env.render(mode='human')
-    #img = pyglet.image.ImageData(lcd.shape[1], lcd.shape[0], 'RGB', lcd.tobytes(), pitch=lcd.shape[1]*-3)
-    #glClearColor(1,1,1,1)
-    #window.clear()
-    #window.switch_to()
-    #window.dispatch_events()
-    #img.blit(300,0)
-    #window.flip()
+    #def upsize(img):
+    #  frac = 128//img.shape[0]
+    #  return 255*img[...,None].astype(np.uint8).repeat(3,-1).repeat(frac, -2).repeat(frac,-3)
+    #wh = A[8,8]
+    #resolutions = [wh*2**i for i in [0,1,2,4]]
+    #lcds = [upsize(env.lcd_render(*wh)) for wh in resolutions][::-1]
+    #img = np.concatenate(lcds, 1)
+    #plt.imsave(f'imgs/{i}.png', img)
+    #if i == 200:
+    #  break
 
-    dr = time.time()-bf
-    #print(dr)
     if plotting:
       plt.imshow(img); plt.show()
     past_keys = {key: val for key, val in curr_keys.items()}
-
-

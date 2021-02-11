@@ -294,7 +294,7 @@ class WorldEnv(gym.Env, EzPickle):
     self._reset_bodies()
     #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
     if inject_obs is not None:
-      inject_obs = utils.WrappedArray(np.array(inject_obs).astype(np.float), self.obs_info)
+      inject_obs = utils.NamedArray(np.array(inject_obs).astype(np.float), self.obs_info)
 
       if len(self.world_def.robots) != 0:
         name = self.world_def.robots[0].name + ':root'
@@ -356,7 +356,8 @@ class WorldEnv(gym.Env, EzPickle):
     return self._get_obs().arr
 
   def _get_obs(self):
-    obs = utils.WrappedArray(np.zeros(self.obs_size), self.obs_info)
+    obs = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
+    # GRAB OBJECT INFO
     for obj in self.world_def.objects:
       body = self.dynbodies[obj.name]
       obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
@@ -365,14 +366,12 @@ class WorldEnv(gym.Env, EzPickle):
       else:
         obs[f'{obj.name}:cos'] = np.cos(body.angle)
         obs[f'{obj.name}:sin'] = np.sin(body.angle)
-
+    # GRAB ROBOT INFO
     for robot in self.world_def.robots:
       root = self.dynbodies[robot.name + ':root']
       obs[f'{robot.name}:root:x:p'], obs[f'{robot.name}:root:y:p'] = root_xy = root.position
-
       if self.C.obj_offset:
         obs[f'{obj.name}:xd:p'], obs[f'{obj.name}:yd:p'] = obs[f'{obj.name}:x:p', f'{obj.name}:y:p'] - A[root_xy]
-
       if self.C.all_corners:
         obs[f'{robot.name}:root:kx:p', f'{robot.name}:root:ky:p'] = A[root.transform * root.fixtures[0].shape.vertices[-1]]
       else:
@@ -401,19 +400,17 @@ class WorldEnv(gym.Env, EzPickle):
 
   def step(self, action):
     self.ep_t += 1
-    action = utils.WrappedArray(action, self.act_info, do_map=True)
-    # TORQUE CONTROL
+    action = utils.NamedArray(action, self.act_info, do_map=True)
+    # JOINT CONTROL
     for robot in self.world_def.robots:
       for jname, joint in robot.joints.items():
         name = f'{robot.name}:{jname}'
-        if joint.limits[0] == joint.limits[1]:
-          continue
+        if joint.limits[0] == joint.limits[1]: continue  # joint that doesn't move
         if self.C.use_speed:
           self.joints[name].motorSpeed = float(joint.speed * np.clip(action[name + ':speed'], -1, 1))
         else:
           self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name + ':torque']))
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
-
     # RUN SIM STEP
     self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
     obs = self._get_obs()
@@ -424,31 +421,50 @@ class WorldEnv(gym.Env, EzPickle):
     done = self.ep_t >= self.C.ep_len
     return obs.arr, reward, done, info
 
-  def lcd_render(self, width=None, height=None):
+  def lcd_render(self, width=None, height=None, pretty=False):
     """render the env using PIL at potentially very low resolution
     """
     if width is None and height is None:
       width = int(self.C.lcd_base*self.C.wh_ratio)
       height = self.C.lcd_base
-    image = Image.new("1", (width, height))
+
+    if pretty:
+      width *= 8
+      height *= 8
+      mode = "RGB"
+      backgrond = (1,1,1)
+    else:
+      mode = "1"
+      backgrond = 1
+
+    image = Image.new(mode, (width, height))
     draw = ImageDraw.Draw(image)
-    draw.rectangle([0, 0, width, height], fill=1)
+    draw.rectangle([0, 0, width, height], fill=backgrond)
     for name, body in self.dynbodies.items():
       pos = A[body.position]
       shape = body.fixtures[0].shape
+      if pretty:
+        color = tuple([int(255.0*(1-x)) for x in body.color1])
+        outline = tuple([int(255.0*(1-x)) for x in body.color2])
+        linew = 1
+      else:
+        color = 0
+        outline = None
+        linew = 1
+
       if isinstance(shape, circleShape):
         rad = shape.radius
         topleft = (pos - rad) / self.WIDTH
         botright = (pos + rad) / self.WIDTH
         topleft = (topleft * width)
         botright = (botright * width)
-        draw.ellipse(topleft.tolist() + botright.tolist(), fill=0)
+        draw.ellipse(topleft.tolist() + botright.tolist(), fill=color, outline=outline, width=linew)
       else:
         trans = body.transform
         points = A[[trans * v for v in shape.vertices]] / self.WIDTH
         points = (width * points).tolist()
         points = tuple([tuple(xy) for xy in points])
-        draw.polygon(points, fill=0)
+        draw.polygon(points, fill=color, outline=outline)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     lcd = np.array(image)
     return lcd
@@ -464,9 +480,12 @@ class WorldEnv(gym.Env, EzPickle):
       # use a pyglet viewer to show the images to the user in realtime.
       if self.viewer is None:
         self.viewer = Viewer(width*8, height*8, self.C)
-      high_res = self.lcd_render(width*8, height*8)
-      high_res = 255*high_res[...,None].astype(np.uint8).repeat(3,-1)
-      low_res = 255*lcd[...,None].astype(np.uint8).repeat(3,-1).repeat(8, -2).repeat(8,-3)
-      img = np.concatenate([high_res, np.zeros_like(low_res)[:2], low_res], axis=0)
+      high_res = 255*self.lcd_render(width, height, pretty=True).astype(np.uint8)
+      if False:
+        high_res = 255*high_res[...,None].astype(np.uint8).repeat(3,-1)
+      low_res = 255*lcd.astype(np.uint8)[...,None].repeat(8, 0).repeat(8, 1).repeat(3,2)
+      img = np.concatenate([high_res, np.zeros_like(low_res)[:,:2], low_res], axis=1)
       self.viewer.render(img)
       return lcd
+
+

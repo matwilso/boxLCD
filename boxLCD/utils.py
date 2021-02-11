@@ -27,19 +27,19 @@ class X:
     return np.array(stuff)
 A = X()
 
-class WrappedArray():
+class NamedArray():
   """
   Gives an array an interface like a dictionary, so you can index into it by keys.
   Also handles mapping between different ranges, like [-1,1] to the true value bounds.
   This is convenient for ensuring consistent scaling for feeding in to neural networks.
 
-  WrappedArray is one way to handle named array elements. Another option is to convert back and forth between vector and dictionary.
-  WrappedArray can be faster and more convenient.
+  NamedArray is one way to handle named array elements. Another option is to convert back and forth between vector and dictionary.
+  NamedArray can be faster and more convenient.
 
   #usage:
   #  >>> obs = np.array([10.0, 5.0, 3.2])
   #  >>> obs_info = {'}
-  #  >>> wrapped_obs = WrappedArray(obs, obs_info, do_map=True)
+  #  >>> named_obs = NamedArray(obs, obs_info, do_map=True)
 
   args:
     arr (np.ndarray) of shape (..., N)
@@ -54,6 +54,12 @@ class WrappedArray():
   def _name2idx(self, name):
     """get the index of an element in the array"""
     return list(self.arr_info.keys()).index(name)
+
+  def todict(self):
+    d = {}
+    for key in self.arr_info:
+      d[key] = self[key]
+    return d
 
   def __call__(self, key):
     """support parenthes as well"""

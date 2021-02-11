@@ -5,7 +5,7 @@ set_width = False
 
 class Viewer:
   def __init__(self, width, height, C):
-    self.window = pyglet.window.Window(width, height*2)
+    self.window = pyglet.window.Window(2*width, height)
     self.width = width
     self.height = height
     self.C = C
@@ -18,9 +18,9 @@ class Viewer:
     self.window.dispatch_events()
     img = pyglet.image.ImageData(image.shape[1], image.shape[0], 'RGB', image.tobytes(), pitch=image.shape[1] * -3)
     img.blit(0, 0)
-    label1 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.width}x{self.height})</font>', x=self.width/2, y=7*self.height/4, anchor_x='center', anchor_y='center')
+    label1 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.width}x{self.height}x3)</font>', x=self.width/2, y=3*self.height/4, anchor_x='center', anchor_y='center')
     label1.draw()
-    label2 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.lcd_w}x{self.lcd_h})</font>', x=self.width/2, y=3*self.height/4, anchor_x='center', anchor_y='center')
+    label2 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">({self.lcd_w}x{self.lcd_h})</font>', x=3*self.width/2, y=3*self.height/4, anchor_x='center', anchor_y='center')
     label2.draw()
     arr = None
     if return_rgb_array:
