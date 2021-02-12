@@ -1,9 +1,7 @@
 import pyglet
-set_width = False
-# this is a really bad idea if the underlying code changes.
-# i really should make my own rendering class to copy the gym.envs.classic_control.rendering code.
 
 class Viewer:
+  """use pyglet to render images that have already been generated, to show to user live"""
   def __init__(self, width, height, C):
     self.window = pyglet.window.Window(2*width, height)
     self.width = width
@@ -13,6 +11,10 @@ class Viewer:
     self.lcd_h = self.C.lcd_base
 
   def render(self, image, return_rgb_array=False):
+    """
+    image (np.ndarray): shape (H,W,C) in RGB 0-255 uint8 format
+    return_rgb_array (bool): if you want the pyglet buffer back
+    """
     self.window.clear()
     self.window.switch_to()
     self.window.dispatch_events()

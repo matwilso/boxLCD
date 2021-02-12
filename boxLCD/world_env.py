@@ -360,8 +360,6 @@ class WorldEnv(gym.Env, EzPickle):
     for robot in self.world_def.robots:
       root = self.dynbodies[robot.name + ':root']
       obs[f'{robot.name}:root:x:p'], obs[f'{robot.name}:root:y:p'] = root_xy = root.position
-      if self.C.obj_offset:
-        obs[f'{obj.name}:xd:p'], obs[f'{obj.name}:yd:p'] = obs[f'{obj.name}:x:p', f'{obj.name}:y:p'] - A[root_xy]
       if self.C.all_corners:
         obs[f'{robot.name}:root:kx:p', f'{robot.name}:root:ky:p'] = A[root.transform * root.fixtures[0].shape.vertices[-1]]
       else:

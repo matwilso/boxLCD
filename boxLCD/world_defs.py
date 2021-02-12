@@ -125,7 +125,6 @@ def make_crab(robot, C):
   clawMask = 0x011
   categoryBits: int = 0x0020
   if True:
-    # if not C.all_contact:
     maskBits = 0x001
     baseMask = 0x001
   else:
