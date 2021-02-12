@@ -8,6 +8,7 @@ A = utils.A
 FPS = 50
 SCALE = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 
+# STRUCTS THAT ARE USED TO DEFINE A WORLD
 class Object(NamedTuple):
   name: str
   shape: str = 'box'
@@ -17,7 +18,11 @@ class Object(NamedTuple):
   friction: float = 0.5
   restitution: float = None
   categoryBits: int = 0x0110
+  rand_angle: int = 1
+  rangex: Tuple[float, float] = None
+  rangey: Tuple[float, float] = None
 
+# ROBOT PARTS
 class Body(NamedTuple):
   shape: polygonShape
   density: float = 1
@@ -41,12 +46,12 @@ class Robot(NamedTuple):
   root_body: Body = None
   bodies: Dict[str, Body] = None
   joints: Dict[str, Joint] = None
-  rangex: Tuple[float, float] = (-0.8, 0.8)
-  rangey: Tuple[float, float] = (-0.0, -0.0)
   rand_angle: int = 0
   angularDamping: float = 0
   linearDamping: float = 0
+  bound: float = 1.5  # spatial extent of robot. must be set so we don't start robot stuck in a wall
 
+# FULL WORLD DEF
 class WorldDef(NamedTuple):
   robots: List[Robot] = []
   objects: List[Object] = []
@@ -54,6 +59,7 @@ class WorldDef(NamedTuple):
   forcetorque: int = 0
 
 
+# THESE TAKE A PARTIAL ROBOT DESCRIPTION AND BUILD ALL THE JOINTS AND STUFF.
 ROBOT_FILLER = {}
 def register(name):
   def _reg(func):
@@ -68,7 +74,7 @@ def register(name):
 def make_urchin(robot, C):
   LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
   SHAPES = {}
-  SHAPES['root'] = circleShape(radius=0.8*LEG_W)
+  SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
   SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
   root_body = Body(SHAPES['root'])
   bodies = {
@@ -81,7 +87,12 @@ def make_urchin(robot, C):
       'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
       'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, rangey=(-0.5,-0.5))
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.5)
+
+# urchin is the best robot. the rest need some work.
+# it's actually a bit hard to design a robot that can do interesting things in 2D space.
+# i guess i maybe oughta have some top down views, but then how do you control with joints?
+# could have a roomba with a gripper or something like that. or a reacher arm.
 
 @register('crab')
 def make_crab(robot, C):
@@ -100,7 +111,7 @@ def make_crab(robot, C):
   #LEG_W, LEG_H = 8/SCALE, 16/SCALE
   ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
   CLAW_W, CLAW_H = 4 / SCALE, 16 / SCALE
-  CRAB_POLY = 0.9*A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
+  CRAB_POLY = 0.9 * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
   SHAPES = {}
   SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY])
   #SHAPES['root'] = circleShape(radius=20/SCALE)
@@ -165,7 +176,7 @@ def make_crab(robot, C):
       'rrclaw0': Joint('relbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
       'rrclaw1': Joint('rrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
   },)
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, rangey=[0.0, 0.0])
+  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, bound=2.0)
 
 # TODO: make armed walker
 @register('walker')
@@ -174,7 +185,7 @@ def make_walker(robot, C):
   LEG_W, LEG_H = 10 / SCALE, 24 / SCALE
   ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
   CLAW_W, CLAW_H = 6 / SCALE, 16 / SCALE
-  HULL_POLY = 0.8*A[(-30, +9), (+6, +9), (+34, +1), (+34, -8), (-30, -8)]
+  HULL_POLY = 0.8 * A[(-30, +9), (+6, +9), (+34, +1), (+34, -8), (-30, -8)]
 
   SHAPES = {}
   SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in HULL_POLY])
@@ -203,7 +214,7 @@ def make_walker(robot, C):
       'rhip': Joint('root', -0.05, (0.0, LEG_DOWN), (0, LEG_H / 2), [-0.8, 1.1]),
       'rknee': Joint('rhip', -0.05, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.6, -0.1]),
 
-      'shoulder': Joint('root', 2.0, (0, 5/SCALE), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
+      'shoulder': Joint('root', 2.0, (0, 5 / SCALE), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
       'elbow': Joint('shoulder', 3.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
       'lclaw0': Joint('elbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
       'lclaw1': Joint('lclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
@@ -215,7 +226,6 @@ def make_walker(robot, C):
       type=robot.type,
       name=robot.name,
       root_body=Body(SHAPES['root']),
-      rangey=(0.0, 0.0),
       bodies=bodies,
       joints=joints,
   )
@@ -236,7 +246,6 @@ def make_luxo(robot, C):
       type=robot.type,
       name=robot.name,
       root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
-      rangey=(0.0,0.0),
       bodies={
           'lhip': Body(SHAPES['hip']),
           'lknee': Body(SHAPES['knee']),
@@ -282,13 +291,13 @@ def make_gingy(robot, C):
       'lleg': Joint('body', 0.8, (-SIDE, -VERT), (0, LEG_H / 2), [-0.2, 0.4]),
       'rleg': Joint('body', -0.8, (SIDE, -VERT), (0, LEG_H / 2), [-0.4, 0.2]),
   }
-  return Robot(type=robot.type, name=robot.name, rangey=(0.0, 0.0), root_body=Body(SHAPES['root'], density=0.01), bodies=bodies, joints=joints)
+  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=0.01), bodies=bodies, joints=joints)
 
 @register('octo')
 def make_octo(robot, C):
   LEG_W, LEG_H = 8 / SCALE, 25 / SCALE
   SHAPES = {}
-  SHAPES['root'] = circleShape(radius=1.5*LEG_W)
+  SHAPES['root'] = circleShape(radius=1.5 * LEG_W)
   SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
   root_body = Body(SHAPES['root'], density=0.1)
   bodies = {
@@ -306,10 +315,10 @@ def make_octo(robot, C):
       'bleg1': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
       'cleg1': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
       'dleg1': Joint('root', 3.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'aleg2': Joint('aleg1', 0.0, (0, -LEG_H/2), (0, LEG_H/2), [-1.0, 1.0], limited=False),
-      'bleg2': Joint('bleg1', 1.0, (0, -LEG_H/2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'cleg2': Joint('cleg1', 2.0, (0, -LEG_H/2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'dleg2': Joint('dleg1', 3.0, (0, -LEG_H/2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+      'aleg2': Joint('aleg1', 0.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+      'bleg2': Joint('bleg1', 1.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+      'cleg2': Joint('cleg1', 2.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+      'dleg2': Joint('dleg1', 3.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
 
   }
   return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1)

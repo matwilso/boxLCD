@@ -16,8 +16,8 @@ from boxLCD import utils
 from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
 
-# THIS IS AN ABSTRACT CLASS. 
-# SPECIFIC INSTANCES ARE DESCRIBED IN envs.py
+# THIS IS AN ABSTRACT CLASS ALL OF THE LOGIC FOR SIMULATION
+# SPECIFIC INSTANCES ARE DESCRIBED IN envs.py, WHERE SPECIFIC WORLDS ARE DEFINED
 class WorldEnv(gym.Env, EzPickle):
   """
   enables flexible specification of a box2d environment
@@ -163,14 +163,15 @@ class WorldEnv(gym.Env, EzPickle):
   def _reset_bodies(self):
     self.dynbodies = {}
     self.joints = {}
-
+    # ROBOT
     for robot in self.world_def.robots:
       color = (0.9, 0.4, 0.4), (0.5, 0.3, 0.5)
       root_body = robot.root_body
       fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = robot.name + ':root'
-      rat = self.C.wh_ratio
-      root_xy = A[self._sample(name + ':x:p', *robot.rangex), self._sample(name + ':y:p', *robot.rangey)]
+      rangex = 1 - (2*robot.bound / self.WIDTH)
+      rangey = 1 - (2*robot.bound / self.HEIGHT)
+      root_xy = A[self._sample(name + ':x:p', -rangex, rangex), self._sample(name + ':y:p', -rangey, -rangey)]
 
       if self.C.all_corners:
         body = root_body
@@ -190,9 +191,9 @@ class WorldEnv(gym.Env, EzPickle):
       dyn.color1, dyn.color2 = color
       self.dynbodies[name] = dyn
 
+      # PUT ALL THE JOINT ON THE ROOT AND ENSURE CORRECT ANGLES
       parent_angles = {}
       parent_angles[name] = root_angle
-
       for bj_name in robot.joints:
         name = robot.name + ':' + bj_name
         body = robot.bodies[bj_name]
@@ -218,7 +219,6 @@ class WorldEnv(gym.Env, EzPickle):
             fixtures=fixture)
         dyn.color1, dyn.color2 = color
         self.dynbodies[name] = dyn
-
         rjd = revoluteJointDef(
             bodyA=self.dynbodies[parent_name],
             bodyB=self.dynbodies[name],
@@ -232,38 +232,41 @@ class WorldEnv(gym.Env, EzPickle):
             upperAngle=joint.limits[1],
         )
         self.joints[name] = jnt = self.b2_world.CreateJoint(rjd)
-        #self.joints[name].bodyB.transform.angle = self._sample(name+':theta')
 
+    # OBJECT
     for obj in self.world_def.objects:
+      # MAKE SHAPE AND SIZE
       obj_size = obj.size
-      color = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
-      #fixture = fixtureDef(shape=circleShape(radius=1.0), density=1)
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
       shape = obj_shapes[shape_name]
       if obj.restitution is None:
         restitution = 0 if shape_name == 'box' else 0.7
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=restitution)
+      # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
+      if obj.rangex is None: rangex = 1 - (2*obj_size / self.WIDTH)
+      if obj.rangey is None: rangey = 1 - (2*obj_size / self.HEIGHT)
       if len(self.world_def.robots) == 0:
-        pos = A[(self._sample(obj.name + ':x:p', -0.90, 0.90), self._sample(obj.name + ':y:p', -0.90, 0.90))]
+        pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, rangey))]
       else:
-        pos = A[(self._sample(obj.name + ':x:p', -0.95), self._sample(obj.name + ':y:p', -0.9, -0.25))]
-
-      if self.C.all_corners:
-        samp = self._sample(obj.name + ':kx:p'), self._sample(obj.name + ':ky:p')
-        angle = np.arctan2(*(pos - samp))
+        pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, -0.25))]
+      # ANGLE OR NOT 
+      if obj.rand_angle:
+        if self.C.all_corners:
+          samp = self._sample(obj.name + ':kx:p'), self._sample(obj.name + ':ky:p')
+          angle = np.arctan2(*(pos - samp))
+        else:
+          angle = np.arctan2(self._sample(obj.name + ':sin'), self._sample(obj.name + ':cos'))
       else:
-        angle = np.arctan2(self._sample(obj.name + ':sin'), self._sample(obj.name + ':cos'))
-
+        angle = 0
+      # CREATE OBJ BODY
       body = self.b2_world.CreateDynamicBody(
           position=pos,
           angle=angle,
           fixtures=fixture,
-          angularDamping=0.1,
-          # linearDamping=0.5,
           linearDamping=obj.damping,
       )
-      body.color1, body.color2 = color
+      body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       self.dynbodies[obj.name] = body
 
   def reset(self, inject_obs=None):

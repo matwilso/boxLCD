@@ -66,7 +66,7 @@ class LCDEnv(gym.Env, EzPickle):
   def __init__(self, env):
     self.env = env
     self.C = env.C
-    self.pobs_keys = utils.nlfilter(self.env.obs_keys, 'object')
+    self.pobs_keys = utils.nfiltlist(self.env.obs_keys, 'object')
     #self.pobs_keys = self.env.obs_keys
     self.num_pobs = len(self.pobs_keys)
     self.pobs_idxs = [self.env.obs_keys.index(x) for x in self.pobs_keys]
