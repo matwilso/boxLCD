@@ -2,6 +2,17 @@
 # boxLCD 📟
 ## *box2D physics with low-res binarized rendering*
 
+
+By itself, I don't think this is the most interesting problem.
+But if we can't master this, I don't think we have a chance at tackling harder domains.
+I think the analogy with MNIST is good.
+This is just for quickly iterating on ideas so that you can deploy them on tasks you actually care about.
+
+I do think this class of models is important for robotics.
+
+
+
+
 The aim of this project is to accelerate progress in [learned simulator and world model research](link to my post),
 by providing a testbed that enables us to develop useful approaches, but with much quicker iteration speed and smaller computational budgets.
 
@@ -267,4 +278,4 @@ I ripped that out and masacred it a bit to make it simpler in some ways
 so I could add messy code complexity in other ways.
 
 
-TODO:
+TODO: make world defs so you can randomize over num objects and such. maybe no agent.

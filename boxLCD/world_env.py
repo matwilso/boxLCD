@@ -15,26 +15,9 @@ from gym.utils import seeding, EzPickle
 from boxLCD import utils
 from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
-# ENVIRONMENT DEFAULT CONFIG
-C = utils.AttrDict()
 
-C.base_dim = 5
-C.wh_ratio = 1.0
-C.lcd_base = 16
-C.lcd_render = 1
-C.dark_mode = 0
-C.use_arms = 1
-C.use_images = 0
-C.ep_len = 200
-C.angular_offset = 0
-C.root_offset = 0
-C.obj_offset = 0
-C.compact_obs = 0
-C.use_speed = 1
-C.all_contact = 1
-C.all_corners = 0
-C.walls = 1
-
+# THIS IS AN ABSTRACT CLASS. 
+# SPECIFIC INSTANCES ARE DESCRIBED IN envs.py
 class WorldEnv(gym.Env, EzPickle):
   """
   enables flexible specification of a box2d environment
@@ -46,6 +29,7 @@ class WorldEnv(gym.Env, EzPickle):
       'render.modes': ['human', 'rgb_array'],
       'video.frames_per_second': FPS
   }
+
   def __init__(self, world_def, _C):
     """
     args:
@@ -134,11 +118,11 @@ class WorldEnv(gym.Env, EzPickle):
 
   @property
   def VIEWPORT_H(self):
-    return 30*self.HEIGHT
+    return 30 * self.HEIGHT
 
   @property
   def VIEWPORT_W(self):
-    return 30*self.WIDTH
+    return 30 * self.WIDTH
 
   @property
   def FPS(self):
@@ -153,9 +137,10 @@ class WorldEnv(gym.Env, EzPickle):
     return [seed]
 
   def _sample(self, namex, lr=-1.0, ur=None):
-    if ur is None: ur = -lr
+    if ur is None:
+      ur = -lr
     return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
-    
+
   def _comp_angle(self, name, body, base_pos):
     import ipdb; ipdb.set_trace()
     cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
@@ -256,7 +241,9 @@ class WorldEnv(gym.Env, EzPickle):
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
       shape = obj_shapes[shape_name]
-      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=0 if shape_name == 'box' else 0.7)
+      if obj.restitution is None:
+        restitution = 0 if shape_name == 'box' else 0.7
+      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=restitution)
       if len(self.world_def.robots) == 0:
         pos = A[(self._sample(obj.name + ':x:p', -0.90, 0.90), self._sample(obj.name + ':y:p', -0.90, 0.90))]
       else:
@@ -405,7 +392,8 @@ class WorldEnv(gym.Env, EzPickle):
     for robot in self.world_def.robots:
       for jname, joint in robot.joints.items():
         name = f'{robot.name}:{jname}'
-        if joint.limits[0] == joint.limits[1]: continue  # joint that doesn't move
+        if joint.limits[0] == joint.limits[1]:
+          continue  # joint that doesn't move
         if self.C.use_speed:
           self.joints[name].motorSpeed = float(joint.speed * np.clip(action[name + ':speed'], -1, 1))
         else:
@@ -425,14 +413,11 @@ class WorldEnv(gym.Env, EzPickle):
     """render the env using PIL at potentially very low resolution
     """
     if width is None and height is None:
-      width = int(self.C.lcd_base*self.C.wh_ratio)
+      width = int(self.C.lcd_base * self.C.wh_ratio)
       height = self.C.lcd_base
-
     if pretty:
-      width *= 8
-      height *= 8
       mode = "RGB"
-      backgrond = (1,1,1)
+      backgrond = (1, 1, 1)
     else:
       mode = "1"
       backgrond = 1
@@ -440,17 +425,16 @@ class WorldEnv(gym.Env, EzPickle):
     image = Image.new(mode, (width, height))
     draw = ImageDraw.Draw(image)
     draw.rectangle([0, 0, width, height], fill=backgrond)
-    for name, body in self.dynbodies.items():
+    # for body in reversed(list(self.dynbodies.values())):
+    for body in self.dynbodies.values():
       pos = A[body.position]
       shape = body.fixtures[0].shape
       if pretty:
-        color = tuple([int(255.0*(1-x)) for x in body.color1])
-        outline = tuple([int(255.0*(1-x)) for x in body.color2])
-        linew = 1
+        color = tuple([int(255.0 * (1 - x)) for x in body.color1])
+        outline = tuple([int(255.0 * (1 - x)) for x in body.color2])
       else:
         color = 0
         outline = None
-        linew = 1
 
       if isinstance(shape, circleShape):
         rad = shape.radius
@@ -458,7 +442,7 @@ class WorldEnv(gym.Env, EzPickle):
         botright = (pos + rad) / self.WIDTH
         topleft = (topleft * width)
         botright = (botright * width)
-        draw.ellipse(topleft.tolist() + botright.tolist(), fill=color, outline=outline, width=linew)
+        draw.ellipse(topleft.tolist() + botright.tolist(), fill=color, outline=outline)
       else:
         trans = body.transform
         points = A[[trans * v for v in shape.vertices]] / self.WIDTH
@@ -468,10 +452,10 @@ class WorldEnv(gym.Env, EzPickle):
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     lcd = np.array(image)
     return lcd
-    #TODO: deal with scrolling
+    # TODO: deal with scrolling
 
   def render(self, mode='rgb_array'):
-    width = int(self.C.lcd_base*self.C.wh_ratio)
+    width = int(self.C.lcd_base * self.C.wh_ratio)
     height = self.C.lcd_base
     lcd = self.lcd_render(width, height)
     if mode == 'rgb_array':
@@ -479,13 +463,11 @@ class WorldEnv(gym.Env, EzPickle):
     elif mode == 'human':
       # use a pyglet viewer to show the images to the user in realtime.
       if self.viewer is None:
-        self.viewer = Viewer(width*8, height*8, self.C)
-      high_res = 255*self.lcd_render(width, height, pretty=True).astype(np.uint8)
+        self.viewer = Viewer(width * 8, height * 8, self.C)
+      high_res = 255 * self.lcd_render(width * 8, height * 8, pretty=True).astype(np.uint8)
       if False:
-        high_res = 255*high_res[...,None].astype(np.uint8).repeat(3,-1)
-      low_res = 255*lcd.astype(np.uint8)[...,None].repeat(8, 0).repeat(8, 1).repeat(3,2)
-      img = np.concatenate([high_res, np.zeros_like(low_res)[:,:2], low_res], axis=1)
+        high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
+      low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
+      img = np.concatenate([high_res, np.zeros_like(low_res)[:, :2], low_res], axis=1)
       self.viewer.render(img)
       return lcd
-
-

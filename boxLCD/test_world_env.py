@@ -12,7 +12,8 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
-from boxLCD import Box, C, Dropbox
+from boxLCD import C
+from boxLCD import envs
 import pyglet
 KEY = pyglet.window.key
 A = utils.A
@@ -23,8 +24,10 @@ if __name__ == '__main__':
   for key, value in C.items():
     parser.add_argument(f'--{key}', type=utils.args_type(value), default=value)
   C = parser.parse_args()
-  env = Box(C)
-  #env = Dropbox(C)
+  #env = envs.Bounce(C)
+  #env = envs.Dropbox(C)
+  #env = envs.UrchinBall(C)
+  env = envs.UrchinBalls(C)
   start = env.reset()
   env.render(mode='human')
   key_handler = KEY.KeyStateHandler()
@@ -34,7 +37,7 @@ if __name__ == '__main__':
   # set up variables
   paused = False
   past_keys = {}
-  reset_on_done = False
+  reset_on_done = True
   plotting = False
   obs_log = False
   omax = 0.0
@@ -51,13 +54,13 @@ if __name__ == '__main__':
   # RUN THE ENV AND RENDER IT
   for i in itertools.count(0):
     action = env.action_space.sample()
-    action = np.zeros_like(action)
-    daction = utils.NamedArray(action, env.act_info, do_map=False)
+    #action = np.zeros_like(action)
     curr_keys = defaultdict(lambda: False)
     curr_keys.update({key: val for key, val in key_handler.items()})
     check = lambda x: curr_keys[x] and not past_keys[x]
 
     if check(KEY._0) or check(KEY.NUM_0):
+      #env.seed(0)
       start = env.reset()
       time.sleep(0.1)
     if check(KEY.SPACE):
@@ -72,8 +75,9 @@ if __name__ == '__main__':
       exit()
 
     if not paused or check(KEY.RIGHT):
-      act = env.action_space.sample()
-      obs, rew, done, info = env.step(act)
+      action = env.action_space.sample()
+      #action = np.zeros_like(action)
+      obs, rew, done, info = env.step(action)
       nobs = utils.NamedArray(obs, env.obs_info, do_map=False)
       if obs_log:
         print(nobs.todict())
@@ -81,18 +85,9 @@ if __name__ == '__main__':
       if done and reset_on_done:
         print('episode return',  ret)
         ret = 0
+        #env.seed(0)
         start = obs = env.reset()
     img = env.render(mode='human')
-    #def upsize(img):
-    #  frac = 128//img.shape[0]
-    #  return 255*img[...,None].astype(np.uint8).repeat(3,-1).repeat(frac, -2).repeat(frac,-3)
-    #wh = A[8,8]
-    #resolutions = [wh*2**i for i in [0,1,2,4]]
-    #lcds = [upsize(env.lcd_render(*wh)) for wh in resolutions][::-1]
-    #img = np.concatenate(lcds, 1)
-    #plt.imsave(f'imgs/{i}.png', img)
-    #if i == 200:
-    #  break
 
     if plotting:
       plt.imshow(img); plt.show()

@@ -18,22 +18,16 @@ class Viewer:
     self.window.dispatch_events()
     img = pyglet.image.ImageData(image.shape[1], image.shape[0], 'RGB', image.tobytes(), pitch=image.shape[1] * -3)
     img.blit(0, 0)
-    #-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji
-    label1 = pyglet.text.HTMLLabel(f'<font face="Helvetica" size=10">{self.height}x{self.width}x3 (RGB 0-255)</font>', x=self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
-    label1.draw()
-    label2 = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size=10">{self.lcd_h}x{self.lcd_w} (BINARY 0-1)</font>', x=3*self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
-    label2.draw()
+    if self.C.debug:
+      label1 = pyglet.text.HTMLLabel(f'<font face="Helvetica Bold" size=10">{self.height}x{self.width}x3</font>', x=self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
+      label1.draw()
+      label2 = pyglet.text.HTMLLabel(f'<font face="Helvetica Bold" size=10">{self.lcd_h}x{self.lcd_w}</font>', x=3*self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
+      label2.draw()
     arr = None
     if return_rgb_array:
       buffer = pyglet.image.get_buffer_manager().get_color_buffer()
       image_data = buffer.get_image_data()
       arr = np.frombuffer(image_data.get_data(), dtype=np.uint8)
-      # In https://github.com/openai/gym-http-api/issues/2, we
-      # discovered that someone using Xmonad on Arch was having
-      # a window of size 598 x 398, though a 600 x 400 window
-      # was requested. (Guess Xmonad was preserving a pixel for
-      # the boundary.) So we use the buffer height/width rather
-      # than the requested one.
       arr = arr.reshape(buffer.height, buffer.width, 4)
       arr = arr[::-1, :, 0:3]
     self.window.flip()
