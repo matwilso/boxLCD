@@ -11,12 +11,10 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from envs.box import Box
 
-from utils import A
+from boxLCD.utils import A
 import utils
-from data import data
-from envs.box import Box
+import data
 from runners.trainer import Trainer
 from define_config import env_fn
 from nets.world import AutoWorld
@@ -63,47 +61,36 @@ class WorldTrainer(Trainer):
         state = sample['state'].cpu()
         state_img = []
         for j in range(state.shape[1]):
-          obs = self.big_tvenv.reset(np.arange(self.C.num_envs), state[:,j])
-          if self.C.cheap_render:
-            state_img += [obs['lcd'][...,None]]
-          else:
-            state_img += [self.big_tvenv.render()]
+          obs = self.tvenv.reset(np.arange(self.C.num_envs), state[:,j])
+          state_img += [self.tvenv.render(pretty=True)]
         state_img = np.stack(state_img, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
         self.writer.add_video('state_samples', utils.force_shape(state_img), i, fps=50)
 
     if True:
       # EVAL
-      if self.C.num_robots == 0:
+      if len(self.env.env.world_def.robots) == 0:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
         reset_states = [None]*N
       obses = {key: [] for key in self.env.observation_space.spaces}
-      big_obses = {key: [] for key in self.env.observation_space.spaces}
       for key, val in self.tvenv.reset(np.arange(N), reset_states).items():
         obses[key] += [val]
-      for key, val in self.big_tvenv.reset(np.arange(N), obses['state'][0]).items():
-        big_obses[key] += [val]
-
-      if not self.C.cheap_render:
-        real_imgs = [self.tvenv.render()]
+      real_imgs = [self.tvenv.render(pretty=True)]
       acts = []
       for _ in range(self.C.ep_len - 1):
         act = self.tvenv.action_space.sample()
         obs = self.tvenv.step(act)[0]
         for key, val in obs.items(): obses[key] += [val]
-        big_obs = self.big_tvenv.reset(np.arange(N), obs['state'])
-        for key, val in big_obs.items(): big_obses[key] += [val]
-        if not self.C.cheap_render:
-          real_imgs += [self.tvenv.render()]
+        real_imgs += [self.tvenv.render(pretty=True)]
         acts += [act]
       acts += [np.zeros_like(act)]
       obses = {key: np.stack(val, 1) for key, val in obses.items()}
-      big_obses = {key: np.stack(val, 1) for key, val in big_obses.items()}
       acts = np.stack(acts, 1)
       acts = torch.as_tensor(acts, dtype=torch.float32).to(self.C.device)
       prompts = {key: torch.as_tensor(1.0*val[:,:5]).to(self.C.device) for key, val in obses.items()}
       prompted_samples, prompt_loss = self.model.sample(N, cond=acts, prompts=prompts)
       self.logger['prompt_sample_loss'] += [prompt_loss]
+      # TODO: show a pretty example next to these erro plots
       real_lcd = obses['lcd'][:,:,None]
       if 'image' in self.C.subset:
         lcd_psamp = prompted_samples['lcd']
@@ -124,10 +111,7 @@ class WorldTrainer(Trainer):
           else:
             imgs += [self.big_tvenv.render()]
         imgs = np.stack(imgs, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
-        if self.C.cheap_render:
-          real_imgs = big_obses['lcd'][:,:,None]
-        else:
-          real_imgs = np.stack(real_imgs, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
+        real_imgs = np.stack(real_imgs, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
         if imgs.dtype == np.uint8:
           error = (real_imgs - imgs + 255) // 2
         else:

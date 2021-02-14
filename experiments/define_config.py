@@ -1,29 +1,35 @@
 import subprocess
 import sys
 import pathlib
-from boxLCD import utils
-from envs.box import Box, Dropbox
-from envs.wrappers import LCDEnv, NormalEnv
+import boxLCD.utils
+from boxLCD import envs
+from boxLCD import C as boxLCD_C
+from boxLCD import wrappers
+from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
   def _make():
-    if C.env == 'box':
-      env = Box(C)
-    elif C.env == 'dropbox':
-      env = Dropbox(C)
-    if C.lcd_render:
-      env = LCDEnv(env)
-    else:
-      env = NormalEnv(env)
-
+    if C.env == 'dropbox':
+      env = envs.Dropbox(C)
+    elif C.env == 'bounce':
+      env = envs.Bounce(C)
+    elif C.env == 'boxor':
+      env = envs.BoxOrCircle(C)
+    elif C.env == 'urchin':
+      env = envs.Urchin(C)
+    elif C.env == 'urchin_ball':
+      env = envs.UrchinBall(C)
+    elif C.env == 'urchin_balls':
+      env = envs.UrchinBalls(C)
+    env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env
   return _make
 
 def config():
-  C = utils.AttrDict()
+  C = boxLCD.utils.AttrDict()
   # BASICS
-  C.logdir = pathlib.Path('logs/')
+  C.logdir = pathlib.Path('./logs/trash')
   C.weightdir = pathlib.Path('.')
   C.buffdir = pathlib.Path('.')
   C.datapath = pathlib.Path('.')
@@ -34,19 +40,17 @@ def config():
 
   #C.data_mode = 'image'
   C.amp = 1
-  C.cheap_render = 1
   C.done_n = 1000000
   C.save_n = 5
   C.full_state = 0
   C.num_vars = 0
 
-
-  C.decode = 'binary'
+  C.decode = 'multi'
   C.conv_io = 0
   C.collect_n = 100
   C.grad_clip = 10.0
 
-  C.subset = 'image+state'
+  C.subset = 'image'
 
   C.bs = 64
   C.lr = 1e-4
@@ -64,10 +68,14 @@ def config():
   C.sample_sample = 0
   C.skip_train = 0
 
-  C.env = 'box'
+  C.env = 'dropbox'
 
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
   C.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
-  return C
 
+  pastKeys = list(C.keys())
+  for key, val in boxLCD_C.items():
+    assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
+    C[key] = val
+  return C

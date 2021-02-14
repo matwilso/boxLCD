@@ -71,7 +71,7 @@ class NamedArray():
       idx = self._name2idx(key)
       if self.do_map:
         return mapto(self.arr[..., idx], self.arr_info[key])
-    elif isinstance(key, list):
+    elif isinstance(key, list) or isinstance(key, tuple):
       idx = [self._name2idx(subk) for subk in key]
       if self.do_map:
         bounds = np.array([self.arr_info[subk] for subk in key]).T
@@ -87,7 +87,7 @@ class NamedArray():
       if self.do_map:
         self.arr[..., idx] = rmapto(item, self.arr_info[key])
         return
-    elif isinstance(key, list):
+    elif isinstance(key, list) or isinstance(key, tuple):
       idx = [self._name2idx(subk) for subk in key]
       if self.do_map:
         bounds = np.array([self.arr_info[subk] for subk in key]).T

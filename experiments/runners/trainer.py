@@ -10,12 +10,10 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from envs.box import Box
 
-from utils import A
+from boxLCD.utils import A
 import utils
-from data import data
-from envs.box import Box
+import data
 from runners.runner import Runner
 from define_config import env_fn
 from nets.state import StateTransformer

@@ -143,9 +143,7 @@ class ConvBinHead(nn.Module):
     self.C = C
     self.in_n = in_n
     self.out_n = out_n
-    H = self.C.lcd_h
-    W = self.C.lcd_w
-    self.shape = W//H
+    self.shape = int(self.C.wh_ratio)
     #self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 7, stride=2)
     #self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=2)
     self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 4, stride=4)

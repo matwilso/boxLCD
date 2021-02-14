@@ -25,7 +25,7 @@ def dump_logger(logger, writer, i, C):
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
-      if key == 'loss':
+      if key == 'loss' and i > 0:
         writer.add_scalar('logx/'+key, val, int(np.log(1e5*i)))
       #if 'loss' in key:
       #  writer.add_scalar('neg/'+key, -val, i)
@@ -36,8 +36,6 @@ def dump_logger(logger, writer, i, C):
     yaml.dump(C, f)
   print('=' * 30)
   return defaultdict(lambda: [])
-
-
 
 def write_gif(name, frames, fps=20):
   start = time.time()

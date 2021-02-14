@@ -36,8 +36,9 @@ class NormalEnv(gym.Env, EzPickle):
     obs = self.env.reset()
     return {'state': obs}
 
-  def render(self, mode='rgb_array'):
-    return self.env.render(mode=mode)
+  def render(self, *args, **kwargs):
+    return self.env.render(*args, **kwargs)
+
 
 class PixelEnv(gym.Env, EzPickle):
   def __init__(self, env):
@@ -83,7 +84,8 @@ class LCDEnv(gym.Env, EzPickle):
     else:
       spaces['state'] = gym.spaces.Box(-1, +1, (self.num_pobs,), dtype=np.float32)
     spaces['full_state'] = self.env.observation_space
-    spaces['lcd'] = gym.spaces.Box(0, 1, (self.C.lcd_h, self.C.lcd_w), dtype=np.bool)
+
+    spaces['lcd'] = gym.spaces.Box(0, 1, (self.C.lcd_base, int(self.C.lcd_base*self.C.wh_ratio)), dtype=np.bool)
     return gym.spaces.Dict(spaces)
 
   def step(self, action):
@@ -95,12 +97,6 @@ class LCDEnv(gym.Env, EzPickle):
     return self.env.lcd_render()
 
   def reset(self, *args, **kwargs):
-    if len(args) != 0 and args[0] is not None:
-      args = list(args)
-      #inject_obs = np.zeros(self.observation_space.spaces['full_state'].shape)
-      inject_obs = np.zeros(self.observation_space.spaces['full_state'].shape)
-      inject_obs[self.pobs_idxs] = args[0]
-      args[0] = inject_obs
     full_state = self.env.reset(*args, **kwargs)
     state = full_state[self.pobs_idxs] if self.num_pobs != 0 else np.zeros(1)
     return {'state': state, 'lcd': self.env.lcd_render(), 'full_state': full_state}
@@ -109,5 +105,5 @@ class LCDEnv(gym.Env, EzPickle):
   def viewer(self):
     return self.env.viewer
 
-  def render(self, mode='rgb_array'):
-    return self.env.render(mode=mode)
+  def render(self, *args, **kwargs):
+    return self.env.render(*args, **kwargs)

@@ -9,11 +9,9 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from envs.box import Box
-
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
-from utils import A
+from boxLCD.utils import A
 import utils
 
 class RolloutDataset(Dataset):
@@ -40,8 +38,10 @@ class RolloutDataset(Dataset):
 
 def load_ds(C):
   from torchvision import transforms
-  train_dset = RolloutDataset(C.datapath/'box-lcd.npz', train=True, C=C)
-  test_dset = RolloutDataset(C.datapath/'box-lcd.npz', train=False, C=C)
+  train_dset = RolloutDataset(C.datapath, train=True, C=C)
+  test_dset = RolloutDataset(C.datapath, train=False, C=C)
+  #train_dset = RolloutDataset(C.datapath / 'dump.npz', train=True, C=C)
+  #test_dset = RolloutDataset(C.datapath / 'dump.npz', train=False, C=C)
   train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   return train_loader, test_loader

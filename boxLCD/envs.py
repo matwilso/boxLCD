@@ -20,7 +20,7 @@ C.debug = 0
 
 class Dropbox(WorldEnv):
   def __init__(self, C):
-    w = WorldDef(robots=[], objects=[Object('object0', shape='box', size=0.5, density=0.1)])
+    w = WorldDef(robots=[], objects=[Object('object0', shape='box', size=0.7, density=0.1)])
     C.wh_ratio = 1.0
     C.ep_len = 100
     super().__init__(w, C)

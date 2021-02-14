@@ -62,18 +62,16 @@ class SyncVectorEnv(VectorEnv):
   def reset(self, idxs, phis):
     return self.reset_wait(idxs, phis)
 
-  def render(self, kwargs=None):
-    if kwargs is None: kwargs = [None for e in self.envs]
+  def render(self, *args, **kwargs):
     imgs = []
-    for env, kw in zip(self.envs, kwargs):
-      if kw is not None:
-        imgs.append(env.render(**kw))
-      else:
-        imgs.append(env.render())
+    for env in self.envs:
+      imgs.append(env.render(*args, **kwargs))
     if not self.rendered:
       self.rendered = True
       if self.C.vanished:
-        for env in self.envs: env.viewer.window.set_visible(False)
+        for env in self.envs:
+          if env.viewer is not None:
+            env.viewer.window.set_visible(False)
     return np.stack(imgs)
 
   def reset_wait(self, idxs, phis):

@@ -15,8 +15,6 @@ from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHe
 from nets.gpt import GPT
 from nets.gpt_world import GPTWorld
 
-
-
 class AutoWorld(nn.Module):
   def __init__(self, env, C):
     super().__init__()

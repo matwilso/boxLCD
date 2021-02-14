@@ -1,3 +1,2 @@
-python main.py --mode=world --datapath=logs/durchin/1e5/ --bs=64 --num_envs=4 --lr=1e-4 --logdir=logs/urchin/100k/conv_io1e-4 --subset=image --decode=multi --done_n=30 --n_layer=3 --n_head=16 --n_embed=512 --conv_io=1
-python main.py --mode=world --datapath=logs/durchin/1e5/ --bs=64 --num_envs=4 --lr=5e-4 --logdir=logs/urchin/100k/conv_io5e-4 --subset=image --decode=multi --done_n=30 --n_layer=3 --n_head=16 --n_embed=512 --conv_io=1
-python main.py --mode=world --datapath=logs/durchin/1e5/ --bs=64 --num_envs=4 --lr=5e-5 --logdir=logs/urchin/100k/conv_io5e-5 --subset=image --decode=multi --done_n=30 --n_layer=3 --n_head=16 --n_embed=512 --conv_io=1
+python main.py --mode=collect --env=urchin_ball --collect_n=100000
+python main.py --mode=world --env=urchin_ball --datapath=logs/trash/urchin_ball-lcd-10000.npz --logdir=logs/demo1/urchin_ball

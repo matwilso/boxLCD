@@ -455,10 +455,10 @@ class WorldEnv(gym.Env, EzPickle):
     return lcd
     # TODO: deal with scrolling
 
-  def render(self, mode='rgb_array'):
+  def render(self, mode='rgb_array', pretty=False):
     width = int(self.C.lcd_base * self.C.wh_ratio)
     height = self.C.lcd_base
-    lcd = self.lcd_render(width, height)
+    lcd = self.lcd_render(width, height, pretty=pretty)
     if mode == 'rgb_array':
       return lcd
     elif mode == 'human':

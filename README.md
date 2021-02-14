@@ -1,7 +1,12 @@
-![](./assets/sideside.gif)
+![](./assets/lcd_wave.gif)
 # boxLCD 📟
 ## *box2D physics with low-res binarized rendering*
 
+ 
+I think the value of this is it can capture enough of the problem to be useful
+while being simple enough to enable quick iteration.
+It seems like a decent place to get started, where if we can't solve the problem
+really well for these tasks, I don't think we can expect to solve them for more complex systems.
 
 By itself, I don't think this is the most interesting problem.
 But if we can't master this, I don't think we have a chance at tackling harder domains.
@@ -9,6 +14,12 @@ I think the analogy with MNIST is good.
 This is just for quickly iterating on ideas so that you can deploy them on tasks you actually care about.
 
 I do think this class of models is important for robotics.
+
+
+
+ 
+
+
 
 
 
