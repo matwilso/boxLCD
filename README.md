@@ -1,4 +1,4 @@
-![](./assets/lcd_wave.gif)
+![](./assets/sideside.gif)
 # boxLCD 📟
 ## *box2D physics with low-res binarized rendering*
 
