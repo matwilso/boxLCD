@@ -231,3 +231,16 @@ It is complex, mirrors challenges we will face in real robotics, and it should o
 There are precise rules the govern it, just like the real world.
 You can make observations about those rules.
 And you want to learn how the system works.
+
+
+
+
+It is in active development, but it currently supports.
+It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
+
+This is mostly just to test out ideas and prototype. So I expect to make this much better.
+
+
+// TODO: create examples of bounce, dropbox, robots with varieties. w/ both pyglet and lcd rendering.
+
+I think framing this, building this, and working on it will end up being valuable.

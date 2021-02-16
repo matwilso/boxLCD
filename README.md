@@ -15,6 +15,7 @@ So here then we aim to create the closest possible aGnalog to the problems we wi
 future while keeping it extremely tractable.
 
 boxLCD uses box2D physics and uses extremely low resolution and binarized rendering.
+And provides sample environments which you can use to try to learn to cover the physics.
 
 This is a crude analog, and many aspects of the real world complexity are missing.
 I think a good analogy for what boxLCD is trying to do for learned simulators is what generating MNIST digits is
@@ -42,16 +43,6 @@ Right now, the goal is just predict the physics accurately given past states and
 In the future, I plan to set up tasks that then have a goal that they use this
 
 
-It is in active development, but it currently supports.
-It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
-
-This is mostly just to test out ideas and prototype. So I expect to make this much better.
-
-
-// TODO: create examples of bounce, dropbox, robots with varieties. w/ both pyglet and lcd rendering.
-
-I think framing this, building this, and working on it will end up being valuable.
-
 
 ## Usage
 
@@ -75,7 +66,7 @@ while True:
     env.render(mode='human')
 ```
 
-Pretty rendering vs. LCD rendering for the demo environments |  
+Pretty rendering vs. LCD rendering |  
 :-------------------------:|
 `env = envs.Dropbox()` (16x16) | 
 ![](./assets/demos/dropbox.gif)  |  
