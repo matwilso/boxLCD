@@ -1,292 +1,84 @@
-![](./assets/sideside.gif)
+<!--![](./assets/sideside.gif)-->
 # boxLCD 📟
-## *box2D physics with low-res binarized rendering*
+<!--## *box2D physics with low-res and binarized rendering*-->
 
- 
-I think the value of this is it can capture enough of the problem to be useful
-while being simple enough to enable quick iteration.
-It seems like a decent place to get started, where if we can't solve the problem
-really well for these tasks, I don't think we can expect to solve them for more complex systems.
+## Abstract
 
-By itself, I don't think this is the most interesting problem.
-But if we can't master this, I don't think we have a chance at tackling harder domains.
-I think the analogy with MNIST is good.
-This is just for quickly iterating on ideas so that you can deploy them on tasks you actually care about.
+The aim of this project is to accelerate progress in [learned simulator and world model research](https://matwilso.github.io/robot-learning/future/),
+by providing a simple testbed for developing and quickly iterating on predictive modeling ideas.
 
-I do think this class of models is important for robotics.
-
-
-
- 
-
-
-
-
-
-
-The aim of this project is to accelerate progress in [learned simulator and world model research](link to my post),
-by providing a testbed that enables us to develop useful approaches, but with much quicker iteration speed and smaller computational budgets.
-
-prototyping and demonstrating hte ideas that will b euseful in the real case.
-so that we can work out ideas and so that we can prove the potential value of future reasearch.
-
-
-boxLCD is a hackable testbed which usings simple bo2d physics rendering at extremely low-resolution.
-
-To this end, boxLCD renders box2d physics in extremely low-resolution images (16x32, smaller than MNIST-sized images). As shown in the gif, this is a simple but rich space for displaying physical motion.
-
-
-
-I'm starting with a pretty basic set of tasks, but it can be extended to handle more.
-
-
-This enables trying generative modeling techniques that operate in pixel space, and
-trying ideas that would normally be slow to iterate on or prohibitively expensive. 
-
-In the best case, we get useful research that enables future progress on real world real robot tasks.
-In the worst case, it is useful for me to quickly try out ideas and get up to speed on learning world models.
-
-
-
-
- 
-
+It seeks to provide as close an analog as possible to the eventual goal scenario where
+we are learning predictive models of the real world and using these as learned simulators
+or world models for training robots to operate more effectively in the real world.
+While remaining tractable to train and quickly iterated on ideas using very limited computational resources (it's nice
+if you can at least run initial experiments with a single desktop GPU machine).
 Operating on high-res images from robots in the real world is expensive.
 So here then we aim to create the closest possible aGnalog to the problems we will face in the
 future while keeping it extremely tractable.
 
+boxLCD uses box2D physics and uses extremely low resolution and binarized rendering.
+
+This is a crude analog, and many aspects of the real world complexity are missing.
+I think a good analogy for what boxLCD is trying to do for learned simulators is what generating MNIST digits is
+in generative modeling. Generating MNIST digits is trivial compared to generating high-resolution images of faces for example.
+But it provides a very simple testbed for developing ideas, the cores of which ideas are useful for tasks you actually care about.
+In this direction, you must get the overall structure of the problem right.
+MNIST can help if all you care about is generating still images. But if you want
+to develop methods that deal with video, you need something like moving MNIST or BAIR dataset.
+So boxLCD tries to get as close to the real world setting as possible:
+- physics based. robot doesn't move magically, but has to actuate all its joints
+- can't directly observe objects and the environment. use images
+- robots have cameras + proprioception and they take robot actions. the real world is going to have to fuse multiple sources of sensor data.
+- uncertainty. physics are fairly consistent, but there are unobservable properties of the world. you must represent uncertainty
+
+- modeling uncertainty, making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns
+- enable loading of structured information into predictions
 
 
-This is in alpha stages, and I don't really expect to have a ton of users so I will probably
-be improving and breaking things a lot and redesigning. But if you are using it, let me know and I 
-can try not to mess up your stuff. And also improve stuff.
-This is mostly just to test out ideas and prototype. So I expect to make this much better.
+boxLCD is in active development.
+It is going to be driven by a loop which involves me developing environments,
+training networks that can accurately predict those environments.
+And then iterating on the process to develop more powerful models and using them to.
+
+Right now, the goal is just predict the physics accurately given past states and actions.
+In the future, I plan to set up tasks that then have a goal that they use this
 
 
-
-
-While I think 
-
-The generative modeling task and learning the simulator seem extremely rich and challenging,
-and contain a lot of the meat of the problem.
-
-I suspect this will have more action bechmarks later. But I think this is somewhat
-already covered. And that generative modeling of this world itself is likely to lead
-to ideas useful for MBRL and other work.
-
-It helps to focus on subsets of the full challenge. And I think world modeling itself
-is a very large and challenging subset of the full challenge.
-
-
-
-
-
-
-
-Specifically we are focused on predictive learning / generative modeling. Given a set of environments
-with similar underlying physics, can we learn a good predictive model of this data?
-Can we effectively learn to clone the physics simulator using neural network models?
-
-Such abilities have huge implications for being able to train 
-
-
-If we can, this has
-
-
-
-
-
-For now, we are focusing on how well you can learn to predict this data.
-
-
-
-
-
-The testbed is to learn to accurately predict the behavior of a few 
-
-
-
-
-We expect that learning large predictive models of the world is going to be critical
-to the future success of robot learning.
-
-Operating on video is extremely expensive and can make research progress and iteration
-speed slow, especially for those with limited budgets.
-
-
-
-boxLCD renders simple 2D physics environments in very low resolution binarized images to enable quick
-iterations of ideas on low computational budgets.
+It is in active development, but it currently supports.
 It offers a few basic sample environments and a limited wrapper around the pybox2d API to make defining custom b2worlds easier.
 
+This is mostly just to test out ideas and prototype. So I expect to make this much better.
 
-2D physics, with very-low resolution offers a crude approximation to the final task. But we think it captures
-enough of the structure of the final goal to be useful, while enabling tremendously quicker iteration
-cycles for trying out ideas, which will lower the bar to entry of working on these problems and accelerate progress.
-
-Think of it like an MNIST for learning world models.
-The images are actually generally smaller than MNIST, but it is much more interesting.
-
-// TODO: add docs on
-// TODO: specific envs and stuff. like the options and the custom creatures you can create
-// TODO: we have purely state-based and also mixture of state and pixel-based prediction
-// TODO: make organization better
 
 // TODO: create examples of bounce, dropbox, robots with varieties. w/ both pyglet and lcd rendering.
 
 I think framing this, building this, and working on it will end up being valuable.
 
 
-## Setup
+## Usage
+
+TODO: colab notebook
+
+TODO: cloning and requirements and example of how to run different envs and stuff.
 
 `pip install -e .`
 
 (Maybe not require cloning)
 
-## boxLCD Challenge 🌐 🧩
+## Demos
 
-Associated with boxLCD is the boxLCD Challenge.
-Meant to simulate as closely as possible the challenges that will be faced in developing powerful learned world models
-on real robots in the real world, while being tremendously more tractable.
+TODO: side by side pretty and lcd for each
 
-We execute a robot with random actions in the world to generate as much data as we want. 
-And then the goal is to learn a model that predicts the future with the lowest possible error.
-By pushing on this metric, we will be able to develop better methods for learning models of the world
-that will eventually be useful for enabling robots to learn to achieve more difficult tasks than is possible today.
+### Dropbox
+### Bounce
+### BoxOrCircle
+### Urchin
+### UrchinBall
+### UrchinBalls
+### UrchinCubes
 
-The underlying physics and logic are quite complex, with contacts, momentum, and robot actions, but the dimensionality is tiny.
+TODO: side by side videos of the pretty, lcd, and predictions of the . kind of like my tensorboard plot
 
-
-shown in the gif above is only 16x32 = 512, compared to 64x128x3x256 = 24576x256 = 6291456. So 50x less data or actually 12800x less data, and smaller than MNIST (28x28=784). Now we're talking. We should talk bits. And bits-wise, there is so much less information to process. About 10kx less.
-So the task is complex and meaningful, but experiments can be run with much less compute.
-It is complex, mirrors challenges we will face in real robotics, and it should offer good signal about what really matters.
-
-There are precise rules the govern it, just like the real world.
-You can make observations about those rules.
-And you want to learn how the system works.
-
-
-Properties that will likely be useful in real world learned sims and world models:
-- merging robot proprioception with exteroception (cameras, sensors)
-- not relying on raw state knowledge of objects
-- enable loading of structured information into predictions
-- modeling uncertainty, making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns
-
-// convert -resize 100% -delay 2 -loop 0 *.png test.gif
-
-
-## Related Work 📝
-
-There are some related work, like moving MNIST. But that doesn't have control in it. Also this is lower dim.
-https://www.tensorflow.org/datasets/catalog/moving_mnist
-
-Doom and Berkeley dataset are other examples. But they are higher res and less configurable.
-They also don't have associated structured information.
-
-This is not like anything else exists. It is explicitly targeting the world models
-and learned simulator task and provides low dimensional stuff. It allows custom environment interaction
-to test custom scenarios. You incorporate robot actions and robot proprioception with partial observations,
-as we will have in the real world.
-
-- targeting learned simulator and world model research goals
-- extremely low-res and binary for quick iteration speed
-- video prediction, integrated with robot action *and* proprioception, as will be the case in the real world
-- greater access to the simulator to enable custom scenarios, not just a fixed set of envs. but more general settings
-
-This is explicitly building to the goal of learned sims and world models.
-
-Background knowledge pointer to faq
-
-
-https://haozhi.io/RPIN/
-
-https://phyre.ai/
-This one you set the state of the environment and then you see it roll out.
-This is unlike robotics where you act at every timestep.
-It is a narrow setting where you take one action and see what happens for many steps.
-
-Also taking actions at every step is way harder to learn.
-This creates many possible ways states can diverge. You can't rely
-on them following a sequence, which is much easier.
-
-Ilya bouncing balls. Back in the day though, these were not binarized, slightly larger.
-And the RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces results that are not crisp.
-The balls move, but the collisions are gooey (in supplementary, compare 1.gif,2.gif with the training data 5.gif).
-https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html
-
-Basically the point is this project is trying to approximate something very specific.
-No previous work are trying to learn simulators or world models like this.
-And the details and what you aim for matter. 
-We think this aims most closely at an interesting goal
-We think this has the greatest pareto front / product / AUC of aiming to the goal and being more approachable with small budgets.
-
-
-
-https://github.com/greydanus/mnist1d
-https://greydanus.github.io/2020/12/01/scaling-down/
-
-This is not that similar, but has the shared goal of focusing on iteration speed.
-We should focus on things that will scale. It may not help a ton for what actually ends
-up scaling, but it gives a good place to build intuitions and fundamentals.
-
-
-## Expected speed gains: some back of the envelope computations 🖩
-
-### Bits 📲
-
-Information wise. 
-
-The PixelCNN numbers are a bit unfair and more recent architecture (PixelCNN++ and later) use more clever approaches.
-Also other approaches don't have to generate pixels one at a time and can greatly amortize the computations.
-But information-wise, there are 8-bits to represent an RGB pixel. So that would make it 64x128x3x8 = 1.97 million, or 384x more information
-to process in the case of the large resolution image.
-
-Binary saves you 24x the amount of information as RGB and scaling down the image size accounts for the rest.
-
-Basically, low-res binarized images are very small to process and the gains in iteration speed from these are pretty insane.
-It can be easy to glaze over these numbers. But 50x iteration speed means you can run a test in 1 hr vs. 2 days.
-That is the difference of being able to actually work on something and not.
-
-
-### Computation 🧑‍💻
-
-Computation wise, the advantages are still large but not as drastic.
-
-In a 64x128x3 image represented in floating point, there are 24576 values that must be processed in your network,
-and some multiple more than that to produce outputs.
-Now say the best architecture for this task ends up being PixelCNN (not ++ version).
-In the PixelCNN network (not ++ version), you decode each pixel into a 256-sized softmax, so this
-requires another factor of 256 computations on the output for a grand total of 6.3 million on the output.
-24576 values on the input and a maximum of 6.3 million on the output.
-
-Now if we instead use a 16x32x1x1 using the same method, there are a grand total of 512 values that must be processed
-in your network, and for a binary cross entropy loss, the number remains the same.
-We save a factor of 50x on the input and a factor of 12,000x on the output.
-
-// TODO: we should probably lean a bit heavier on bits and less on computation.
-
-
-### Caveats
-
-Now this does assume that a large cost of computations is the I/O, where maybe the underlying
-data process is the tricky part. Since both types of rendering represent the same underlying data
-process, maybe your gains are weaker.
-But when you balance all these factors out, I think this approach is likely to really help the speed
-at which you can try ideas and see useful results and iterate.
-
-
-
-## FAQS ℹ️
-**Why is it called boxLCD?**
-LCD as in Liquid Crystal Display, which are generally pixelated and monochromatic.
-And it rhymes with 2d.
-
-**Background knowledge**
-unsupervised learning / generative models course
-go through autoregs and understand the code. see my repo with explanations.
-then karpathy's minGPT implementation is pretty clean.
-I ripped that out and masacred it a bit to make it simpler in some ways
-so I could add messy code complexity in other ways.
-
-
-TODO: make world defs so you can randomize over num objects and such. maybe no agent.
+## Future Roadmap:
+- tasks of moving object
+- block dude tasks. support for scrolling, static environment features like ramps and walls
