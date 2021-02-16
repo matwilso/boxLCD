@@ -1,32 +1,45 @@
 ![](./assets/sideside.png)
-# boxLCD 📟
-<!--## *box2D physics with low-res and binarized rendering*-->
+
+boxLCD 📟
+=================
+**boxLCD uses box2D physics and uses extremely low resolution and binarized rendering. It provides sample robot environments which you can use to try to learn to cover the physics with much fewer computational resources.**
 
 The aim of this project is to accelerate progress in [learned simulator and world model research](https://matwilso.github.io/robot-learning/future/),
 by providing a simple testbed for developing and quickly iterating on predictive modeling ideas.
 Eventually we care about systems that are trained on real world data and that help robots act in the real world.
-But we have a lot of fundamental research to do before this is possible.
+But it seems that we have a lot of fundamental research to do before this is possible.
 
-boxLCD uses box2D physics and uses extremely low resolution and binarized rendering.
-And provides sample robot environments which you can use to try to learn to cover the physics with much fewer computational resources.
-
-I think a decent analogy is MNIST. Generating MNIST digits is trivial and not very useful, compared to generating high-resolution images of faces, for example.
+You can think of this like an MNIST for learned simulators.
+Generating MNIST digits is not very useful and has become fairly trivial, compared to generating high-resolution images of faces, for example.
 But it provides a simple first task to try ideas on and it lets you iterate quickly and build intuition.
-boxLCD aims to sort of be like an MNIST for learned simulators / world models.
+boxLCD aims to provide a similar service, but for learning dynamics models in robotics.
 
 boxLCD tries to capture some key properties of future learned simulators:
-- physics based. unlike past similar work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
+- physics based. unlike past related work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
 - vision. in the real world, you can't directly observe the state of the world. you primarily sense it through vision (pixels).
 - partial observability + modeling uncertainty. even what you can currently see doesn't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. because of this, you enable:
   - making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns
   - automatic domain randomization. by modeling uncertainty, you can sample and then get samples that coverage the true distribution of variation in the space.
 - enable loading of structured information into predictions, like feeding meshes, natural language descriptions. 
 
+While being computational tractable and easy to work with:
+- narrow 2d physics settings, at least to start out.
+- simple rendering. boxLCD enables variable sized rendering, but the default envs use a maximum `16x32 = 544` sized binary images (smaller than MNIST). compared to datasets like the [BAIR Pushing dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small) with `64x64x3 = 12288` sized RGB images, this represents a 24x descrease in floating point numbers on the input and output. And information-wise, `24*8bits=`192x decrease in the bits to process, which can matter especially for naive PixelCNN type approaches.
+- programmatic and customizable. you can geneate new scenarios and customize the environments to different settings you want to test.
+
 boxLCD is in active development.
 Right now, we are focused on developing environments and training models solely to predict accuracte physics, given past observations and actions.
 In the future, we plan to set up goal-based tasks and leverage our models to quickly learn to solve them.
 
-## Installation
+
+**Table of Contents**
+- [Installation ‍💻](#installation-)
+- [Demos 🦀⚽](#demos-)
+- [Training results 📈](#training-results-)
+- [Future Roadmap 🧭](#future-roadmap-)
+- [Related Work 📝](#related-work-)
+
+## Installation ‍💻
 
 I recommend cloning the repo and experimenting with it locally, as you may want to customize the environments or the API.
 
@@ -36,7 +49,7 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
-## Demos
+## Demos 🦀⚽
 
 ```
 from boxLCD import envs
@@ -64,7 +77,7 @@ Pretty rendering &#124; LCD rendering |
 ![](./assets/demos/urchin_cubes.gif)  |  
 
 
-## Training
+## Training results 📈
 TODO: error plots of lcd, and predictions of it
 
 (description)
@@ -76,7 +89,7 @@ It has to generate all pixels at once.
 very nice sampling in some latent space that corresponds. It has to sample all of the pixels
 at once. 
 
-### Automatic Domain Randomization
+### Automatic Domain Randomization 🎲
 `env = envs.BoxOrCircle()` (16x16) 
 
 I claim in my learned simulators post that powerful generative models will have to
@@ -97,9 +110,66 @@ Non-cherry picked example, on the far sides, you can see it kind of waffles betw
 
 ![](./assets/demos/domrand_bad.gif) 
 
-## Future Roadmap:
+## Future Roadmap 🧭
 - adding goals for moving objects to certain locations
   - maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but full physics
 - support for scrolling, static environment features like ramps and walls
 - maybe multiple image channels to represent these different layers 
 - more formal benchmarks and bits/dim baselines?
+
+## Related Work 📝
+
+https://github.com/kenjyoung/MinAtar
+
+There are some related work, like moving MNIST. But that doesn't have control in it. Also this is lower dim.
+https://www.tensorflow.org/datasets/catalog/moving_mnist
+
+Doom and Berkeley dataset are other examples. But they are higher res and less configurable.
+They also don't have associated structured information.
+
+This is not like anything else exists. It is explicitly targeting the world models
+and learned simulator task and provides low dimensional stuff. It allows custom environment interaction
+to test custom scenarios. You incorporate robot actions and robot proprioception with partial observations,
+as we will have in the real world.
+
+- targeting learned simulator and world model research goals
+- extremely low-res and binary for quick iteration speed
+- video prediction, integrated with robot action *and* proprioception, as will be the case in the real world
+- greater access to the simulator to enable custom scenarios, not just a fixed set of envs. but more general settings
+
+This is explicitly building to the goal of learned sims and world models.
+
+Background knowledge pointer to faq
+
+
+https://haozhi.io/RPIN/
+
+https://phyre.ai/
+This one you set the state of the environment and then you see it roll out.
+This is unlike robotics where you act at every timestep.
+It is a narrow setting where you take one action and see what happens for many steps.
+
+Also taking actions at every step is way harder to learn.
+This creates many possible ways states can diverge. You can't rely
+on them following a sequence, which is much easier.
+
+Ilya bouncing balls. Back in the day though, these were not binarized, slightly larger.
+And the RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces results that are not crisp.
+The balls move, but the collisions are gooey (in supplementary, compare 1.gif,2.gif with the training data 5.gif).
+https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html
+
+Basically the point is this project is trying to approximate something very specific.
+No previous work are trying to learn simulators or world models like this.
+And the details and what you aim for matter. 
+We think this aims most closely at an interesting goal
+We think this has the greatest pareto front / product / AUC of aiming to the goal and being more approachable with small budgets.
+
+
+
+https://github.com/greydanus/mnist1d
+https://greydanus.github.io/2020/12/01/scaling-down/
+
+This is not that similar, but has the shared goal of focusing on iteration speed.
+We should focus on things that will scale. It may not help a ton for what actually ends
+up scaling, but it gives a good place to build intuitions and fundamentals.
+
