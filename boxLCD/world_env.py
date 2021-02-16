@@ -455,7 +455,7 @@ class WorldEnv(gym.Env, EzPickle):
     return lcd
     # TODO: deal with scrolling
 
-  def render(self, mode='rgb_array', pretty=False):
+  def render(self, mode='rgb_array', pretty=False, return_pyglet_view=False):
     width = int(self.C.lcd_base * self.C.wh_ratio)
     height = self.C.lcd_base
     lcd = self.lcd_render(width, height, pretty=pretty)
@@ -470,5 +470,8 @@ class WorldEnv(gym.Env, EzPickle):
         high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
       low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
       img = np.concatenate([high_res, np.zeros_like(low_res)[:, :2], low_res], axis=1)
-      self.viewer.render(img)
-      return lcd
+      if return_pyglet_view:
+        out = self.viewer.render(img, return_rgb_array=return_pyglet_view)
+      else:
+        out = lcd
+      return out

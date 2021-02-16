@@ -21,6 +21,8 @@ def env_fn(C, seed=None):
       env = envs.UrchinBall(C)
     elif C.env == 'urchin_balls':
       env = envs.UrchinBalls(C)
+    elif C.env == 'urchin_cubes':
+      env = envs.UrchinCubes(C)
     env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env

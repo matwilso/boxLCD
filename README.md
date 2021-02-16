@@ -1,8 +1,6 @@
-<!--![](./assets/sideside.gif)-->
+![](./assets/sideside.png)
 # boxLCD 📟
 <!--## *box2D physics with low-res and binarized rendering*-->
-
-## Abstract
 
 The aim of this project is to accelerate progress in [learned simulator and world model research](https://matwilso.github.io/robot-learning/future/),
 by providing a simple testbed for developing and quickly iterating on predictive modeling ideas.
@@ -67,17 +65,32 @@ TODO: cloning and requirements and example of how to run different envs and stuf
 
 ## Demos
 
-TODO: side by side pretty and lcd for each
+```
+from boxLCD import envs
+env = envs.Dropbox() # for example
+obs = env.reset()
+while True:
+    action = env.action_space.sample()
+    obs, _, done, info = env.step(action)
+    env.render(mode='human')
+```
 
-### Dropbox
-### Bounce
-### BoxOrCircle
-### Urchin
-### UrchinBall
-### UrchinBalls
-### UrchinCubes
+Pretty rendering vs. LCD rendering for the demo environments |  
+:-------------------------:|
+`env = envs.Dropbox()` (16x16) | 
+![](./assets/demos/dropbox.gif)  |  
+`env = envs.Bounce()` (16x16) | 
+![](./assets/demos/bounce.gif)  |  
+`env = envs.Urchin()` (16x16) | 
+![](./assets/demos/urchin.gif)  |  
+`env = envs.UrchinBall()` (16x24) | 
+![](./assets/demos/urchin_ball.gif)  |  
+`env = envs.UrchinBalls()` (16x32) | 
+![](./assets/demos/urchin_balls.gif)  |  
+`env = envs.UrchinCubes()` (16x32) | 
+![](./assets/demos/urchin_cubes.gif)  |  
 
-TODO: side by side videos of the pretty, lcd, and predictions of the . kind of like my tensorboard plot
+TODO: error plots of lcd, and predictions of it
 
 ## Future Roadmap:
 - tasks of moving object
