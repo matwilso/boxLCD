@@ -1,5 +1,8 @@
 # boxLCD Whitepaper
 
+STILL IN PROGRESS.
+COME BACK LATER OR PREPARE TO READ A VERY SHITTY UNFINISHED DOCUMENT
+
 **Abstract (identical to main README.md)**
 
 The aim of this project is to accelerate progress in [learned simulator and world model research](https://matwilso.github.io/robot-learning/future/),
@@ -244,3 +247,32 @@ This is mostly just to test out ideas and prototype. So I expect to make this mu
 // TODO: create examples of bounce, dropbox, robots with varieties. w/ both pyglet and lcd rendering.
 
 I think framing this, building this, and working on it will end up being valuable.
+
+
+If we work on simpler 
+If we can prove we can solve tasks on simpler benchmarks, 
+
+It seeks to provide as close an analog as possible to the eventual goal scenario where
+we are learning predictive models of the real world and using these as learned simulators
+or world models for training robots to operate more effectively in the real world.
+While remaining tractable to train and quickly iterated on ideas using very limited computational resources (it's nice
+if you can at least run initial experiments with a single desktop GPU machine).
+Operating on high-res images from robots in the real world is expensive.
+So here then we aim to create the closest possible aGnalog to the problems we will face in the
+future while keeping it extremely tractable.
+
+
+This is a crude analog, and many aspects of the real world complexity are missing.
+
+
+I think a good analogy for what boxLCD is trying to do for learned simulators is what generating MNIST digits is
+in generative modeling. 
+But it provides a very simple testbed for developing ideas, the cores of which ideas are useful for tasks you actually care about.
+In this direction, you must get the overall structure of the problem right.
+MNIST can help if all you care about is generating still images. But if you want
+to develop methods that deal with video, you need something like moving MNIST or BAIR dataset.
+So boxLCD tries to get as close to the real world setting as possible:
+
+It is going to be driven by a loop which involves me developing environments,
+training networks that can accurately predict those environments.
+And then iterating on the process to develop more powerful models and using them to.
