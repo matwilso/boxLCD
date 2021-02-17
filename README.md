@@ -24,9 +24,12 @@ For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap
 
 **Table of Contents**
 - [Installation ‍💻](#installation-)
-- [Demos ⚽](#demos-)
-- [Training results 📈](#training-results-)
+- [Environment demos ⚽](#environment-demos-)
+- [Example training results 📈](#example-training-results-)
+  - [Urchin](#urchin)
+  - [Intelligent Domain Randomization](#intelligent-domain-randomization)
 - [Roadmap 📍](#roadmap-)
+  - [Future Features](#future-features)
 - [Related Work 📚](#related-work-)
 
 ## Installation ‍💻
@@ -78,17 +81,15 @@ See [examples](./examples) for scripts to recreate these.
 |episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
 |`envs.Bounce()`| after 10 epochs | after 100 epochs |
 |episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
-|`envs.Urchin()`| after 10 epochs | after 200 epochs |
+|`envs.Urchin()`| after 10 epochs | after 100 epochs |
 |episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
-
-## Details
 
 To demonstrate what is possible with boxLCD, I trained a [model](./examples/model.py) on a few simple environments using a very naive approach.
 
 It's a causally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
-To train the model, you feed those flat image tokens in and the model produces independent Bernoulli distributions for 
-each pixel, and you optimize this to match the ground truth. 
+To train the model, we feed those flat image tokens in and the model produces independent Bernoulli distributions for 
+each pixel, and we optimize this to match the ground truth. 
 To sample the model, we prompt it with the start 10 frames of the episode, and have it predict
 the rest autoregressively.
 
@@ -96,31 +97,29 @@ This is an extremely simplistic approach and it has to generate all pixels at on
 In some ways, it's surprising it works.
 For more details, see the code in [examples](./examples).
 
-We do not condition on or try to predict continuous proprioceptive, because I haven't gotten that working yet.
-I find that training the proprioceptive data using Gaussians leads to very bad autoregressive samples.
-Discrete autoregresive training and sampling is much more straightforward and works better out of the box.
+We do not condition on or try to predict continuous proprioceptive state, because I haven't gotten that working yet.
+I find using Gaussians leads to very bad autoregressive samples.
+Discrete sampling works much better out of the box.
 
 ### Urchin
-The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts.
+The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
 The robot is 3-way symmetric, and since we are only using images here, the model is continually forced to
 identify which leg corresponds to which index in the action vector based on past observations and actions.
 We also randomly sample the actions for the 3 joints at each time step, so the agent can't rely on a semi-fixed policy
 to narrow down the state space it has to cover.
 
-In other tests, I have gotten the model samples to match the ground truth more closely.
-
 ### Intelligent Domain Randomization
-Powerful generative models will have to model uncertainty in the environment, so sampling them 
-will get you intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
+Because powerful generative models will have to model uncertainty in the environment, sampling them 
+will give you intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
 your model will be tuned to the underlying distribution and only give you variety you might actually see in the real world.
 
-For a rough proof of concept, I created an environment that simulates either the falling
+For a rough proof of concept of this, I created an environment that simulates either the falling
 box or the circle. Since these shapes are sometimes indistinguishable at low resolution, the model 
 cannot tell them apart given the prompt. If we were training a robot to manipulate these objects, we
 would want it to be prepared for either scenario.
 
 Below is a cherry picked example, where the desired behavior occurs.
-On the far right 2 examples, the model is uncertain about the shape and happens to sample the wrong
+On the far right 2 rollouts, the model is uncertain about the shape and happens to sample the wrong
 one---a box instead of a circle, and a circle instead of a box.
 
 ![](./assets/samples/domrand_good.gif) 
@@ -135,17 +134,15 @@ Some of the reasoning behind this project can be found in some blog posts I have
 the [future of robot learning](https://matwilso.github.io/robot-learning/future/), and [learned simualtors](https://matwilso.github.io/robot-learning/learned-sims/).
 
 boxLCD tries to capture some key properties of future learned simulators:
-- physics based. unlike past related work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
-- vision. in the real world, you can't directly observe the state of the world. you primarily sense it through vision (pixels).
-- partial observability + modeling uncertainty. even what you can currently see doesn't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. because of this, you enable:
-  - making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns
-  - automatic domain randomization. by modeling uncertainty, you can sample and then get samples that coverage the true distribution of variation in the space.
-- enable loading of structured information into predictions, like feeding meshes, natural language descriptions. 
+- **physics based.** unlike past related work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
+- **vision-based.** you primarily sense the real world through vision (pixels).
+- **partially observable.** even what you can currently see doesn't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns. and [intelligent domain randomization](#intelligent-domain-randomization).
+- **interfaceable.** enable loading of structured information into predictions, like feeding meshes, natural language descriptions. 
 
 While being computational tractable and easy to work with:
-- narrow 2d physics settings, at least to start out.
-- simple rendering. boxLCD enables variable sized rendering, but the default envs use a maximum `16x32 = 544` sized binary images (smaller than MNIST). compared to datasets like the [BAIR Pushing dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small) with `64x64x3 = 12288` sized RGB images, this represents a 24x descrease in floating point numbers on the input and output. And information-wise, `24*8bits=`192x decrease in the bits to process, which can matter especially for naive PixelCNN type approaches.
-- programmatic and customizable. you can geneate new scenarios and customize the environments to different settings you want to test.
+- **narrow 2d physics settings**, at least to start out.
+- **simple rendering.** boxLCD enables variable sized rendering, but the default envs use a maximum `16x32 = 544` sized binary images (smaller than MNIST). compared to datasets like the [BAIR Pushing dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small) with `64x64x3 = 12288` sized RGB images, this represents a 24x descrease in floating point numbers on the input and output. And information-wise, `24*8bits=`192x decrease in the bits to process, which can matter especially for naive PixelCNN type approaches.
+- **programmatic and customizable.** you can geneate new scenarios and customize the environments to different settings you want to test.
 
 boxLCD is in active development.
 Right now, we are focused on developing environments and training models solely to predict accuracte physics, given past observations and actions.
