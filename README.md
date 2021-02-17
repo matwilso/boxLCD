@@ -8,15 +8,16 @@ environments and an API for defining worlds.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot-learning/learned-sims/) and world model research,
 by providing a simple testbed for learning predictive dynamics models of physics environments.
-Eventually we care about predictive models that are trained on real world data and that help robots act in the real world,
-but we have a lot of fundamental research to do, before we can realize that [full vision](https://matwilso.github.io/robot-learning/future/).
+Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
+However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-learning/future/),
+and that small scale testbeds are very useful for making progress.
 
-You can think of boxLCD as something akin to MNIST, but for learning dynamics models in robotics.
+boxLCD can be thought of as something akin to MNIST, but for learning dynamics models in robotics.
 Generating MNIST digits is not very useful and has become fairly trivial.
 But it provides a simple first task to try ideas on and it lets you iterate quickly and build intuition.
 Learning dynamics models of 2D physics with low resolution images is not very useful and will be trivial
 compared to learning models of the real world.
-But it provides a more more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
+But it provides a much more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
 
 boxLCD is somewhat of a minimum viable product at this point.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap).
@@ -51,65 +52,82 @@ while True:
     env.render(mode='human')
 ```
 
-Pretty rendering &#124; upscaled LCD rendering |  
+Pretty rendering &#124; LCD rendering (upscaled) |  
 :-------------------------:|
-`env = envs.Dropbox()` (16x16) | 
+`envs.Dropbox()` (16x16) | 
 ![](./assets/demos/dropbox.gif)  |  
-`env = envs.Bounce()` (16x16) | 
+`envs.Bounce()` (16x16) | 
 ![](./assets/demos/bounce.gif)  |  
-`env = envs.Urchin()` (16x16) | 
+`envs.Urchin()` (16x16) | 
 ![](./assets/demos/urchin.gif)  |  
-`env = envs.UrchinBall()` (16x24) | 
+`envs.UrchinBall()` (16x24) | 
 ![](./assets/demos/urchin_ball.gif)  |  
-`env = envs.UrchinBalls()` (16x32) | 
+`envs.UrchinBalls()` (16x32) | 
 ![](./assets/demos/urchin_balls.gif)  |  
-`env = envs.UrchinCubes()` (16x32) | 
+`envs.UrchinCubes()` (16x32) | 
 ![](./assets/demos/urchin_cubes.gif)  |  
 
 
 ## Example training results 📈
-TODO: error plots of lcd, and predictions of it
 
-(description)
+See [examples](./examples) for scripts to recreate these.
 
-This is an extremely simplistic approach and it is not able to sample latent features.
-It has to generate all pixels at once.
+| | Training Results |   |
+|:---:|:-------------------------:| :-------------------------:|
+|`envs.Dropbox`| after 10 epochs |  after 100 epochs |
+|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
+|`envs.Bounce()`| after 10 epochs | after 100 epochs |
+|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
+|`envs.Urchin()`| after 10 epochs | after 200 epochs |
+|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
 
- approach I am using is extremely simple, and it doesn't allow
-very nice sampling in some latent space that corresponds. It has to sample all of the pixels
-at once. 
+## Details
 
+To demonstrate what is possible with boxLCD, I trained a [model](./examples/model.py) on a few simple environments using a very naive approach.
+
+It's a causally masked Transformer trained to predict the next frame given all past frames.
+It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
+To train the model, you feed those flat image tokens in and the model produces independent Bernoulli distributions for 
+each pixel, and you optimize this to match the ground truth. 
+To sample the model, we prompt it with the start 10 frames of the episode, and have it predict
+the rest autoregressively.
+
+This is an extremely simplistic approach and it has to generate all pixels at once by sampling them independently.
+In some ways, it's surprising it works.
+For more details, see the code in [examples](./examples).
+
+We do not condition on or try to predict continuous proprioceptive, because I haven't gotten that working yet.
+I find that training the proprioceptive data using Gaussians leads to very bad autoregressive samples.
+Discrete autoregresive training and sampling is much more straightforward and works better out of the box.
 
 ### Urchin
+The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts.
+The robot is 3-way symmetric, and since we are only using images here, the model is continually forced to
+identify which leg corresponds to which index in the action vector based on past observations and actions.
+We also randomly sample the actions for the 3 joints at each time step, so the agent can't rely on a semi-fixed policy
+to narrow down the state space it has to cover.
 
-This task is actually quite tricky. Since we are only using images and the robot is symmetric and
-we feed the actions as a vector, it has to identify which action corresponds to which leg based on past
-interactions. And then it has to account for how the actions at every single step affect the motion.
-And the policy is completely randomly, so it has to learn a harder task compared to if a fixed or partially
-stochastic policy was acting.
+In other tests, I have gotten the model samples to match the ground truth more closely.
 
+### Intelligent Domain Randomization
+Powerful generative models will have to model uncertainty in the environment, so sampling them 
+will get you intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
+your model will be tuned to the underlying distribution and only give you variety you might actually see in the real world.
 
+For a rough proof of concept, I created an environment that simulates either the falling
+box or the circle. Since these shapes are sometimes indistinguishable at low resolution, the model 
+cannot tell them apart given the prompt. If we were training a robot to manipulate these objects, we
+would want it to be prepared for either scenario.
 
-### Automatic Domain Randomization
-`env = envs.BoxOrCircle()` (16x16) 
+Below is a cherry picked example, where the desired behavior occurs.
+On the far right 2 examples, the model is uncertain about the shape and happens to sample the wrong
+one---a box instead of a circle, and a circle instead of a box.
 
-I claim in my learned simulators post that powerful generative models will have to
-model uncertainty in the environment and so then sampling from them will be identical to domain randomization.
+![](./assets/samples/domrand_good.gif) 
 
-For a rough simple test case of this, I can create an environment that simulates either a circle
-or a box shape. Since these shapes are sometimes indistinguishable at low resolution, the model has no
-way of knowing which shape it is dealing with given only 5 starting frames.
-
-My model is extremely simple and must sample all pixels at once.
-Even, so it can sometimes sample both scenarios.
-
-Cherry picked example. See the far right 2 examples, where the model happens to sample the wrong shape.
-
-![](./assets/demos/domrand_good.gif) 
-
-Non-cherry picked example, on the far sides, you can see it kind of waffles between bouncing and not.
-
-![](./assets/demos/domrand_bad.gif) 
+It doesn't always do this, and sometimes it just waffles between bouncing and not.
+But the model I used is extremely naive and doesn't allow sampling in a latent space,
+so I expect more sophisticated models to do better.
 
 ## Roadmap 📍
 
