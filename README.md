@@ -73,18 +73,8 @@ Pretty rendering &#124; LCD rendering (upscaled) |
 
 ## Example training results 📈
 
-See [examples](./examples) for scripts to recreate these.
 
-| | Training Results |   |
-|:---:|:-------------------------:| :-------------------------:|
-|`envs.Dropbox`| after 10 epochs |  after 100 epochs |
-|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
-|`envs.Bounce()`| after 10 epochs | after 100 epochs |
-|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
-|`envs.Urchin()`| after 10 epochs | after 100 epochs |
-|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
-
-To demonstrate what is possible with boxLCD, I trained a [model](./examples/model.py) on a few simple environments using a very naive approach.
+To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a very naive approach.
 
 It's a causally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
@@ -100,6 +90,18 @@ For more details, see the code in [examples](./examples).
 We do not condition on or try to predict continuous proprioceptive state, because I haven't gotten that working yet.
 I find using Gaussians leads to very bad autoregressive samples.
 Discrete sampling works much better out of the box.
+
+
+See [examples](./examples) for scripts to recreate these.
+| | Training Results |   |
+|:---:|:-------------------------:| :-------------------------:|
+|`envs.Dropbox`| after 10 epochs |  after 100 epochs |
+|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
+|`envs.Bounce()`| after 10 epochs | after 100 epochs |
+|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
+|`envs.Urchin()`| after 10 epochs | after 100 epochs |
+|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
+
 
 ### Urchin
 The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
