@@ -3,18 +3,23 @@
 boxLCD 📟
 =================
 
-boxLCD uses box2D physics with extremely low resolution and binarized rendering. It provides an API
-and sample environments which you can use to develop methods for learning dynamics models.
+boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
+environments and an API for defining worlds.
 
-The aim of this project is to accelerate progress in learned simulator and world model research,
-by providing a simple testbed for developing and quickly iterating on predictive modeling ideas.
-Eventually we care about systems that are trained on real world data and that help robots act in the real world.
-But it seems that we have a lot of fundamental research to do before this is possible.
+The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot-learning/learned-sims/) and world model research,
+by providing a simple testbed for developing and quickly iterating on ideas for learning predictive models.
+Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
+But we have a lot of fundamental research to do, before we can realize the [full vision](https://matwilso.github.io/robot-learning/future/).
 
-You can think of it roughly like an MNIST for learned simulators.
-Generating MNIST digits is not very useful and has become fairly trivial, compared to generating high-resolution images of faces, for example.
+You can think of boxLCD as something akin to MNIST, but for learning dynamics models in robotics.
+Generating MNIST digits is not very useful and has become fairly trivial.
 But it provides a simple first task to try ideas on and it lets you iterate quickly and build intuition.
-boxLCD aims to provide a similar service, but for learning dynamics models in robotics.
+Learning dynamics models of 2D physics with low resolution images is not very useful and will be trivial
+compared to learning models of the real world.
+But it provides an easy entry point to the problem, both for the field as a whole, as well as individuals starting out in the area.
+
+boxLCD is somewhat of a minimum viable product at this point.
+For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap).
 
 **Table of Contents**
 - [Installation ‍💻](#installation-)
@@ -25,7 +30,7 @@ boxLCD aims to provide a similar service, but for learning dynamics models in ro
 
 ## Installation ‍💻
 
-I recommend cloning the repo and experimenting with it locally, as you may want to customize the environments or the API.
+I recommend cloning the repo and experimenting with it locally, as you may want to read through things and customize them.
 
 ```
 git clone https://github.com/matwilso/boxLCD.git
@@ -34,7 +39,7 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
-## Demos ⚽
+## Environment demos ⚽
 
 ```python
 from boxLCD import envs
@@ -46,7 +51,7 @@ while True:
     env.render(mode='human')
 ```
 
-Pretty rendering &#124; LCD rendering |  
+Pretty rendering &#124; upscaled LCD rendering |  
 :-------------------------:|
 `env = envs.Dropbox()` (16x16) | 
 ![](./assets/demos/dropbox.gif)  |  
@@ -62,7 +67,7 @@ Pretty rendering &#124; LCD rendering |
 ![](./assets/demos/urchin_cubes.gif)  |  
 
 
-## Training results 📈
+## Example training results 📈
 TODO: error plots of lcd, and predictions of it
 
 (description)
@@ -74,7 +79,7 @@ It has to generate all pixels at once.
 very nice sampling in some latent space that corresponds. It has to sample all of the pixels
 at once. 
 
-### Automatic Domain Randomization 🎲
+### Automatic Domain Randomization
 `env = envs.BoxOrCircle()` (16x16) 
 
 I claim in my learned simulators post that powerful generative models will have to
