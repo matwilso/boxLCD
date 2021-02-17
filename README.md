@@ -7,16 +7,16 @@ boxLCD is box2D physics with low resolution and binarized rendering. It provides
 environments and an API for defining worlds.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot-learning/learned-sims/) and world model research,
-by providing a simple testbed for developing and quickly iterating on ideas for learning predictive models.
-Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
-But we have a lot of fundamental research to do, before we can realize the [full vision](https://matwilso.github.io/robot-learning/future/).
+by providing a simple testbed for learning predictive dynamics models of physics environments.
+Eventually we care about predictive models that are trained on real world data and that help robots act in the real world,
+but we have a lot of fundamental research to do, before we can realize that [full vision](https://matwilso.github.io/robot-learning/future/).
 
 You can think of boxLCD as something akin to MNIST, but for learning dynamics models in robotics.
 Generating MNIST digits is not very useful and has become fairly trivial.
 But it provides a simple first task to try ideas on and it lets you iterate quickly and build intuition.
 Learning dynamics models of 2D physics with low resolution images is not very useful and will be trivial
 compared to learning models of the real world.
-But it provides an easy entry point to the problem, both for the field as a whole, as well as individuals starting out in the area.
+But it provides a more more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
 
 boxLCD is somewhat of a minimum viable product at this point.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap).
@@ -42,8 +42,8 @@ pip install -r requirements.txt
 ## Environment demos ⚽
 
 ```python
-from boxLCD import envs
-env = envs.Dropbox() # for example
+from boxLCD import envs, C
+env = envs.Dropbox(C) # for example
 obs = env.reset()
 while True:
     action = env.action_space.sample()
@@ -78,6 +78,17 @@ It has to generate all pixels at once.
  approach I am using is extremely simple, and it doesn't allow
 very nice sampling in some latent space that corresponds. It has to sample all of the pixels
 at once. 
+
+
+### Urchin
+
+This task is actually quite tricky. Since we are only using images and the robot is symmetric and
+we feed the actions as a vector, it has to identify which action corresponds to which leg based on past
+interactions. And then it has to account for how the actions at every single step affect the motion.
+And the policy is completely randomly, so it has to learn a harder task compared to if a fixed or partially
+stochastic policy was acting.
+
+
 
 ### Automatic Domain Randomization
 `env = envs.BoxOrCircle()` (16x16) 
