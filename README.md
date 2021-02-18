@@ -90,11 +90,6 @@ To sample the model, we prompt it with the start 10 frames of the episode, and h
 This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
 In some ways, it's surprising it works so well.
 
-We do not condition on or try to predict continuous proprioceptive state, because I haven't gotten that working yet.
-I find using Gaussians leads to very bad autoregressive samples.
-Discrete sampling works much better out of the box.
-
-
 See [examples](./examples) for scripts to recreate the gifs below:
 | | Training Results for datasets of 10k rollouts |   |
 |:---:|:-------------------------:| :-------------------------:|
@@ -105,6 +100,9 @@ See [examples](./examples) for scripts to recreate the gifs below:
 |`envs.Urchin()`| 10 epochs | 100 epochs |
 |episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
 
+We do not condition on or predict the continuous proprioceptive state information, because I haven't gotten that working yet.
+I find using Gaussians leads to very bad autoregressive samples.
+Discrete sampling works much better out of the box.
 
 ### Urchin
 The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
@@ -169,21 +167,24 @@ But in the future, we plan to expand this scope and design tasks that leverage o
 There are several related benchmarks that are worth noting.
 However, I'm not aware of any work with the same goals as boxLCD, nor one that simultaneously satisfies the same criteria.
 
-If you think I'm missing something here, let me know.
-
 ### Video prediction
 
 - [BAIR Pushing Dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small). 44k examples of robot pushing objects in a bin. 64x64x3 sized frames.
 - [RoboNet](https://www.tensorflow.org/datasets/catalog/robonet). 15M video frames from 113 unique camera views. Like a scaled up version of BAIR Pushing, but on many robots and from different views. 64x64x3 sized frames.
 - [Moving MNIST](https://www.tensorflow.org/datasets/catalog/moving_mnist). MNIST digits that are animated to move and bounce off the walls of a 64x64 sized frame.
 
-### Physics environments
+### Physics/embodied environments
 
 - [PHYRE: A Benchmark For Physical Reasoning](https://phyre.ai/). A variety of simmple classical mechanics puzzles. Has fairly rich environments and dynamics, but only enables taking a single action at the beginning of an episode, and there's no robot.
 - [Simulated Billiards](https://haozhi.io/RPIN/). Billiards environment. Similar to PHYRE, you only take a single action.
 - [Ilya's bouncing balls dataset](https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html). Kind of interesting to look at something from back in the day. These were not binarized, slightly larger frames. The RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces decent tracking results, but they aren't that crisp (collisons are gooey. in supplementary, compare samples 1.gif,2.gif with the training data 5.gif).
+- [Habitat sim](https://github.com/facebookresearch/habitat-sim). "A flexible, high-performance 3D simulator for Embodied AI research". Focused on things like navigation, instruction following, and question answering. Not very physics-based as far as I can tell.
+- [Gibson environment](https://github.com/StanfordVL/GibsonEnv). "Real-World Perception for Embodied Agents". You can load robots in and they can walk around in realistic looking scenes.
+- [AI2-THOR environment](https://ai2thor.allenai.org/). Realistic scenes, Unity 3D physics, has simulated and real world counterparts.
 
 ### Other miniaturized environments and datasets
 - [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
 - [MNIST-1D](https://github.com/greydanus/mnist1d). "A 1D analogue of the MNIST dataset for measuring spatial biases and answering 'science of deep learning' questions."
 - [Procgen](https://openai.com/blog/quantifying-generalization-in-reinforcement-learning/). Procedurally generated and smallish scale environments for testing generalization of RL algorithms. 
+
+If you think I'm missing anything here, let me know.
