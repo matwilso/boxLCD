@@ -6,10 +6,10 @@ boxLCD 📟
 boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
 environments and an API for defining worlds.
 
-The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot-learning/learned-sims/) and world model research,
+The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot/learned-sims/) and world model research,
 by providing a simple testbed for learning predictive dynamics models of physics environments.
 Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
-However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-learning/future/),
+However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot/future/),
 and that small scale testbeds are very useful for making progress.
 
 boxLCD can be thought of as something akin to MNIST, but for learning dynamics models in robotics.
@@ -133,7 +133,7 @@ so I expect more sophisticated models to do better.
 ## Roadmap 📍
 
 Some of the reasoning behind this project can be found in some blog posts I have written on 
-the [future of robot learning](https://matwilso.github.io/robot-learning/future/), and [learned simualtors](https://matwilso.github.io/robot-learning/learned-sims/).
+the [future of robot learning](https://matwilso.github.io/robot/future/), and [learned simualtors](https://matwilso.github.io/robot/learned-sims/).
 
 boxLCD tries to capture some key properties of future learned simulators:
 - **physics based.** unlike past related work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
@@ -148,6 +148,9 @@ While being computational tractable and easy to work with:
 
 boxLCD is in active development.
 Right now, we are focused on developing environments and training models solely to predict accuracte physics, given past observations and actions.
+
+One thing I believe is that pushing on accuracy purely is highely correlated with useful models.
+If you learned how to solve this task very well, that would help you a lot in solving specific tasks. 
 
 ### Future Features
 - goal-based tasks and leverage our models to quickly learn to solve them.
