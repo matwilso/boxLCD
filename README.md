@@ -71,20 +71,19 @@ Pretty rendering &#124; LCD rendering (upscaled) |
 ![](./assets/demos/urchin_cubes.gif)  |  
 
 
-## Example training results 📈
+## Example training results 📉
 
 
 To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a very naive approach.
 
 It's a causally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
-To train the model, we feed those flat image tokens in and the model produces independent Bernoulli distributions for 
-each pixel, and we optimize this to match the ground truth. 
-To sample the model, we prompt it with the start 10 frames of the episode, and have it predict
-the rest autoregressively.
+To train the model, we feed those flat image tokens in, the model produces independent Bernoulli distributions for
+each pixel in the frame, and we optimize this distribution to match the ground truth (loss = -logp). 
+To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
 
-This is an extremely simplistic approach and it has to generate all pixels at once by sampling them independently.
-In some ways, it's surprising it works.
+This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
+In some ways, it's surprising it works so well.
 For more details, see the code in [examples](./examples).
 
 We do not condition on or try to predict continuous proprioceptive state, because I haven't gotten that working yet.
@@ -92,14 +91,14 @@ I find using Gaussians leads to very bad autoregressive samples.
 Discrete sampling works much better out of the box.
 
 
-See [examples](./examples) for scripts to recreate these.
-| | Training Results |   |
+See [examples](./examples) for scripts to recreate the gifs below:
+| | Training Results for datasets of 10k rollouts |   |
 |:---:|:-------------------------:| :-------------------------:|
-|`envs.Dropbox`| after 10 epochs |  after 100 epochs |
+|`envs.Dropbox`| 10 epochs |  100 epochs |
 |episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
-|`envs.Bounce()`| after 10 epochs | after 100 epochs |
+|`envs.Bounce()`| 10 epochs | 100 epochs |
 |episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
-|`envs.Urchin()`| after 10 epochs | after 100 epochs |
+|`envs.Urchin()`| 10 epochs | 100 epochs |
 |episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
 
 
@@ -116,13 +115,12 @@ will give you intelligent domain randomization for free. Instead of randomizing 
 your model will be tuned to the underlying distribution and only give you variety you might actually see in the real world.
 
 For a rough proof of concept of this, I created an environment that simulates either the falling
-box or the circle. Since these shapes are sometimes indistinguishable at low resolution, the model 
-cannot tell them apart given the prompt. If we were training a robot to manipulate these objects, we
-would want it to be prepared for either scenario.
+box or the ball. Since these shapes are sometimes indistinguishable at low resolution, the model 
+cannot tell them apart given the prompt, so it should sample each option some fraction of the time.
 
 Below is a cherry picked example, where the desired behavior occurs.
 On the far right 2 rollouts, the model is uncertain about the shape and happens to sample the wrong
-one---a box instead of a circle, and a circle instead of a box.
+one---a box instead of a ball, and a ball instead of a box.
 
 ![](./assets/samples/domrand_good.gif) 
 
@@ -135,25 +133,25 @@ so I expect more sophisticated models to do better.
 Some of the reasoning behind this project can be found in some blog posts I have written on 
 the [future of robot learning](https://matwilso.github.io/robot/future/), and [learned simualtors](https://matwilso.github.io/robot/learned-sims/).
 
-boxLCD tries to capture some key properties of future learned simulators:
-- **physics based.** unlike past related work, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to propel the robot.
-- **vision-based.** you primarily sense the real world through vision (pixels).
-- **partially observable.** even what you can currently see doesn't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. making reasonable continuations of physics prompts that are plausible given all knowledge. and reasonable sampling over unknowns. and [intelligent domain randomization](#intelligent-domain-randomization).
-- **interfaceable.** enable loading of structured information into predictions, like feeding meshes, natural language descriptions. 
+boxLCD aims to serve as a testbed that most accurately captures the challenge of future learned simulators:
+- **physics-based.** unlike some past testbeds, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to locomote.
+- **pixel-based.** we expect robots in the real world to primarily sense the world through vision (pixels), so it is important to work with pixels.
+- **multi-modal sensing.** robots also have other sensors like joint encoders and inertial measurement units (IMUs) that provide high quality information, so it is important to practice using and fusing these together for better understanding of the world.
+- **partially observable.** sensors don't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. given prompts, you should be able to sample reasonable continuations given all knowledge, and be able to do things like [intelligent domain randomization](#intelligent-domain-randomization).
+- **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a structured or unstructured language description of a scene, these systems should be able to incorporate that information to make better predictions. for example, given a description of an object they can't fully observe, they should be able to improve the accuracy of their predictions about that object.
 
-While being computational tractable and easy to work with:
-- **narrow 2d physics settings**, at least to start out.
+At the same time, it tries to remain computational tractable and easy to work with:
+- **2d physics settings.** box2d shares some similar properties with real world physics (joints, contacts, friction, gravity), but it is very simplified.
 - **simple rendering.** boxLCD enables variable sized rendering, but the default envs use a maximum `16x32 = 544` sized binary images (smaller than MNIST). compared to datasets like the [BAIR Pushing dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small) with `64x64x3 = 12288` sized RGB images, this represents a 24x descrease in floating point numbers on the input and output. And information-wise, `24*8bits=`192x decrease in the bits to process, which can matter especially for naive PixelCNN type approaches.
 - **programmatic and customizable.** you can geneate new scenarios and customize the environments to different settings you want to test.
 
 boxLCD is in active development.
-Right now, we are focused on developing environments and training models solely to predict accuracte physics, given past observations and actions.
-
-One thing I believe is that pushing on accuracy purely is highely correlated with useful models.
-If you learned how to solve this task very well, that would help you a lot in solving specific tasks. 
+At the moment, we are focused on developing environments and training models with the sole purpose of learning accurate physics models (not solving goals).
+I do believe that pushing on accuracy purely will be highely correlated with useful models.
+But in the future, we plan to expand this scope and design tasks that leverage our learned models.
 
 ### Future Features
-- goal-based tasks and leverage our models to quickly learn to solve them.
+- goal-based tasks that leverage our models
   - maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but full physics based
 - more robots and varied objects
 - support for scrolling (environments which do not fit on the screen all at once)
@@ -161,59 +159,26 @@ If you learned how to solve this task very well, that would help you a lot in so
 - maybe multiple image channels to represent these different layers 
 - more formal benchmarks and bits/dim baselines
 
+![](./assets/roadmap_pic.png)
+
 ## Related Work 📚
 
-https://github.com/kenjyoung/MinAtar
+There are several related benchmarks that are worth mentioning,
+but none of them have the same goal and none of them simultaneously satisfy all the criteria that boxLCD does.
 
-There are some related work, like moving MNIST. But that doesn't have control in it. Also this is lower dim.
-https://www.tensorflow.org/datasets/catalog/moving_mnist
+### Video prediction
 
-Doom and Berkeley dataset are other examples. But they are higher res and less configurable.
-They also don't have associated structured information.
+- [BAIR Pushing Dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small). 44k examples of robot pushing objects in a bin. 64x64x3 sized frames.
+- [RoboNet](https://www.tensorflow.org/datasets/catalog/robonet). 15M video frames from 113 unique camera views. Like a scaled up version of BAIR Pushing, but on many robots and from different views. 64x64x3 sized frames.
+- [Moving MNIST](https://www.tensorflow.org/datasets/catalog/moving_mnist). MNIST digits that are animated to move and bounce off the walls of a 64x64 sized frame.
 
-This is not like anything else exists. It is explicitly targeting the world models
-and learned simulator task and provides low dimensional stuff. It allows custom environment interaction
-to test custom scenarios. You incorporate robot actions and robot proprioception with partial observations,
-as we will have in the real world.
+### Physics environments
 
-- targeting learned simulator and world model research goals
-- extremely low-res and binary for quick iteration speed
-- video prediction, integrated with robot action *and* proprioception, as will be the case in the real world
-- greater access to the simulator to enable custom scenarios, not just a fixed set of envs. but more general settings
+- [PHYRE: A Benchmark For Physical Reasoning](https://phyre.ai/). A variety of simmple classical mechanics puzzles. Has fairly rich environments and dynamics, but only enables taking a single action at the beginning of an episode, and there's no robot.
+- [Simulated Billiards](https://haozhi.io/RPIN/). Billiards environment. Similar to PHYRE, you only take a single action.
+- [Ilya's bouncing balls dataset](https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html). Kind of interesting to look at something from back in the day. These were not binarized, slightly larger. The RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces decent tracking results, but they aren't that crisp---the balls move but the collisions are gooey (in supplementary, compare samples 1.gif,2.gif with the training data 5.gif).
 
-This is explicitly building to the goal of learned sims and world models.
-
-Background knowledge pointer to faq
-
-
-https://haozhi.io/RPIN/
-
-https://phyre.ai/
-This one you set the state of the environment and then you see it roll out.
-This is unlike robotics where you act at every timestep.
-It is a narrow setting where you take one action and see what happens for many steps.
-
-Also taking actions at every step is way harder to learn.
-This creates many possible ways states can diverge. You can't rely
-on them following a sequence, which is much easier.
-
-Ilya bouncing balls. Back in the day though, these were not binarized, slightly larger.
-And the RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces results that are not crisp.
-The balls move, but the collisions are gooey (in supplementary, compare 1.gif,2.gif with the training data 5.gif).
-https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html
-
-Basically the point is this project is trying to approximate something very specific.
-No previous work are trying to learn simulators or world models like this.
-And the details and what you aim for matter. 
-We think this aims most closely at an interesting goal
-We think this has the greatest pareto front / product / AUC of aiming to the goal and being more approachable with small budgets.
-
-
-
-https://github.com/greydanus/mnist1d
-https://greydanus.github.io/2020/12/01/scaling-down/
-
-This is not that similar, but has the shared goal of focusing on iteration speed.
-We should focus on things that will scale. It may not help a ton for what actually ends
-up scaling, but it gives a good place to build intuitions and fundamentals.
-
+### Other miniaturized environments and datasets
+- [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
+- [MNIST-1D](https://github.com/greydanus/mnist1d). "A 1D analogue of the MNIST dataset for measuring spatial biases and answering 'science of deep learning' questions."
+- [Procgen](https://openai.com/blog/quantifying-generalization-in-reinforcement-learning/). Procedurally generated and smallish scale environments for testing generalization of RL algorithms. 
