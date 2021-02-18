@@ -140,7 +140,7 @@ boxLCD aims to serve as a testbed that accurately captures the challenge of futu
 - **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a structured or unstructured language description of a scene, these systems should be able to incorporate that information to make better predictions. for example, given a description of an object they can't fully observe, they should be able to improve the accuracy of their predictions about that object. we plan to design tasks that test for this.
 
 At the same time, boxLCD aims to remain computationally tractable and easy to work with:
-- **2d physics settings.** box2d physics shares some similar properties with real world physics (joints, contacts, friction, gravity), but it is very simplified.
+- **2d physics settings.** box2d physics shares some similar properties with real world physics (contacts, friction, gravity), but it is very simplified.
 - **simple rendering.** boxLCD enables color and variable sized rendering, but the default envs use at most a `16x32 = 544` sized binary images (smaller than MNIST)
 - **programmatic and customizable.** boxLCD lets you geneate new scenarios and customize the environments to different settings you want to test.
 
