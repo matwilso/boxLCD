@@ -1,4 +1,4 @@
-![](./assets/sideside.png)
+![](./assets/lcd_sideside.png)
 
 boxLCD 📟
 =================
