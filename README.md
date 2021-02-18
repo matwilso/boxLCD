@@ -104,11 +104,13 @@ I find using Gaussians leads to very bad autoregressive samples.
 Discrete sampling works much better out of the box.
 
 ### Urchin
-The Urchin task is actually quite tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
+The Urchin task is actually a bit tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
 The robot is 3-way symmetric, and since we are only using images here, the model is continually forced to
 identify which leg corresponds to which index in the action vector based on past observations and actions.
 We also randomly sample the actions for the 3 joints at each time step, so the agent can't rely on a semi-fixed policy
 to narrow down the state space it has to cover.
+
+(note: this is just an illustration of how far you can get with little effort. i expect you can do much better if you tried)
 
 ### Intelligent Domain Randomization
 Because powerful generative models will have to model uncertainty in the environment, sampling them 

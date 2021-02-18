@@ -5,6 +5,8 @@ logs/
 *.gif
 *.mp4
 *.png
+*.jpg
+*.jpeg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
