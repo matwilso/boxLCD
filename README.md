@@ -4,7 +4,7 @@ boxLCD 📟
 =================
 
 boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
-environments and an API for defining worlds.
+environments and an API for defining them.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot/learned-sims/) and world model research,
 by providing a simple testbed for learning predictive dynamics models of physics environments.
@@ -88,7 +88,6 @@ each pixel in the frame, and we optimize these distributions to match the ground
 To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
 
 This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
-In some ways, it's surprising it works so well.
 
 See [examples](./examples) for scripts to recreate the gifs below:
 | | Training Results for datasets of 10k rollouts |   |
