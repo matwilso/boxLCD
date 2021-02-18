@@ -12,12 +12,14 @@ Eventually we care about predictive models that are trained on real world data a
 However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot/future/),
 and that small scale testbeds are very useful for making progress.
 
+<!--
 boxLCD can be thought of as something akin to MNIST, but for learning dynamics models in robotics.
 Generating MNIST digits is not very useful and has become fairly trivial.
 But it provides a simple first task to try ideas on and it lets you iterate quickly and build intuition.
 Learning dynamics models of 2D physics with low resolution images is not very useful and will be trivial
 compared to learning models of the real world.
 But it provides a much more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
+-->
 
 boxLCD is somewhat of a minimum viable product at this point.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap).
@@ -25,12 +27,15 @@ For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap
 **Table of Contents**
 - [Installation ‍💻](#installation-)
 - [Environment demos ⚽](#environment-demos-)
-- [Example training results 📈](#example-training-results-)
+- [Example training results 📉](#example-training-results-)
   - [Urchin](#urchin)
   - [Intelligent Domain Randomization](#intelligent-domain-randomization)
 - [Roadmap 📍](#roadmap-)
   - [Future Features](#future-features)
 - [Related Work 📚](#related-work-)
+  - [Video prediction](#video-prediction)
+  - [Physics environments](#physics-environments)
+  - [Other miniaturized environments and datasets](#other-miniaturized-environments-and-datasets)
 
 ## Installation ‍💻
 
@@ -79,12 +84,11 @@ To demonstrate what is possible with boxLCD, we train a [model](./examples/model
 It's a causally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
 To train the model, we feed those flat image tokens in, the model produces independent Bernoulli distributions for
-each pixel in the frame, and we optimize this distribution to match the ground truth (loss = -logp). 
+each pixel in the frame, and we optimize these distributions to match the ground truth (loss = -logp). 
 To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
 
 This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
 In some ways, it's surprising it works so well.
-For more details, see the code in [examples](./examples).
 
 We do not condition on or try to predict continuous proprioceptive state, because I haven't gotten that working yet.
 I find using Gaussians leads to very bad autoregressive samples.
@@ -125,25 +129,23 @@ one---a box instead of a ball, and a ball instead of a box.
 ![](./assets/samples/domrand_good.gif) 
 
 It doesn't always do this, and sometimes it just waffles between bouncing and not.
-But the model I used is extremely naive and doesn't allow sampling in a latent space,
-so I expect more sophisticated models to do better.
 
 ## Roadmap 📍
 
 Some of the reasoning behind this project can be found in some blog posts I have written on 
 the [future of robot learning](https://matwilso.github.io/robot/future/), and [learned simualtors](https://matwilso.github.io/robot/learned-sims/).
 
-boxLCD aims to serve as a testbed that most accurately captures the challenge of future learned simulators:
-- **physics-based.** unlike some past testbeds, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated to locomote.
-- **pixel-based.** we expect robots in the real world to primarily sense the world through vision (pixels), so it is important to work with pixels.
-- **multi-modal sensing.** robots also have other sensors like joint encoders and inertial measurement units (IMUs) that provide high quality information, so it is important to practice using and fusing these together for better understanding of the world.
-- **partially observable.** sensors don't tell the full story of the world. you constantly have to make estimates of state that you only observe indirectly. given prompts, you should be able to sample reasonable continuations given all knowledge, and be able to do things like [intelligent domain randomization](#intelligent-domain-randomization).
-- **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a structured or unstructured language description of a scene, these systems should be able to incorporate that information to make better predictions. for example, given a description of an object they can't fully observe, they should be able to improve the accuracy of their predictions about that object.
+boxLCD aims to serve as a testbed that accurately captures the challenge of future learned simulators:
+- **physics-based.** unlike some past testbeds, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated.
+- **pixel-based.** robots in the real world primarily sense the world through vision (pixels), so we use pixels.
+- **multi-modal sensing.** robots also have other sensors like joint encoders and inertial measurement units (IMUs) that provide high quality information, so we provide proprioceptive information and we're working on ways to fuse several sources of information to make better predictions.
+- **partially observable.** sensors don't tell the full story of the world. robots constantly have to make estimates of state that you only observe indirectly. given prompts, we're exploring the ability to sample reasonable continuations given all knowledge, and be able to do things like [intelligent domain randomization](#intelligent-domain-randomization).
+- **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a structured or unstructured language description of a scene, these systems should be able to incorporate that information to make better predictions. for example, given a description of an object they can't fully observe, they should be able to improve the accuracy of their predictions about that object. we plan to design tasks that test for this.
 
-At the same time, it tries to remain computational tractable and easy to work with:
-- **2d physics settings.** box2d shares some similar properties with real world physics (joints, contacts, friction, gravity), but it is very simplified.
-- **simple rendering.** boxLCD enables variable sized rendering, but the default envs use a maximum `16x32 = 544` sized binary images (smaller than MNIST). compared to datasets like the [BAIR Pushing dataset](https://www.tensorflow.org/datasets/catalog/bair_robot_pushing_small) with `64x64x3 = 12288` sized RGB images, this represents a 24x descrease in floating point numbers on the input and output. And information-wise, `24*8bits=`192x decrease in the bits to process, which can matter especially for naive PixelCNN type approaches.
-- **programmatic and customizable.** you can geneate new scenarios and customize the environments to different settings you want to test.
+At the same time, boxLCD aims to remain computationally tractable and easy to work with:
+- **2d physics settings.** box2d physics shares some similar properties with real world physics (joints, contacts, friction, gravity), but it is very simplified.
+- **simple rendering.** boxLCD enables color and variable sized rendering, but the default envs use at most a `16x32 = 544` sized binary images (smaller than MNIST)
+- **programmatic and customizable.** boxLCD lets you geneate new scenarios and customize the environments to different settings you want to test.
 
 boxLCD is in active development.
 At the moment, we are focused on developing environments and training models with the sole purpose of learning accurate physics models (not solving goals).
@@ -157,14 +159,17 @@ But in the future, we plan to expand this scope and design tasks that leverage o
 - support for scrolling (environments which do not fit on the screen all at once)
 - static environment features like ramps and walls
 - maybe multiple image channels to represent these different layers 
+- ways to plug in information, like descriptions of objects that get read in and used to improve model accuracy.
 - more formal benchmarks and bits/dim baselines
 
 ![](./assets/roadmap_pic.png)
 
 ## Related Work 📚
 
-There are several related benchmarks that are worth mentioning,
-but none of them have the same goal and none of them simultaneously satisfy all the criteria that boxLCD does.
+There are several related benchmarks that are worth noting.
+However, I'm not aware of any work with the same goals as boxLCD, nor one that simultaneously satisfies the same criteria.
+
+If you think I'm missing something here, let me know.
 
 ### Video prediction
 
@@ -176,7 +181,7 @@ but none of them have the same goal and none of them simultaneously satisfy all 
 
 - [PHYRE: A Benchmark For Physical Reasoning](https://phyre.ai/). A variety of simmple classical mechanics puzzles. Has fairly rich environments and dynamics, but only enables taking a single action at the beginning of an episode, and there's no robot.
 - [Simulated Billiards](https://haozhi.io/RPIN/). Billiards environment. Similar to PHYRE, you only take a single action.
-- [Ilya's bouncing balls dataset](https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html). Kind of interesting to look at something from back in the day. These were not binarized, slightly larger. The RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces decent tracking results, but they aren't that crisp---the balls move but the collisions are gooey (in supplementary, compare samples 1.gif,2.gif with the training data 5.gif).
+- [Ilya's bouncing balls dataset](https://papers.nips.cc/paper/2008/hash/9ad6aaed513b73148b7d49f70afcfb32-Abstract.html). Kind of interesting to look at something from back in the day. These were not binarized, slightly larger frames. The RTRBM (Recurrent Temporal Restricted Boltzmann Machine) produces decent tracking results, but they aren't that crisp (collisons are gooey. in supplementary, compare samples 1.gif,2.gif with the training data 5.gif).
 
 ### Other miniaturized environments and datasets
 - [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
