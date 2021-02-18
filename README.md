@@ -22,7 +22,7 @@ But it provides a much more tractable starting point, both for the field as a wh
 -->
 
 boxLCD is somewhat of a minimum viable product at this point.
-For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap).
+For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
 
 **Table of Contents**
 - [Installation ‍💻](#installation-)
