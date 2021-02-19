@@ -3,13 +3,13 @@
 boxLCD 📟
 =================
 
-boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
+boxLCD is box2D physics with low resolution and binarized rendering. It provides a few sample
 environments and an API for defining them.
 
-The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/robot/learned-sims/) and world model research,
+The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/learned-sims/) and world model research,
 by providing a simple testbed for learning predictive dynamics models of physics environments.
 Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
-However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot/future/),
+However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-future/),
 and that small scale testbeds are very useful for making progress.
 
 <!--
@@ -132,7 +132,7 @@ It doesn't always do this, and sometimes it just waffles between bouncing and no
 ## Roadmap 📍
 
 Some of the reasoning behind this project can be found in some blog posts I have written on 
-the [future of robot learning](https://matwilso.github.io/robot/future/), and [learned simualtors](https://matwilso.github.io/robot/learned-sims/).
+the [future of robot learning](https://matwilso.github.io/robot-future/), and [learned simualtors](https://matwilso.github.io/learned-sims/).
 
 boxLCD aims to serve as a testbed that accurately captures the challenge of future learned simulators:
 - **physics-based.** unlike some past testbeds, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated.
