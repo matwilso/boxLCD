@@ -114,10 +114,10 @@ to narrow down the state space it has to cover.
 
 ### Intelligent Domain Randomization
 Because powerful generative models will have to model uncertainty in the environment, sampling them 
-will give you intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
-your model will be tuned to the underlying distribution and only give you variety you might actually see in the real world.
+should give intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
+the model will be tuned to the underlying distribution and only produce variety you might actually see in the real world.
 
-For a rough proof of concept of this, I created an environment that simulates either the falling
+For a crude proof of concept of this, I created an environment that simulates either the falling
 box or the ball. Since these shapes are sometimes indistinguishable at low resolution, the model 
 cannot tell them apart given the prompt, so it should sample each option some fraction of the time.
 
@@ -127,7 +127,7 @@ one---a box instead of a ball, and a ball instead of a box.
 
 ![](./assets/samples/domrand_good.gif) 
 
-It doesn't always do this, and sometimes it just waffles between bouncing and not.
+It doesn't always do this, and sometimes it just waffles between bouncing and not, but the model I am using is weak.
 
 ## Roadmap 📍
 
