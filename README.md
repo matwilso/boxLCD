@@ -4,7 +4,7 @@ boxLCD 📟
 =================
 
 boxLCD is box2D physics with low resolution and binarized rendering. It provides a few sample
-environments and an API for defining them.
+environments and an API for defining and rendering custom environments.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/learned-sims/) and world model research,
 by providing a simple testbed for learning predictive dynamics models of physics environments.
@@ -60,7 +60,7 @@ while True:
     env.render(mode='human')
 ```
 
-Pretty rendering &#124; LCD rendering (upscaled) |  
+Pretty rendering vs LCD rendering (upscaled for visualization) |  
 :-------------------------:|
 `envs.Dropbox()` (16x16) | 
 ![](./assets/demos/dropbox.gif)  |  
@@ -79,15 +79,14 @@ Pretty rendering &#124; LCD rendering (upscaled) |
 ## Example training results 📉
 
 
-To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a very naive approach.
+To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a naive approach.
 
-It's a causally masked Transformer trained to predict the next frame given all past frames.
+It's a temporally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
 To train the model, we feed those flat image tokens in, the model produces independent Bernoulli distributions for
 each pixel in the frame, and we optimize these distributions to match the ground truth (loss = -logp). 
 To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
 
-This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
 
 See [examples](./examples) for scripts to recreate the gifs below:
 | | Training Results for datasets of 10k rollouts |   |
@@ -98,6 +97,8 @@ See [examples](./examples) for scripts to recreate the gifs below:
 |episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
 |`envs.Urchin()`| 10 epochs | 100 epochs |
 |episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
+
+This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
 
 We do not condition on or predict the continuous proprioceptive state information, because I haven't gotten that working yet.
 I find using Gaussians leads to very bad autoregressive samples.
@@ -113,13 +114,13 @@ to narrow down the state space it has to cover.
 (note: this is just an illustration of how far you can get with little effort. i expect you can do much better if you tried)
 
 ### Intelligent Domain Randomization
-Because powerful generative models will have to model uncertainty in the environment, sampling them 
-should give intelligent domain randomization for free. Instead of randomizing over a bunch of wacky parameters,
-the model will be tuned to the underlying distribution and only produce variety you might actually see in the real world.
+Because powerful generative models will have to model uncertainty in the environment, sampling them should give intelligent domain randomization.
+Instead of randomizing over a bunch of wacky parameters, the model will be tuned to the underlying distribution and only produce variety you might actually see in the real world.
 
-For a crude proof of concept of this, I created an environment that simulates either the falling
-box or the ball. Since these shapes are sometimes indistinguishable at low resolution, the model 
+For a crude demonstration of this idea, I created an environment that simulates either a falling
+box or a bouncing ball. Since these shapes are sometimes indistinguishable at low resolution, the model 
 cannot tell them apart given the prompt, so it should sample each option some fraction of the time.
+(For a real world example, you may not know the mass of an opaque container, so your model should sample over a range of possible masses.)
 
 Below is a cherry picked example, where the desired behavior occurs.
 On the far right 2 rollouts, the model is uncertain about the shape and happens to sample the wrong
@@ -127,7 +128,7 @@ one---a box instead of a ball, and a ball instead of a box.
 
 ![](./assets/samples/domrand_good.gif) 
 
-It doesn't always do this, and sometimes it just waffles between bouncing and not, but the model I am using is weak.
+It sometimes doesn't do as well and just waffles between bouncing and not, but again the model I am using is pretty weak.
 
 ## Roadmap 📍
 
@@ -138,8 +139,8 @@ boxLCD aims to serve as a testbed that accurately captures the challenge of futu
 - **physics-based.** unlike some past testbeds, robots and objects don't move magically. they are governed by consistent physics and joints must be actuated.
 - **pixel-based.** robots in the real world primarily sense the world through vision (pixels), so we use pixels.
 - **multi-modal sensing.** robots also have other sensors like joint encoders and inertial measurement units (IMUs) that provide high quality information, so we provide proprioceptive information and we're working on ways to fuse several sources of information to make better predictions.
-- **partially observable.** sensors don't tell the full story of the world. robots constantly have to make estimates of state that you only observe indirectly. given prompts, we're exploring the ability to sample reasonable continuations given all knowledge, and be able to do things like [intelligent domain randomization](#intelligent-domain-randomization).
-- **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a structured or unstructured language description of a scene, these systems should be able to incorporate that information to make better predictions. for example, given a description of an object they can't fully observe, they should be able to improve the accuracy of their predictions about that object. we plan to design tasks that test for this.
+- **partially observable.** sensors don't tell the full story of the world. robots constantly have to make estimates of state that you only observe indirectly. given prompts, we're exploring the ability to sample reasonable continuations given all knowledge.
+- **interfaceable.** along with the sensors commonly available to robots, these systems should be able to interface with other structured information. given a mesh, a natural language or structured description of a scene, these systems should be able to incorporate that information to make better predictions. for example, feeding in the mesh of a partially occluded object should let the model identify the object and make better predictions about how the object moves in the future. we plan to design tasks that test for this.
 
 At the same time, boxLCD aims to remain computationally tractable and easy to work with:
 - **2d physics settings.** box2d physics shares some similar properties with real world physics (contacts, friction, gravity), but it is very simplified.
@@ -152,13 +153,13 @@ I do believe that pushing on accuracy purely will be highely correlated with use
 But in the future, we plan to expand this scope and design tasks that leverage our learned models.
 
 ### Future Features
-- goal-based tasks that leverage our models
-  - maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but full physics based
+- goal-based envs that leverage our models
+  - maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but fully physics based
 - more robots and varied objects
 - support for scrolling (environments which do not fit on the screen all at once)
 - static environment features like ramps and walls
 - maybe multiple image channels to represent these different layers 
-- ways to plug in information, like descriptions of objects that get read in and used to improve model accuracy.
+- envs that challenge the ability to interface with information about a scene, like descriptions of properties of multiple objects and inferring which properties describe which object
 - more formal benchmarks and bits/dim baselines
 
 ![](./assets/roadmap_pic.png)
