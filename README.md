@@ -3,7 +3,9 @@
 boxLCD 📟
 =================
 
-boxLCD is box2D physics with low resolution and binarized rendering. It provides a few sample
+**[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Training examples 📉](#training-examples-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
+
+boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
 environments and an API for defining and rendering custom environments.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/learned-sims/) and world model research,
@@ -22,20 +24,8 @@ But it provides a much more tractable starting point, both for the field as a wh
 -->
 
 boxLCD is somewhat of a minimum viable product at this point.
+It's currently useful for testing out simple generative models, but it is limited in scope.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
-
-**Table of Contents**
-- [Installation ‍💻](#installation-)
-- [Environment demos ⚽](#environment-demos-)
-- [Example training results 📉](#example-training-results-)
-  - [Urchin](#urchin)
-  - [Intelligent Domain Randomization](#intelligent-domain-randomization)
-- [Roadmap 📍](#roadmap-)
-  - [Future Features](#future-features)
-- [Related Work 📚](#related-work-)
-  - [Video prediction](#video-prediction)
-  - [Physics environments](#physics-environments)
-  - [Other miniaturized environments and datasets](#other-miniaturized-environments-and-datasets)
 
 ## Installation ‍💻
 
@@ -51,8 +41,8 @@ pip install -r requirements.txt
 ## Environment demos ⚽
 
 ```python
-from boxLCD import envs, C
-env = envs.Dropbox(C) # for example
+from boxLCD import envs, C  
+env = envs.Dropbox(C)  # C is a default configuration that you can modify
 obs = env.reset()
 while True:
     action = env.action_space.sample()
@@ -76,19 +66,22 @@ Pretty rendering vs LCD rendering (upscaled for visualization) |
 ![](./assets/demos/urchin_cubes.gif)  |  
 
 
-## Example training results 📉
+## Training examples 📉
 
 
 To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a naive approach.
 
-It's a temporally masked Transformer trained to predict the next frame given all past frames.
+Our model is a temporally masked Transformer trained to predict the next frame given all past frames.
 It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
 To train the model, we feed those flat image tokens in, the model produces independent Bernoulli distributions for
 each pixel in the frame, and we optimize these distributions to match the ground truth (loss = -logp). 
 To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
 
 
-See [examples](./examples) for scripts to recreate the gifs below:
+See [examples](./examples) for scripts to recreate the gifs below.
+In the gifs, the top is ground truth, middle is model prediction, and bottom is the error between the two (this visualization approach is copied from Dreamer).
+The results below were trained on a single NVIDIA GTX 1080Ti desktop machine.
+
 | | Training Results for datasets of 10k rollouts |   |
 |:---:|:-------------------------:| :-------------------------:|
 |`envs.Dropbox`| 10 epochs |  100 epochs |
@@ -183,6 +176,7 @@ However, I'm not aware of any work with the same goals as boxLCD, nor one that s
 - [Habitat sim](https://github.com/facebookresearch/habitat-sim). "A flexible, high-performance 3D simulator for Embodied AI research". Focused on things like navigation, instruction following, and question answering. Not very physics-based as far as I can tell.
 - [Gibson environment](https://github.com/StanfordVL/GibsonEnv). "Real-World Perception for Embodied Agents". You can load robots in and they can walk around in realistic looking scenes.
 - [AI2-THOR environment](https://ai2thor.allenai.org/). Realistic scenes, Unity 3D physics, has simulated and real world counterparts.
+- [DeepMind Lab](https://github.com/deepmind/lab). 3D learning environment based on Quake III engine. This is often used in video prediction work, especially from Alphabet.
 
 ### Other miniaturized environments and datasets
 - [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
