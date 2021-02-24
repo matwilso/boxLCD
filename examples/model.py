@@ -132,11 +132,11 @@ class GPT(nn.Module):
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
         batch['lcd'][:, :10] = lcd
-        start = lcd.shape[1] - 1
-      for i in range(start, self.block_size - 1):
+        start = lcd.shape[1]
+      for i in range(start, self.block_size):
         bindist = self.forward(batch)
-        batch['lcd'][:, i + 1] = bindist.sample()[:, i]
-        if i == self.block_size - 2:
+        batch['lcd'][:, i] = bindist.sample()[:, i]
+        if i == self.block_size - 1:
           sample_loss = self.loss(batch)
     batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
     return batch, sample_loss.mean().cpu().detach()
