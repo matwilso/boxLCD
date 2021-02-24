@@ -24,11 +24,11 @@ just images
 
 1. Collect data:
 ```
-python collect.py --env=bounce --collect_n=10000 # (10k rollouts, should take 5-ish minutes)
+python collect.py --env=Bounce --collect_n=10000 # (10k rollouts, should take 5-ish minutes)
 ```
 2. Train a model on that data:
 ```
-python train.py --env=bounce --datapath=rollouts/bounce-10000.npz # training takes about 10-15mins on GPU
+python train.py --env=Bounce --datapath=rollouts/Bounce-10000.npz # trains in a few minutes on GPU, longer for harder tasks
 ```
 3. Visualize training and samples:
 ```

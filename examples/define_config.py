@@ -2,27 +2,14 @@ import subprocess
 import sys
 import pathlib
 import boxLCD.utils
-from boxLCD import envs
+from boxLCD import envs, env_map
 from boxLCD import C as boxLCD_C
 from boxLCD import wrappers
 from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
   def _make():
-    if C.env == 'dropbox':
-      env = envs.Dropbox(C)
-    elif C.env == 'bounce':
-      env = envs.Bounce(C)
-    elif C.env == 'boxor':
-      env = envs.BoxOrCircle(C)
-    elif C.env == 'urchin':
-      env = envs.Urchin(C)
-    elif C.env == 'urchin_ball':
-      env = envs.UrchinBall(C)
-    elif C.env == 'urchin_balls':
-      env = envs.UrchinBalls(C)
-    elif C.env == 'urchin_cubes':
-      env = envs.UrchinCubes(C)
+    env = env_map[C.env](C)
     # wrap to make lcd show up in observation space
     env = wrappers.LCDEnv(env)
     env.seed(seed)
@@ -35,7 +22,7 @@ def config():
   C.logdir = pathlib.Path('./logs/')
   C.datapath = pathlib.Path('.')
   C.collect_n = 10000
-  C.env = 'bounce'
+  C.env = 'Bounce'
   # training stuff
   C.device = 'cuda'  # 'cuda', 'cpu'
   C.num_epochs = 200

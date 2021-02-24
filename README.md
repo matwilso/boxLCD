@@ -115,13 +115,11 @@ box or a bouncing ball. Since these shapes are sometimes indistinguishable at lo
 cannot tell them apart given the prompt, so it should sample each option some fraction of the time.
 (For a real world example, you may not know the mass of an opaque container, so your model should sample over a range of possible masses.)
 
-Below is a cherry picked example, where the desired behavior occurs.
-On the far right 2 rollouts, the model is uncertain about the shape and happens to sample the wrong
-one---a box instead of a ball, and a ball instead of a box.
+Below is an example where the expected behavior occurs.
+On the far left, the model samples a ball instead of a box.
+On the 4th to the right, the model samples a box instead of a ball.
 
 ![](./assets/samples/domrand_good.gif) 
-
-It sometimes doesn't do as well and just waffles between bouncing and not, but again the model I am using is pretty weak.
 
 ## Roadmap 📍
 
