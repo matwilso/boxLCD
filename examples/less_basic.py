@@ -13,7 +13,7 @@ from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
 from boxLCD import C
-from boxLCD import envs
+from boxLCD import envs, env_map
 import pyglet
 KEY = pyglet.window.key
 A = utils.A
@@ -23,18 +23,13 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in C.items():
     parser.add_argument(f'--{key}', type=utils.args_type(value), default=value)
+  parser.add_argument('--env', type=str, default='UrchinBall')
   C = parser.parse_args()
-  #env = envs.Dropbox(C)
-  #env = envs.Bounce(C)
-  #env = envs.Urchin(C)
-  env = envs.UrchinBall(C)
-  #env = envs.UrchinBalls(C)
-  #env = envs.UrchinCubes(C)
-  #env = envs.BoxOrCircle(C)
+  env = env_map[C.env](C)
   start = env.reset()
   env.render(mode='human')
-  key_handler = KEY.KeyStateHandler()
   # monkey patch the env window to get keyboard input
+  key_handler = KEY.KeyStateHandler()
   window = env.viewer.window
   window.push_handlers(key_handler)
   # set up variables
