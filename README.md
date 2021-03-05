@@ -175,6 +175,7 @@ However, I'm not aware of any work with the same goals as boxLCD, nor one that s
 - [Gibson environment](https://github.com/StanfordVL/GibsonEnv). "Real-World Perception for Embodied Agents". You can load robots in and they can walk around in realistic looking scenes.
 - [AI2-THOR environment](https://ai2thor.allenai.org/). Realistic scenes, Unity 3D physics, has simulated and real world counterparts.
 - [DeepMind Lab](https://github.com/deepmind/lab). 3D learning environment based on Quake III engine. This is often used in video prediction work, especially from Alphabet.
+- [ViZDoom](http://vizdoom.cs.put.edu.pl/). 3D environment based on DOOM game. Also customizable. 
 
 ### Other miniaturized environments and datasets
 - [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
