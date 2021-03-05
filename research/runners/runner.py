@@ -3,7 +3,7 @@ import utils
 import data
 from define_config import env_fn
 from nets.flatimage import FlatImageTransformer
-from nets.vqvae import VQVAE
+from nets.combined import Combined
 
 class Runner:
   def __init__(self, C):
@@ -14,5 +14,5 @@ class Runner:
     if self.C.model == 'frame_token':
       self.model = FlatImageTransformer(self.env, C)
     elif self.C.model == 'encdec':
-      self.model = VQVAE(self.env, C)
+      self.model = Combined(self.env, C)
     self.model.to(C.device)

@@ -138,6 +138,11 @@ At the same time, boxLCD aims to remain computationally tractable and easy to wo
 - **simple rendering.** boxLCD enables color and variable sized rendering, but the default envs use at most a `16x32 = 544` sized binary images (smaller than MNIST)
 - **programmatic and customizable.** boxLCD lets you geneate new scenarios and customize the environments to different settings you want to test.
 
+<!--
+Qualitatively, you can deal with the sequence learning and logic task independent of high resolution
+and getting the textures right. So it decouples the problem a bit and makes things simpler.
+-->
+
 boxLCD is in active development.
 At the moment, we are focused on developing environments and training models with the sole purpose of learning accurate physics models (not solving goals).
 I do believe that pushing on accuracy purely will be highely correlated with useful models.
@@ -152,6 +157,7 @@ But in the future, we plan to expand this scope and design tasks that leverage o
 - maybe multiple image channels to represent these different layers 
 - envs that challenge the ability to interface with information about a scene, like descriptions of properties of multiple objects and inferring which properties describe which object
 - more formal benchmarks and bits/dim baselines
+- adding modality of sound. possibly through some pseudo-sound signal. like some simple and short waveform if the robot's limb hits the ground. for a bouncing ball, it would be a different waveform with amplitude proportional to distance from robot.
 
 ![](./assets/roadmap_pic.png)
 
