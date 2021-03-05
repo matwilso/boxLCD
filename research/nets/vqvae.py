@@ -116,7 +116,6 @@ class Decoder(nn.Module):
         nn.Conv2d(H, H, 3, padding=1),
         nn.ReLU(),
         nn.Conv2d(H, 1, 3, padding=1),
-        nn.ReLU(),
     )
   def forward(self, x):
     return self.net(x)

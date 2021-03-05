@@ -135,7 +135,7 @@ class EncDecTrainer(Trainer):
     #self.logger['dt/sample'] = [time.time()-sample_start]
     loss, metrics = self.model.loss(batch, eval=True)
     lcd = batch['lcd'][:8]
-    decoded = metrics.pop('decoded')[:8]
+    decoded = 1.0*(metrics.pop('decoded')[:8].exp() > 0.5)
     error = (decoded - lcd + 1.0) / 2.0
     stack = th.cat([lcd, decoded, error], -2)
     self.writer.add_image('decode', utils.combine_imgs(stack, 1, 8)[None], i)
