@@ -40,6 +40,7 @@ if __name__ == '__main__':
   obs_log = False
   omax = 0.0
   ret = 0
+  delay = 1/80.0
 
   # KEY BINDINGS
   # 0 - reset env
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     if check(KEY._0) or check(KEY.NUM_0):
       #env.seed(0)
       start = env.reset()
-      time.sleep(0.1)
+      time.sleep(0.01)
     if check(KEY.SPACE):
       paused = not paused
     if check(KEY.P):
@@ -71,6 +72,11 @@ if __name__ == '__main__':
       reset_on_done = not reset_on_done
     if check(KEY.ESCAPE): 
       exit()
+    if check(KEY.S):
+      delay *= 2
+    if check(KEY.F):
+      delay /= 2
+
 
     if not paused or check(KEY.RIGHT):
       action = env.action_space.sample()
@@ -86,6 +92,7 @@ if __name__ == '__main__':
         #env.seed(0)
         start = obs = env.reset()
     img = env.render(mode='human')
+    time.sleep(delay)
 
     if plotting:
       plt.imshow(img); plt.show()
