@@ -2,27 +2,14 @@ import subprocess
 import sys
 import pathlib
 import boxLCD.utils
-from boxLCD import envs
+from boxLCD import envs, env_map
 from boxLCD import C as boxLCD_C
 from boxLCD import wrappers
 from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
   def _make():
-    if C.env == 'dropbox':
-      env = envs.Dropbox(C)
-    elif C.env == 'bounce':
-      env = envs.Bounce(C)
-    elif C.env == 'boxor':
-      env = envs.BoxOrCircle(C)
-    elif C.env == 'urchin':
-      env = envs.Urchin(C)
-    elif C.env == 'urchin_ball':
-      env = envs.UrchinBall(C)
-    elif C.env == 'urchin_balls':
-      env = envs.UrchinBalls(C)
-    elif C.env == 'urchin_cubes':
-      env = envs.UrchinCubes(C)
+    env = env_map[C.env](C)
     env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env
@@ -38,10 +25,11 @@ def config():
   C.device = 'cuda' # 'cuda', 'cpu'
   C.mode = 'world'
   C.model = 'frame_token'
+  C.datamode = 'video'
   C.ipython_mode = 0
 
   #C.data_mode = 'image'
-  C.amp = 1
+  C.amp = 0
   C.done_n = 1000000
   C.save_n = 5
   C.full_state = 0

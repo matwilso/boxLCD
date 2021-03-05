@@ -56,6 +56,9 @@ if __name__ == '__main__':
   if C.mode == 'world':
     trainer = runners.WorldTrainer(C)
     trainer.run()
+  elif C.mode == 'encdec':
+    trainer = runners.EncDecTrainer(C)
+    trainer.run()
   elif C.mode == 'viz':
     vizer = runners.Vizer(C)
     if C.ipython_mode:

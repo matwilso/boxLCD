@@ -11,11 +11,9 @@ import torch
 from torch import distributions as tdib
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate
-from nets.gpt import GPT
-from nets.gpt_world import GPTWorld
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
 
-class AutoWorld(nn.Module):
+class FlatImageTransformer(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     self.C = C
@@ -36,10 +34,36 @@ class AutoWorld(nn.Module):
     if 'state' in self.C.subset:
       self.size += self.state_n
       self.gpt_size += 128
-    #self.temporal = GPTWorld(size=self.gpt_size, block_size=self.C.ep_len, dist=self.C.decode, cond=None, C=C)
-    self.temporal = GPTWorld(size=self.gpt_size, block_size=self.C.ep_len, dist=self.C.decode, cond=self.act_n, C=C)
+
+    self.dist = self.C.decode
+    self.block_size = self.C.ep_len
+
     self.linear_up = nn.Linear(self.state_n, 128)
     self.to(C.device)
+
+    self.pos_emb = nn.Parameter(torch.zeros(1, self.block_size, C.n_embed))
+    self.cond_in = nn.Linear(self.act_n, C.n_embed//2, bias=False)
+    # input embedding stem
+    self.embed = nn.Linear(self.gpt_size, C.n_embed//2, bias=False)
+    # transformer
+    self.blocks = nn.Sequential(*[Block(self.block_size, C) for _ in range(C.n_layer)])
+    # decoder head
+    self.ln_f = nn.LayerNorm(C.n_embed)
+    if self.dist == 'gauss':
+      self.dist_head = GaussHead(self.gpt_size, C)
+    elif self.dist == 'mdn':
+      self.dist_head = MDNHead(self.gpt_size, C)
+    elif self.dist == 'binary':
+      self.dist_head = BinaryHead(C.n_embed, self.gpt_size, C)
+    elif self.dist == 'multi':
+      if self.C.conv_io:
+        self.dist_head = MultiHead(C.n_embed, 256, 128, C)
+      else:
+        self.dist_head = MultiHead(C.n_embed, C.state_n+self.imsize, self.imsize, C)
+    if self.C.conv_io:
+      self.custom_embed = ConvEmbed(self.imsize, C.n_embed//2, C)
+    self.to(C.device)
+
 
   def forward(self, batch):
     BS, EPL,*HW = batch['lcd'].shape
@@ -54,10 +78,22 @@ class AutoWorld(nn.Module):
     if 'image' in self.C.subset and 'state' in self.C.subset:
       zstate = self.linear_up(state)
       x = torch.cat([lcd, zstate], -1)
-
-    #bindist, statedist = self.temporal.forward(x, cond=None)
-    bindist, statedist = self.temporal.forward(x, cond=acts)
-    return bindist, statedist
+    BS, T, E = x.shape
+    # SHIFT RIGHT (add a padding on the left)
+    x = torch.cat([torch.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
+    # forward the GPT model
+    if self.C.conv_io:
+      x = self.custom_embed(x)
+    x = self.embed(x)
+    cin = self.cond_in(acts)
+    if acts.ndim == 2:
+      x = torch.cat([x, cin[:,None].repeat_interleave(self.block_size, 1)], -1)
+    else:
+      x = torch.cat([x, cin], -1)
+    x += self.pos_emb # each position maps to a (learnable) vector
+    x = self.blocks(x)
+    logits = self.ln_f(x)
+    return self.dist_head(logits)
 
   def loss(self, batch):
     BS, EPL,*HW = batch['lcd'].shape
@@ -97,18 +133,18 @@ class AutoWorld(nn.Module):
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
         batch['lcd'][:, :5] = lcd
         batch['state'][:, :5] = prompts['state']
-        start = lcd.shape[1]-1
+        start = lcd.shape[1]
 
-      for i in range(start, self.block_size-1):
+      for i in range(start, self.block_size):
         # TODO: check this setting since we have modified things
         bindist, statedist = self.forward(batch)
         if 'image' in self.C.subset:
-         batch['lcd'][:, i+1] = bindist.sample()[:,i]
+         batch['lcd'][:, i] = bindist.sample()[:,i]
         if 'state' in self.C.subset:
-          batch['state'][:, i+1] = statedist.mean[:,i]
+          batch['state'][:, i] = statedist.mean[:,i]
           #batch['state'][:, i+1] = statedist.sample()[:,i]
 
-        if i == self.block_size-2:
+        if i == self.block_size-1:
           sample_loss = self.loss(batch)[0]
 
     batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)

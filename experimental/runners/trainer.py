@@ -16,7 +16,6 @@ import utils
 import data
 from runners.runner import Runner
 from define_config import env_fn
-from nets.state import StateTransformer
 
 class Trainer(Runner):
   def __init__(self, C):

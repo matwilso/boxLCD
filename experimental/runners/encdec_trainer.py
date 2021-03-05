@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
 import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 import numpy as np
@@ -18,7 +19,7 @@ import data
 from runners.trainer import Trainer
 from define_config import env_fn
 
-class WorldTrainer(Trainer):
+class EncDecTrainer(Trainer):
   def __init__(self, C):
     super().__init__(C)
     self.optimizer = Adam(self.model.parameters(), lr=C.lr)
@@ -46,6 +47,7 @@ class WorldTrainer(Trainer):
       self.logger['loss'] += [loss.detach().cpu()]
 
   def sample(self, i):
+    import ipdb; ipdb.set_trace()
     # TODO: prompt to a specific point and sample from there. to compare against ground truth.
     N = self.C.num_envs
     if True:
@@ -128,9 +130,15 @@ class WorldTrainer(Trainer):
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
         loss, metrics = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
-    sample_start = time.time()
-    self.sample(i)
-    self.logger['dt/sample'] = [time.time()-sample_start]
+    #sample_start = time.time()
+    #self.sample(i)
+    #self.logger['dt/sample'] = [time.time()-sample_start]
+    loss, metrics = self.model.loss(batch, eval=True)
+    lcd = batch['lcd'][:8]
+    decoded = metrics.pop('decoded')[:8]
+    error = (decoded - lcd + 1.0) / 2.0
+    stack = th.cat([lcd, decoded, error], -2)
+    self.writer.add_image('decode', utils.combine_imgs(stack, 1, 8)[None], i)
     self.logger['num_vars'] = self.num_vars
     self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
     self.writer.flush()

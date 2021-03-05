@@ -73,3 +73,18 @@ def force_shape(out):
     out = torch.cat([out,torch.zeros(out.shape[:-1])[...,None]], -1)
   out = out.reshape(T, C, H, N * (W+1))[None]
   return out
+
+def combine_imgs(arr, row=5, col=5):
+  """takes batch of video or image and pushes the batch dim into certain image shapes given by b,row,col"""
+  if len(arr.shape) == 4:  # image
+    BS, C, H, W = arr.shape
+    assert BS == row * col, (BS, row, col, H, W)
+    x = arr.reshape([row, col, H, W]).permute(0, 2, 1, 3).flatten(0, 1).flatten(-2)
+    return x
+  elif len(arr.shape) == 5:  # video
+    BS, T, C, H, W = arr.shape
+    assert BS == row * col, (BS, T, row, col, H, W)
+    x = arr.reshape([row, col, T, H, W]).permute(2, 0, 3, 1, 4).flatten(1, 2).flatten(-2)
+    return x
+  else:
+    raise NotImplementedError()

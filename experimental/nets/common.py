@@ -1,5 +1,4 @@
 from define_config import env_fn
-from nets.flows import RealNVP, AffineTransform, MixtureCDFFLowCoupling
 import sys
 from collections import defaultdict
 import numpy as np
@@ -175,28 +174,39 @@ class ConvEmbed(nn.Module):
     x = x.reshape(BS, LEN, -1)
     return x
 
-class FlowHead(nn.Module):
-  def __init__(self, in_n, out_n, C):
+class GPTDist(nn.Module):
+  def __init__(self, gpt, x):
     super().__init__()
-    env = env_fn(C)()
+    self.gpt = gpt
+    self.x = x
+  def log_prob(self, state):
+    x = state.flatten(0,1)[...,None]
+    dist = self.gpt.forward(x, cond=self.x.flatten(0,1))
+    return dist.log_prob(x)
+  def sample(self, prompts=None):
+    shape = self.x.shape
+    return self.gpt.sample(np.prod(shape[:2]), cond=self.x.flatten(0,1), prompts=prompts)[0].reshape(shape[:2] + (-1,))
+
+class MultiHead(nn.Module):
+  def __init__(self, in_n, out_n, split, C):
+    super().__init__()
     self.C = C
     self.in_n = in_n
     self.out_n = out_n
-    kwargs = dict(cond_size=self.in_n, n_hidden=2, hidden_size=256, C=self.C)
-    rng = np.random.RandomState(0)
-    masks = []
-    for i in range(2):
-      if i % 2 == 0:
-        masks += [np.r_[np.ones(8), np.zeros(8)]]
-      else:
-        masks += [np.r_[np.zeros(8), np.ones(8)]]
-      #masks += [rng.choice(np.arange(self.out_n), size=8, replace=False)]
-    self.transforms = [MixtureCDFFLowCoupling(self.out_n, masks[i], **kwargs) for i in range(len(masks))]
-    #self.transforms = [AffineTransform(self.out_n, masks[i], **kwargs) for i in range(len(masks))]
+    self.split = split
+    self.layer = nn.Linear(in_n, in_n * 2)
+    if self.C.conv_io:
+      self.binary = ConvBinHead(in_n, self.split, C)
+    else:
+      self.binary = BinaryHead(in_n, self.split, C)
+    #self.state = FlowHead(in_n, out_n - self.split, C)
+    #self.state = GaussHead(in_n, out_n-self.split, C) 
+    self.state = MDNHead(in_n, out_n-self.split, C) 
+    #self.state = GPT(1, block_size=out_n-self.split, dist='mdn', cond=in_n, C=C) 
 
   def forward(self, x, past_o=None):
-    realnvp = RealNVP(self.out_n, self.transforms, cond=x, C=self.C).to(self.C.device)
-    import ipdb; ipdb.set_trace()
-    realnvp.sample()
-    #import ipdb; ipdb.set_trace()
-    return realnvp
+    xb, xs = self.layer(x).chunk(2, -1)
+    bin = self.binary(xb) if 'image' in self.C.subset else None
+    state = self.state(xs) if 'state' in self.C.subset else None
+    #return bin, GPTDist(self.state, xs)
+    return bin, state

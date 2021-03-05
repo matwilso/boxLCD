@@ -18,8 +18,9 @@ class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile, allow_pickle=True)
     self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
-    if C.mode == 'image':
+    if C.mode == 'encdec':
       self.bufs = {key: val.flatten(0, 1) for key, val in self.bufs.items()}
+      self.bufs['lcd'] = self.bufs['lcd'][:,None]
     cut = int(len(self.bufs['acts']) * 0.8)
     #if C.full_state:
     #  self.bufs['state'] = self.bufs.pop('full_state')
