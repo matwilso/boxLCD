@@ -14,7 +14,6 @@ from datetime import datetime
 from boxLCD.utils import A
 import utils
 import data
-from runners.runner import Runner
 from define_config import env_fn
 from pyglet.gl import glClearColor
 KEY = pyglet.window.key
@@ -77,7 +76,7 @@ class AutoEnv:
   def make_prompt(self):
     pass
 
-class Vizer(Runner):
+class Vizer:
   def __init__(self, C):
     super().__init__(C)
     C.block_size = C.ep_len

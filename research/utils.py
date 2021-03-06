@@ -79,7 +79,10 @@ def combine_imgs(arr, row=5, col=5):
   if len(arr.shape) == 4:  # image
     BS, C, H, W = arr.shape
     assert BS == row * col, (BS, row, col, H, W)
-    x = arr.reshape([row, col, H, W]).permute(0, 2, 1, 3).flatten(0, 1).flatten(-2)
+    if isinstance(arr, np.ndarray):
+      x = arr.reshape([row, col, H, W]).transpose(0, 2, 1, 3).reshape([row*H, col*W])
+    else:
+      x = arr.reshape([row, col, H, W]).permute(0, 2, 1, 3).flatten(0, 1).flatten(-2)
     return x
   elif len(arr.shape) == 5:  # video
     BS, T, C, H, W = arr.shape

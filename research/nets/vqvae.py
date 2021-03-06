@@ -36,8 +36,8 @@ class VQVAE(nn.Module):
     #self.transformerCNN = TransformerCNN(in_size=C.vqK, block_size=4*4, head='cat', C=C)
     #self.prior_optimizer = Adam(self.transformerCNN.parameters(), lr=C.prior_lr, betas=(0.5, 0.999))
 
-  def loss(self, x, eval=False):
-    x = x['lcd']
+  def loss(self, batch, eval=False):
+    x = batch['lcd']
     embed_loss, decoded, perplexity, idxs = self.forward(x)
     recon_loss = -tdib.Bernoulli(logits=decoded).log_prob(x).mean()
     loss = recon_loss + embed_loss
@@ -77,7 +77,7 @@ class Encoder(nn.Module):
         nn.ReLU(),
         nn.Conv2d(H, H, 3, 2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(H, H, 3, 2, padding=1),
+        nn.Conv2d(H, H, 3, 1, padding=1),
         nn.ReLU(),
         nn.Conv2d(H, C.vqD, 3, 1, padding=1),
         nn.ReLU(),
@@ -113,7 +113,6 @@ class Decoder(nn.Module):
     return self.net(x)
 
 class VectorQuantizer(nn.Module):
-  """from: https://github.com/MishaLaskin/vqvae"""
   def __init__(self, K, D, beta, C):
     super().__init__()
     self.K = K
@@ -127,8 +126,9 @@ class VectorQuantizer(nn.Module):
     return z_q
 
   def forward(self, z):
-    # reshape z -> (batch, height, width, channel) and flatten
-    z = z.permute(0, 2, 3, 1).contiguous()
+    if z.ndim == 4:
+      # reshape z -> (batch, height, width, channel) and flatten
+      z = z.permute(0, 2, 3, 1).contiguous()
     z_flattened = z.view(-1, self.D)
     # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
     d = th.sum(z_flattened ** 2, dim=1, keepdim=True) + th.sum(self.embedding.weight**2, dim=1) - 2 * th.matmul(z_flattened, self.embedding.weight.t())
@@ -146,6 +146,23 @@ class VectorQuantizer(nn.Module):
     e_mean = th.mean(min_encodings, dim=0)
     perplexity = th.exp(-th.sum(e_mean * th.log(e_mean + 1e-10)))
     # reshape back to match original input shape
-    z_q = z_q.permute(0, 3, 1, 2).contiguous()
+    if z.ndim == 4:
+      z_q = z_q.permute(0, 3, 1, 2).contiguous()
     return loss, z_q, perplexity, min_encoding_indices.view(z.shape[:-1])
 
+class Decoder(nn.Module):
+  def __init__(self, C):
+    super().__init__()
+    H = C.n_embed
+
+    self.net = nn.Sequential(
+        Upsample(C.vqD, H),
+        nn.ReLU(),
+        Upsample(H, H),
+        nn.ReLU(),
+        nn.Conv2d(H, H, 3, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(H, 1, 3, padding=1),
+    )
+  def forward(self, x):
+    return self.net(x)

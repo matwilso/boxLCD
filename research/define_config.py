@@ -23,17 +23,16 @@ def config():
   C.buffdir = pathlib.Path('.')
   C.datapath = pathlib.Path('.')
   C.device = 'cuda' # 'cuda', 'cpu'
-  C.mode = 'world'
+  C.mode = 'train'
   C.model = 'frame_token'
   C.datamode = 'video'
   C.ipython_mode = 0
 
   #C.data_mode = 'image'
   C.amp = 0
-  C.done_n = 1000000
+  C.num_epochs = 1000000
   C.save_n = 5
   C.full_state = 0
-  C.num_vars = 0
 
   C.decode = 'multi'
   C.conv_io = 0
@@ -51,7 +50,7 @@ def config():
   C.log_n = 1000
   C.data_frac = 1.0
   C.vanished = 1
-  C.num_envs = 5
+  C.num_envs = 8
 
   C.mdn_k = 5
   C.dist_delta = 0
@@ -63,6 +62,9 @@ def config():
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
   C.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
+
+  # values set by the code
+  C.num_vars = 0
 
   pastKeys = list(C.keys())
   for key, val in boxLCD_C.items():

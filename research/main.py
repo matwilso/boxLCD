@@ -21,10 +21,8 @@ import PIL.Image as Image
 from boxLCD.utils import A
 import utils
 import runners
-
-# TODO: handle partial obs for agent info, not just object
-# TODO [2021/02/01]: separate out links and actions and feed in separately in an MHDPA or TF block for good GNN mixing.
-# TODO [2021/02/09]: add some episode writer stuff. so you can write things more chunked then 1e6 rollouts.
+from nets.combined import Combined
+from nets.flatimage import FlatImageTransformer
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -52,12 +50,17 @@ if __name__ == '__main__':
   C = parser.parse_args()
   C.lcd_w = int(C.wh_ratio*C.lcd_base)
   C.lcd_h = C.lcd_base
+  env = env_fn(C)()
+  if C.model == 'frame_token':
+    model = FlatImageTransformer(env, C)
+  elif C.model == 'encdec':
+    assert C.datamode == 'image'
+    model = Combined(env, C)
+  model.to(C.device)
+  C.num_vars = utils.count_vars(model)
 
-  if C.mode == 'world':
-    trainer = runners.WorldTrainer(C)
-    trainer.run()
-  elif C.mode == 'encdec':
-    trainer = runners.EncDecTrainer(C)
+  if C.mode == 'train':
+    trainer = runners.Trainer(model, env, C)
     trainer.run()
   elif C.mode == 'viz':
     vizer = runners.Vizer(C)

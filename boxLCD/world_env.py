@@ -269,7 +269,7 @@ class WorldEnv(gym.Env, EzPickle):
       body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       self.dynbodies[obj.name] = body
 
-  def reset(self, inject_obs=None):
+  def reset(self, full_state=None):
     self.ep_t = 0
     self._destroy()
     self.statics = {}
@@ -283,31 +283,31 @@ class WorldEnv(gym.Env, EzPickle):
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
     #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
-    if inject_obs is not None:
-      inject_obs = utils.NamedArray(np.array(inject_obs).astype(np.float), self.obs_info)
+    if full_state is not None:
+      full_state = utils.NamedArray(np.array(full_state).astype(np.float), self.obs_info)
 
       if len(self.world_def.robots) != 0:
         name = self.world_def.robots[0].name + ':root'
-        root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
+        root_xy = full_state[f'{name}:x:p', f'{name}:y:p']
 
       for obj in self.world_def.objects:
         name = obj.name
         body = self.dynbodies[name]
-        self.dynbodies[name].position = xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
+        self.dynbodies[name].position = xy = full_state[f'{name}:x:p', f'{name}:y:p']
         if self.C.all_corners:
           import ipdb; ipdb.set_trace()  # TODO: make comp angle work with object as well
           self.dynbodies[name].angle = self._comp_angle(name, body, xy)
         else:
-          self.dynbodies[name].angle = np.arctan2(inject_obs(name + ':sin'), inject_obs(name + ':cos'))
+          self.dynbodies[name].angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
 
       for robot in self.world_def.robots:
         name = robot.name + ':root'
-        self.dynbodies[f'{name}'].position = root_xy = inject_obs[f'{name}:x:p', f'{name}:y:p']
+        self.dynbodies[f'{name}'].position = root_xy = full_state[f'{name}:x:p', f'{name}:y:p']
 
         if self.C.all_corners:
           self.dynbodies[f'{name}'].angle = root_angle = self._comp_angle(name, robot.root_body, root_xy)
         else:
-          self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(inject_obs(name + ':sin'), inject_obs(name + ':cos'))
+          self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
         parent_angles = {}
         parent_angles[name] = root_angle
 
@@ -315,7 +315,7 @@ class WorldEnv(gym.Env, EzPickle):
           name = robot.name + ':' + bj_name
           body = robot.bodies[bj_name]
           joint = robot.joints[bj_name]
-          parent_name = roborobote + ':' + joint.parent
+          parent_name = robot.name + ':' + joint.parent
           mangle = root_angle + joint.angle
           mangle = np.arctan2(np.sin(mangle), np.cos(mangle))
           parent_angles[name] = mangle
@@ -329,14 +329,14 @@ class WorldEnv(gym.Env, EzPickle):
           rot = utils.make_rot(mangle)
           ab_delta = rot.dot(ab_delta)
           if self.C.root_offset:
-            self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[root_xy] + A[(inject_obs[name + ':x:p'], inject_obs[name + ':y:p'])]
+            self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[root_xy] + A[(full_state[name + ':x:p'], full_state[name + ':y:p'])]
           else:
-            self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(inject_obs[name + ':x:p'], inject_obs[name + ':y:p'])]
+            self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(full_state[name + ':x:p'], full_state[name + ':y:p'])]
 
           if self.C.all_corners:
             offset_angle = self._comp_angle(name, robot.bodies[name.split(':')[1]], pos)
           else:
-            offset_angle = np.arctan2(inject_obs[name + ':sin'], inject_obs[name + ':cos'])
+            offset_angle = np.arctan2(full_state[name + ':sin'], full_state[name + ':cos'])
             if self.C.angular_offset:
               offset_angle = root_angle + offset_angle
               offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))

@@ -97,6 +97,10 @@ class LCDEnv(gym.Env, EzPickle):
     return self.env.lcd_render()
 
   def reset(self, *args, **kwargs):
+    if 'state' in kwargs:
+      full_state = np.zeros(self.observation_space.spaces['full_state'].shape)
+      full_state[self.pobs_idxs] = kwargs['state']
+      kwargs = {'full_state': full_state}
     full_state = self.env.reset(*args, **kwargs)
     state = full_state[self.pobs_idxs] if self.num_pobs != 0 else np.zeros(1)
     return {'state': state, 'lcd': self.env.lcd_render(), 'full_state': full_state}

@@ -18,7 +18,7 @@ class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile, allow_pickle=True)
     self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
-    if C.mode == 'encdec':
+    if C.datamode == 'image':
       self.bufs = {key: val.flatten(0, 1) for key, val in self.bufs.items()}
       self.bufs['lcd'] = self.bufs['lcd'][:,None]
     cut = int(len(self.bufs['acts']) * 0.8)
@@ -28,6 +28,7 @@ class RolloutDataset(Dataset):
       self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
     else:
       self.bufs = {key: val[cut:] for key, val in self.bufs.items()}
+    self.C = C
 
   def __len__(self):
     return len(self.bufs['acts'])
@@ -38,7 +39,6 @@ class RolloutDataset(Dataset):
     return elem
 
 def load_ds(C):
-  from torchvision import transforms
   train_dset = RolloutDataset(C.datapath, train=True, C=C)
   test_dset = RolloutDataset(C.datapath, train=False, C=C)
   #train_dset = RolloutDataset(C.datapath / 'dump.npz', train=True, C=C)
