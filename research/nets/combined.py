@@ -28,10 +28,10 @@ class Combined(nn.Module):
     super().__init__()
     self.vqvae = VQVAE(env, C)
     self.state_vqvae = State_VQVAE(env, C)
-    self.gpt = GPT(C.vqK, 8+24, C=C)
+    self.gpt = GPT(C.vqK, 8 + 24, C=C)
     self.image_optimizer = Adam(self.vqvae.parameters(), lr=C.lr)
     self.state_optimizer = Adam(self.state_vqvae.parameters(), lr=C.lr)
-    self.gpt_optimizer = Adam(self.gpt.parameters(), lr=1e-3)
+    self.gpt_optimizer = Adam(self.gpt.parameters(), lr=1e-3, betas=(0.5, 0.999))
     self.env = env
     self.C = C
 
@@ -58,17 +58,18 @@ class Combined(nn.Module):
     code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
     gpt_dist = self.gpt.forward(code_idxs)
     prior_loss = -gpt_dist.log_prob(code_idxs).mean()
+    prior_loss.backward()
     self.gpt_optimizer.step()
 
     return {
-      'prior_loss': prior_loss,
-      **{'image/'+key: val for key, val in imetrics.items()},
-      **{'state/'+key: val for key, val in smetrics.items()}
-      }
+        'prior_loss': prior_loss,
+        **{'image/' + key: val for key, val in imetrics.items()},
+        **{'state/' + key: val for key, val in smetrics.items()}
+    }
 
   def evaluate(self, writer, batch, epoch):
     iloss, imetrics = self.vqvae.loss(batch, eval=True, return_idxs=True)
-    pred_lcd = 1.0*(imetrics.pop('decoded')[:8].exp() > 0.5)
+    pred_lcd = 1.0 * (imetrics.pop('decoded')[:8].exp() > 0.5)
     lcd = batch['lcd'][:8]
     error = (pred_lcd - lcd + 1.0) / 2.0
     stack = th.cat([lcd, pred_lcd, error], -2)
@@ -83,25 +84,28 @@ class Combined(nn.Module):
     truths = []
     for s in true_state:
       truths += [self.env.reset(state=s)['lcd']]
-    preds = 1.0*np.stack(preds)
-    truths = 1.0*np.stack(truths)
+    preds = 1.0 * np.stack(preds)
+    truths = 1.0 * np.stack(truths)
     error = (preds - truths + 1.0) / 2.0
-    stack = np.concatenate([truths, preds, error], -2)[:,None]
+    stack = np.concatenate([truths, preds, error], -2)[:, None]
     writer.add_image('state/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
     # SAMPLE
     # image based on state
+    # TODO: test with original idxs. no changes.
     image_idxs = imetrics.pop('idxs')
     state_idxs = smetrics.pop('idxs')
-    idxs = th.cat([state_idxs, th.zeros_like(image_idxs.flatten(-2))], -1)
+    idxs = th.cat([state_idxs, image_idxs.flatten(-2)], -1)
+    #idxs = th.cat([state_idxs, th.zeros_like(image_idxs.flatten(-2))], -1)
     code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
     for i in range(7, self.gpt.block_size):
       dist = self.gpt.forward(code_idxs)
-      code_idxs[:,i] = dist.sample()[:,i]
-    sample_image_idxs = code_idxs[:,8:].reshape(-1, 4, 6, self.C.vqK)
-    prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).permute(0,3,1,2)
+      code_idxs[:, i] = dist.sample()[:, i]
+    sample_image_idxs = code_idxs[:, 8:]
+    prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).reshape([-1, 4, 6, self.C.vqD]).permute(0, 3, 1, 2)
+    #prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).permute(0,2,1).reshape([-1, self.C.vqD, 4, 6])
     decoded = self.vqvae.decoder(prior_enc)[:8]
-    sample_lcd = 1.0*(decoded.exp() > 0.5)
+    sample_lcd = 1.0 * (decoded.exp() > 0.5)
     error = (sample_lcd - lcd + 1.0) / 2.0
     stack = th.cat([lcd, sample_lcd, error], -2)
     writer.add_image('state2image_sample', utils.combine_imgs(stack, 1, 8)[None], epoch)
