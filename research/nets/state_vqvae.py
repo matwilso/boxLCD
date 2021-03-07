@@ -26,9 +26,6 @@ class State_VQVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.n_embed
-    C.vqD = 128
-    C.vqK = 256
-    C.beta = 0.25
     # encoder -> VQ -> decoder
     self.state_n = env.observation_space['state'].shape[0]
     self.encoder = Encoder(self.state_n, C)
@@ -36,7 +33,7 @@ class State_VQVAE(nn.Module):
     self.decoder = Decoder(self.state_n, C)
     self.C = C
 
-  def loss(self, x, eval=False):
+  def loss(self, x, eval=False, return_idxs=False):
     x = x['state']
     embed_loss, dec_dist, perplexity, idxs = self.forward(x)
     recon_loss = -dec_dist.log_prob(x).mean()
@@ -44,6 +41,8 @@ class State_VQVAE(nn.Module):
     metrics = {'vq_vae_loss': loss, 'recon_loss': recon_loss, 'embed_loss': embed_loss, 'perplexity': perplexity}
     if eval:
       metrics['decoded'] = dec_dist
+    if return_idxs:
+      metrics['idxs'] = idxs
     return loss, metrics
 
   def forward(self, x):

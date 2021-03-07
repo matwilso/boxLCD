@@ -126,15 +126,24 @@ class MDNHead(nn.Module):
     dist = tdib.MixtureSameFamily(cat, tdib.MultivariateNormal(mu, torch.diag_embed(std)))
     return dist
 
-class BinaryHead(nn.Module):
+class CategoricalHead(nn.Module):
+  """take logits and produce a multinomial distribution independently"""
   def __init__(self, in_n, out_n, C):
     super().__init__()
-    self.C = C
     self.layer = nn.Linear(in_n, out_n)
+  def forward(self, x):
+    x = self.layer(x)
+    return tdib.Multinomial(logits=x)
 
-  def forward(self, x, past_o=None):
+class BinaryHead(nn.Module):
+  """take logits and produce a bernoulli distribution independently"""
+  def __init__(self, in_n, out_n, C):
+    super().__init__()
+    self.layer = nn.Linear(in_n, out_n)
+  def forward(self, x):
     x = self.layer(x)
     return tdib.Bernoulli(logits=x)
+
 
 class ConvBinHead(nn.Module):
   def __init__(self, in_n, out_n, C):

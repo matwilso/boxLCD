@@ -46,6 +46,12 @@ def config():
   C.n_layer = 2
   C.n_head = 4
   C.n_embed = 128
+
+  C.vqD = 128
+  C.vqK = 256
+  C.beta = 0.25
+
+
   C.min_std = 1e-4
   C.log_n = 1000
   C.data_frac = 1.0

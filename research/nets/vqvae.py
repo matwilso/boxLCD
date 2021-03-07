@@ -25,33 +25,22 @@ class VQVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.n_embed
-    C.vqD = 128
-    C.vqK = 256
-    C.beta = 0.25
     # encoder -> VQ -> decoder
     self.encoder = Encoder(C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
     self.decoder = Decoder(C)
-    ## prior. this is usually learned after the other stuff has been trained, but we do it all in one swoop.
-    #self.transformerCNN = TransformerCNN(in_size=C.vqK, block_size=4*4, head='cat', C=C)
-    #self.prior_optimizer = Adam(self.transformerCNN.parameters(), lr=C.prior_lr, betas=(0.5, 0.999))
 
-  def loss(self, batch, eval=False):
+  def loss(self, batch, eval=False, return_idxs=False):
     x = batch['lcd']
     embed_loss, decoded, perplexity, idxs = self.forward(x)
     recon_loss = -tdib.Bernoulli(logits=decoded).log_prob(x).mean()
     loss = recon_loss + embed_loss
     prior_loss = th.zeros(1)
-    # PRIOR
-    #self.zero_grad()
-    #code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float().flatten(1,2)
-    #dist = self.transformerCNN.forward(code_idxs)
-    #prior_loss = -dist.log_prob(code_idxs).mean()
-    #prior_loss.backward()
-    #self.prior_optimizer.step()
     metrics = {'vq_vae_loss': loss, 'recon_loss': recon_loss, 'embed_loss': embed_loss, 'perplexity': perplexity, 'prior_loss': prior_loss}
     if eval:
       metrics['decoded'] = decoded
+    if return_idxs:
+      metrics['idxs'] = idxs
     return loss, metrics
 
   def forward(self, x):
