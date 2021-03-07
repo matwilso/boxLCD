@@ -59,17 +59,17 @@ if __name__ == '__main__':
   C.imsize = C.lcd_w*C.lcd_h
   C.window = C.vidstack * C.stacks_per_block
   C = env.C
-  if C.model == 'frame_token':
-    model = FlatImageTransformer(env, C)
-  elif C.model == 'single':
-    assert C.datamode == 'image'
-    model = Combined(env, C)
-  elif C.model == 'multistep':
-    assert C.vidstack < C.ep_len
-    model = Multistep(env, C)
-
-  model.to(C.device)
-  C.num_vars = utils.count_vars(model)
+  if C.mode not in ['collect']:
+    if C.model == 'frame_token':
+      model = FlatImageTransformer(env, C)
+    elif C.model == 'single':
+      assert C.datamode == 'image'
+      model = Combined(env, C)
+    elif C.model == 'multistep':
+      assert C.vidstack < C.ep_len
+      model = Multistep(env, C)
+    model.to(C.device)
+    C.num_vars = utils.count_vars(model)
 
   if C.mode == 'train':
     trainer = runners.Trainer(model, env, C)
