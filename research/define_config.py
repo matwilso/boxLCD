@@ -46,6 +46,8 @@ def config():
   C.n_layer = 2
   C.n_head = 4
   C.n_embed = 128
+  C.vidstack = -1
+  C.stacks_per_block = 32
 
   C.vqD = 128
   C.vqK = 256

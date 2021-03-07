@@ -1,3 +1,4 @@
+from research.nets.multistep import Multistep
 from tqdm import tqdm
 import yaml
 import time
@@ -32,30 +33,41 @@ if __name__ == '__main__':
   temp_cfg = parser.parse_args()
   data_yaml = temp_cfg.datapath / 'hps.yaml'
   weight_yaml = temp_cfg.weightdir / 'hps.yaml'
-  defaults = {}
+  defaults = {
+      'vidstack': temp_cfg.ep_len,
+  }
   ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weightdir']
   if data_yaml.exists():
     with data_yaml.open('r') as f:
       load_cfg = yaml.load(f, Loader=yaml.Loader)
     for key in load_cfg.__dict__.keys():
-      if key in ignore: continue
+      if key in ignore:
+        continue
       defaults[key] = load_cfg.__dict__[key]
   if weight_yaml.exists():
     with weight_yaml.open('r') as f:
       weight_cfg = yaml.load(f, Loader=yaml.Loader)
     for key in weight_cfg.__dict__.keys():
-      if key in ignore: continue
+      if key in ignore:
+        continue
       defaults[key] = weight_cfg.__dict__[key]
   parser.set_defaults(**defaults)
   C = parser.parse_args()
-  C.lcd_w = int(C.wh_ratio*C.lcd_base)
-  C.lcd_h = C.lcd_base
   env = env_fn(C)()
+  C.lcd_w = int(C.wh_ratio * C.lcd_base)
+  C.lcd_h = C.lcd_base
+  C.imsize = C.lcd_w*C.lcd_h
+  C.window = C.vidstack * C.stacks_per_block
+  C = env.C
   if C.model == 'frame_token':
     model = FlatImageTransformer(env, C)
-  elif C.model == 'encdec':
+  elif C.model == 'single':
     assert C.datamode == 'image'
     model = Combined(env, C)
+  elif C.model == 'multistep':
+    assert C.vidstack < C.ep_len
+    model = Multistep(env, C)
+
   model.to(C.device)
   C.num_vars = utils.count_vars(model)
 
@@ -84,12 +96,12 @@ if __name__ == '__main__':
       obs = env.reset()
       for j in range(C.ep_len):
         act = env.action_space.sample()
-        for key  in obses:
+        for key in obses:
           obses[key][i, j] = obs[key]
         acts[i, j] = act
         obs, rew, done, info = env.step(act)
-        #plt.imshow(obs['lcd']);plt.show()
-        #env.render()
+        # plt.imshow(obs['lcd']);plt.show()
+        # env.render()
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       pbar.set_description(f'fps: {C.ep_len/(time.time()-start)}')
     C.logdir.mkdir(parents=True, exist_ok=True)

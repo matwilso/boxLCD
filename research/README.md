@@ -1,4 +1,7 @@
-# experimental
+# research
+
+**ENTER AT YOUR OWN RISK**
+
 
 This is basically my personal messy code for training models on boxLCD.
 

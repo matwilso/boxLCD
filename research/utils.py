@@ -18,6 +18,12 @@ def combined_shape(length, shape=None):
 def count_vars(module):
   return sum([np.prod(p.shape) for p in module.parameters()])
 
+def zero_module(module):
+  """Zero out the parameters of a module and return it."""
+  for p in module.parameters():
+    p.detach().zero_()
+  return module
+
 def dump_logger(logger, writer, i, C):
   print('=' * 30)
   print(i)
@@ -26,8 +32,8 @@ def dump_logger(logger, writer, i, C):
     if writer is not None:
       writer.add_scalar(key, val, i)
       if key == 'loss' and i > 0:
-        writer.add_scalar('logx/'+key, val, int(np.log(1e5*i)))
-      #if 'loss' in key:
+        writer.add_scalar('logx/' + key, val, int(np.log(1e5 * i)))
+      # if 'loss' in key:
       #  writer.add_scalar('neg/'+key, -val, i)
     print(key, val)
   print(C.full_cmd)
@@ -67,11 +73,11 @@ def force_shape(out):
   N, T, C, H, W = out.shape
   if isinstance(out, np.ndarray):
     out = out.transpose(1, 2, 3, 0, 4)
-    out = np.concatenate([out,np.zeros(out.shape[:-1], dtype=out.dtype)[...,None]], -1)
+    out = np.concatenate([out, np.zeros(out.shape[:-1], dtype=out.dtype)[..., None]], -1)
   else:
     out = out.permute(1, 2, 3, 0, 4)
-    out = torch.cat([out,torch.zeros(out.shape[:-1])[...,None]], -1)
-  out = out.reshape(T, C, H, N * (W+1))[None]
+    out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
+  out = out.reshape(T, C, H, N * (W + 1))[None]
   return out
 
 def combine_imgs(arr, row=5, col=5):
@@ -80,7 +86,7 @@ def combine_imgs(arr, row=5, col=5):
     BS, C, H, W = arr.shape
     assert BS == row * col, (BS, row, col, H, W)
     if isinstance(arr, np.ndarray):
-      x = arr.reshape([row, col, H, W]).transpose(0, 2, 1, 3).reshape([row*H, col*W])
+      x = arr.reshape([row, col, H, W]).transpose(0, 2, 1, 3).reshape([row * H, col * W])
     else:
       x = arr.reshape([row, col, H, W]).permute(0, 2, 1, 3).flatten(0, 1).flatten(-2)
     return x
@@ -90,4 +96,4 @@ def combine_imgs(arr, row=5, col=5):
     x = arr.reshape([row, col, T, H, W]).permute(2, 0, 3, 1, 4).flatten(1, 2).flatten(-2)
     return x
   else:
-    raise NotImplementedError()
+    assert False, (arr.shape, arr.ndim)

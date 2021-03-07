@@ -59,6 +59,7 @@ class Trainer:
       # LOGGING
       self.logger['num_vars'] = self.num_vars
       self.logger = utils.dump_logger(self.logger, self.writer, epoch, self.C)
+      self.writer.flush()
       if epoch % self.C.save_n == 0:
         path = self.C.logdir / 'model.pt'
         print("SAVED MODEL", path)

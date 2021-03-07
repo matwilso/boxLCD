@@ -34,7 +34,11 @@ class RolloutDataset(Dataset):
     return len(self.bufs['acts'])
 
   def __getitem__(self, idx):
-    elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
+    start = np.random.randint(0, self.C.ep_len-self.C.window)
+    if self.C.datamode == 'video' and self.C.vidstack != self.C.ep_len:
+      elem = {key: torch.as_tensor(val[idx, start:start+self.C.window], dtype=torch.float32) for key, val in self.bufs.items()}
+    else:
+      elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
     elem['lcd'] /= 255.0
     return elem
 

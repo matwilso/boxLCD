@@ -31,7 +31,7 @@ class Combined(nn.Module):
     self.gpt = GPT(C.vqK, 8 + 24, C=C)
     self.image_optimizer = Adam(self.vqvae.parameters(), lr=C.lr)
     self.state_optimizer = Adam(self.state_vqvae.parameters(), lr=C.lr)
-    self.gpt_optimizer = Adam(self.gpt.parameters(), lr=1e-3, betas=(0.5, 0.999))
+    self.gpt_optimizer = Adam(self.gpt.parameters(), lr=1e-3)#, betas=(0.5, 0.999))
     self.env = env
     self.C = C
 
@@ -60,6 +60,7 @@ class Combined(nn.Module):
     prior_loss = -gpt_dist.log_prob(code_idxs).mean()
     prior_loss.backward()
     self.gpt_optimizer.step()
+    # TODO: what about training end2end more?
 
     return {
         'prior_loss': prior_loss,
@@ -95,10 +96,10 @@ class Combined(nn.Module):
     # TODO: test with original idxs. no changes.
     image_idxs = imetrics.pop('idxs')
     state_idxs = smetrics.pop('idxs')
-    idxs = th.cat([state_idxs, image_idxs.flatten(-2)], -1)
-    #idxs = th.cat([state_idxs, th.zeros_like(image_idxs.flatten(-2))], -1)
+    state_idxs[4:] = state_idxs[4:5,:] # make the last 4 be all the same
+    idxs = th.cat([state_idxs, th.zeros_like(image_idxs.flatten(-2))], -1)
     code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
-    for i in range(7, self.gpt.block_size):
+    for i in range(8, self.gpt.block_size):
       dist = self.gpt.forward(code_idxs)
       code_idxs[:, i] = dist.sample()[:, i]
     sample_image_idxs = code_idxs[:, 8:]
@@ -106,6 +107,7 @@ class Combined(nn.Module):
     #prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).permute(0,2,1).reshape([-1, self.C.vqD, 4, 6])
     decoded = self.vqvae.decoder(prior_enc)[:8]
     sample_lcd = 1.0 * (decoded.exp() > 0.5)
+    lcd[4:] = lcd[4:5] # make the last 4 be all the same
     error = (sample_lcd - lcd + 1.0) / 2.0
     stack = th.cat([lcd, sample_lcd, error], -2)
     writer.add_image('state2image_sample', utils.combine_imgs(stack, 1, 8)[None], epoch)
