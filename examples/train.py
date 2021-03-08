@@ -8,7 +8,6 @@ import numpy as np
 from tqdm import tqdm
 from boxLCD import envs
 from boxLCD.utils import A, AttrDict, args_type
-from define_config import env_fn, config
 import copy
 import matplotlib.pyplot as plt
 import itertools
@@ -24,6 +23,7 @@ import argparse
 from boxLCD.utils import A
 from model import GPT
 import utils
+from define_config import env_fn, parse_args
 
 class Trainer:
   def __init__(self, C):
@@ -119,9 +119,6 @@ class Trainer:
         break
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  for key, value in config().items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  C = parser.parse_args()
+  C = parse_args()
   trainer = Trainer(C)
   trainer.run()

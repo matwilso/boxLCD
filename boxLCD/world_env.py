@@ -16,6 +16,7 @@ from boxLCD import utils
 from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
 
+
 # THIS IS AN ABSTRACT CLASS ALL OF THE LOGIC FOR SIMULATION
 # SPECIFIC INSTANCES ARE DESCRIBED IN envs.py, WHERE SPECIFIC WORLDS ARE DEFINED
 class WorldEnv(gym.Env, EzPickle):
@@ -29,8 +30,22 @@ class WorldEnv(gym.Env, EzPickle):
       'render.modes': ['human', 'rgb_array'],
       'video.frames_per_second': FPS
   }
+  # ENVIRONMENT DEFAULT CONFIG
+  ENV_DC = utils.AttrDict()
+  ENV_DC.base_dim = 5  # base size of box2D physics world
+  ENV_DC.lcd_base = 16  # base size of lcd rendered image. this represents the height. width = wh_ratio*height
+  ENV_DC.wh_ratio = 1.0  # width:height ratio of the world and images
+  ENV_DC.ep_len = 200  # length to run episode before done timeout
+  # settings for different obs and action spaces
+  ENV_DC.angular_offset = 0  # compute joint angular offsets from robot roots
+  ENV_DC.root_offset = 0  # compute position offsets from root
+  ENV_DC.compact_obs = 0  # use compact joint angle space instead of joint positions and sin+cos of theta
+  ENV_DC.use_speed = 1  # use velocity control vs. torque control
+  ENV_DC.all_corners = 0  # use corner keypoint obs instead of sin+cos of theta
+  ENV_DC.walls = 1  # bound the environment with walls on both sides
+  ENV_DC.debug = 0
 
-  def __init__(self, world_def, _C):
+  def __init__(self, world_def, C={}):
     """
     args:
       world_def: description of what components you want in the world.
@@ -39,7 +54,9 @@ class WorldEnv(gym.Env, EzPickle):
     EzPickle.__init__(self)
     # env definitions
     self.world_def = world_def
-    self.C = _C  # CONFIG
+    # CONFIG
+    self.C = utils.AttrDict(self.ENV_DC)
+    for key in C: self.C[key] = C[key] # update with what gets passed in 
     # box2D stuff
     self.scroll = 0.0
     self.viewer = None

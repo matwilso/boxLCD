@@ -11,7 +11,7 @@ python basic.py
 
 Similar to basic, but allows you to set the env from cmd line, and it uses some keyboard cmds (ESC - quit, SPACE - pause, RIGHT - step env, 0 - reset env)
 ```
-python -m less_basic.py --env=UrchinBall
+python less_basic.py --env=UrchinBall
 ```
 
 ## Training

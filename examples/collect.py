@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from boxLCD import envs
 from boxLCD.utils import A, AttrDict, args_type
-from define_config import env_fn, config
+from define_config import env_fn, parse_args
 
 import matplotlib.pyplot as plt
 import itertools
@@ -21,13 +21,8 @@ import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from boxLCD.utils import A
 
-
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  for key, value in config().items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  C = parser.parse_args()
-
+  C = parse_args()
   env = env_fn(C)()
   N = C.collect_n
   obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}

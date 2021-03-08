@@ -1,6 +1,6 @@
 import time
-from boxLCD import envs, C, wrappers
-env = envs.UrchinBall(C)
+from boxLCD import envs, wrappers
+env = envs.UrchinBall()
 #env = wrappers.LCDEnv(env)  # give lcd images as part of the observation
 obs = env.reset()
 while True:
