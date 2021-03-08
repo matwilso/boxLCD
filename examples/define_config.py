@@ -1,23 +1,20 @@
+import argparse
 import subprocess
 import sys
 import pathlib
-import boxLCD.utils
-from boxLCD import envs, env_map
-from boxLCD import C as boxLCD_C
-from boxLCD import wrappers
-from boxLCD.utils import args_type
+from boxLCD import envs, env_map, ENV_DC
+from boxLCD.utils import args_type, AttrDict
 
 def env_fn(C, seed=None):
   def _make():
     env = env_map[C.env](C)
     # wrap to make lcd show up in observation space
-    env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env
   return _make
 
 def config():
-  C = boxLCD.utils.AttrDict()
+  C = AttrDict()
   # BASICS
   C.logdir = pathlib.Path('./logs/')
   C.datapath = pathlib.Path('.')
@@ -35,7 +32,17 @@ def config():
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
   C.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
   pastKeys = list(C.keys())
-  for key, val in boxLCD_C.items():
+  for key, val in ENV_DC.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
     C[key] = val
+  return C
+
+def parse_args():
+  parser = argparse.ArgumentParser()
+  for key, value in config().items():
+    parser.add_argument(f'--{key}', type=args_type(value), default=value)
+  tempC = parser.parse_args()
+  Env = env_map[tempC.env]
+  parser.set_defaults(**Env.ENV_DC)
+  C = AttrDict(parser.parse_args().__dict__)
   return C

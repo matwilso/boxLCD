@@ -41,8 +41,8 @@ pip install -r requirements.txt
 ## Environment demos ⚽
 
 ```python
-from boxLCD import envs, C  
-env = envs.Dropbox(C)  # C is a default configuration that you can modify
+from boxLCD import envs  
+env = envs.Dropbox()  # for example
 obs = env.reset()
 while True:
     action = env.action_space.sample()

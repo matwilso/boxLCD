@@ -4,9 +4,6 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 from boxLCD import envs
-from boxLCD.utils import A, AttrDict, args_type
-from define_config import env_fn, config
-
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -60,7 +57,7 @@ def dump_logger(logger, writer, i, C):
   print(C.num_vars)
   pathlib.Path(C.logdir).mkdir(parents=True, exist_ok=True)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(C, f)
+    yaml.dump(dict(C), f)
   print('=' * 30)
   return defaultdict(lambda: [])
 

@@ -7,9 +7,12 @@ class AttrDict(dict):
   __getattr__ = dict.__getitem__
 
 def args_type(default):
-  if isinstance(default, bool): return lambda x: bool(['False', 'True'].index(x))
-  if isinstance(default, int): return lambda x: float(x) if ('e' in x or '.' in x) else int(x)
-  if isinstance(default, pathlib.Path): return lambda x: pathlib.Path(x).expanduser()
+  if isinstance(default, bool):
+    return lambda x: bool(['False', 'True'].index(x))
+  if isinstance(default, int):
+    return lambda x: float(x) if ('e' in x or '.' in x) else int(x)
+  if isinstance(default, pathlib.Path):
+    return lambda x: pathlib.Path(x).expanduser()
   return type(default)
 
 class X:
@@ -96,6 +99,7 @@ class NamedArray():
     else:
       raise NotImplementedError
     self.arr[..., idx] = item
+
 
 # general dictionary and list utils
 def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}

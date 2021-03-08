@@ -8,7 +8,6 @@ import numpy as np
 from tqdm import tqdm
 from boxLCD import envs
 from boxLCD.utils import A, AttrDict, args_type
-from define_config import env_fn, config
 import copy
 import matplotlib.pyplot as plt
 import itertools
@@ -24,6 +23,7 @@ import argparse
 from boxLCD.utils import A
 from model import GPT
 import utils
+from define_config import env_fn, parse_args
 
 class Trainer:
   def __init__(self, C):
@@ -61,7 +61,7 @@ class Trainer:
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
     self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
     # EVAL
-    if len(self.env.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
+    if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.C.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
@@ -119,9 +119,6 @@ class Trainer:
         break
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  for key, value in config().items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  C = parser.parse_args()
+  C = parse_args()
   trainer = Trainer(C)
   trainer.run()

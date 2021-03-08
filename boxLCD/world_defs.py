@@ -64,10 +64,9 @@ ROBOT_FILLER = {}
 def register(name):
   def _reg(func):
     ROBOT_FILLER[name] = func
-
-    def wrapper(*args, **kwargs):
+    def _thunk(*args, **kwargs):
       return func(*args, **kwargs)
-    return wrapper
+    return _thunk
   return _reg
 
 @register('urchin')
