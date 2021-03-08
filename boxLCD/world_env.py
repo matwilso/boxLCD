@@ -55,6 +55,8 @@ class WorldEnv(gym.Env, EzPickle):
     self.world_def = world_def
     # CONFIG
     self.C = utils.AttrDict(self.ENV_DC)
+    if not isinstance(C, dict):
+      C = C.__dict__
     for key in C: self.C[key] = C[key] # update with what gets passed in 
     # box2D stuff
     self.scroll = 0.0

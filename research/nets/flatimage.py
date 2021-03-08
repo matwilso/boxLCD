@@ -22,7 +22,7 @@ class FlatImageTransformer(nn.Module):
     if self.C.full_state:
       self.state_n = env.observation_space.spaces['full_state'].shape[0]
     else:
-      self.state_n = env.observation_space.spaces[''pstate'].shape[0]
+      self.state_n = env.observation_space.spaces['pstate'].shape[0]
     self.block_size = self.C.ep_len
     C.state_n = self.C.state_n = self.state_n
 
@@ -68,7 +68,7 @@ class FlatImageTransformer(nn.Module):
   def forward(self, batch):
     BS, EPL,*HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
-    state = batch[''pstate']
+    state = batch['pstate']
     acts = batch['acts']
     if 'pstate' == self.C.subset:
       zstate = self.linear_up(state)

@@ -1,9 +1,10 @@
+import argparse
 import subprocess
 import sys
 import pathlib
 import boxLCD.utils
 from boxLCD import envs, env_map
-from boxLCD import C as boxLCD_C
+from boxLCD import ENV_DC
 from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
@@ -73,7 +74,11 @@ def config():
   C.num_vars = 0
 
   pastKeys = list(C.keys())
-  for key, val in boxLCD_C.items():
+  for key, val in ENV_DC.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
     C[key] = val
+
+  
+
+
   return C

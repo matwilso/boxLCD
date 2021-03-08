@@ -78,7 +78,7 @@ class Combined(nn.Module):
 
     sloss, smetrics = self.state_vqvae.loss(batch, eval=True, return_idxs=True)
     pred_state = smetrics.pop('decoded').mean[:8].detach().cpu()
-    true_state = batch[''pstate'][:8].cpu()
+    true_state = batch['pstate'][:8].cpu()
     preds = []
     for s in pred_state:
       preds += [self.env.reset(state=s)['lcd']]

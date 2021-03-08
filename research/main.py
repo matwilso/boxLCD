@@ -20,6 +20,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from boxLCD.utils import A
+from boxLCD import env_map
 import utils
 import runners
 from nets.combined import Combined
@@ -29,8 +30,10 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
-
   temp_cfg = parser.parse_args()
+  # grab defaults from the env
+  Env = env_map[temp_cfg.env]
+  parser.set_defaults(**Env.ENV_DC)
   data_yaml = temp_cfg.datapath / 'hps.yaml'
   weight_yaml = temp_cfg.weightdir / 'hps.yaml'
   defaults = {
@@ -53,12 +56,11 @@ if __name__ == '__main__':
       defaults[key] = weight_cfg.__dict__[key]
   parser.set_defaults(**defaults)
   C = parser.parse_args()
-  env = env_fn(C)()
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base
   C.imsize = C.lcd_w*C.lcd_h
   C.window = C.vidstack * C.stacks_per_block
-  C = env.C
+  env = env_fn(C)()
   if C.mode not in ['collect']:
     if C.model == 'frame_token':
       model = FlatImageTransformer(env, C)
