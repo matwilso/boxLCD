@@ -2,14 +2,13 @@ import argparse
 import subprocess
 import sys
 import pathlib
-from boxLCD import envs, env_map, ENV_DC, wrappers
+from boxLCD import envs, env_map, ENV_DC
 from boxLCD.utils import args_type, AttrDict
 
 def env_fn(C, seed=None):
   def _make():
     env = env_map[C.env](C)
     # wrap to make lcd show up in observation space
-    env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env
   return _make

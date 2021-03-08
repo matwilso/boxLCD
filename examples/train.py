@@ -61,7 +61,7 @@ class Trainer:
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
     self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
     # EVAL
-    if len(self.env.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
+    if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.C.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:

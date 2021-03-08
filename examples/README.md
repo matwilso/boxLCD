@@ -9,7 +9,7 @@ Just run an env and visualize the human mode rendering:
 python basic.py
 ```
 
-Similar to basic, but allows you to set the env from cmd line, and it uses some keyboard cmds (ESC - quit, SPACE - pause, RIGHT - step env, 0 - reset env)
+Similar to basic, but allows you to set the env from cmd line, and it enables some keyboard control (ESC - quit, SPACE - pause, RIGHT - step env, 0 - reset env)
 ```
 python less_basic.py --env=UrchinBall
 ```

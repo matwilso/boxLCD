@@ -1,16 +1,16 @@
 from boxLCD.world_env import WorldEnv
-import boxLCD.wrappers as wrappers
 from boxLCD.world_defs import WorldDef, Object, Robot
 from boxLCD import utils
 
 def cc(**kwargs):
   """custom config (default settings)"""
   def decorator(Cls):
-    class NewCls(Cls):
-      ENV_DC = utils.AttrDict(Cls.mro()[1].ENV_DC)
+    class CustomWorldEnv(Cls):
+      # grab the WorldEnv ENV_DC and update it with new defaults
+      ENV_DC = utils.AttrDict(WorldEnv.ENV_DC)
       for key in kwargs:
         ENV_DC[key] = kwargs[key]
-    return NewCls
+    return CustomWorldEnv
   return decorator
 
 @cc(ep_len=100)

@@ -2,6 +2,7 @@
 
 **ENTER AT YOUR OWN RISK**
 
+These are active experiments and hacking I am doing. 
 
 This is basically my personal messy code for training models on boxLCD.
 

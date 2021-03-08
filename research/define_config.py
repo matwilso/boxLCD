@@ -4,13 +4,11 @@ import pathlib
 import boxLCD.utils
 from boxLCD import envs, env_map
 from boxLCD import C as boxLCD_C
-from boxLCD import wrappers
 from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
   def _make():
     env = env_map[C.env](C)
-    env = wrappers.LCDEnv(env)
     env.seed(seed)
     return env
   return _make

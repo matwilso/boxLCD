@@ -54,7 +54,7 @@ class Encoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.n_embed
-    state_n = env.observation_space.spaces['state'].shape[0]
+    state_n = env.observation_space.spaces['pstate'].shape[0]
     act_n = env.action_space.shape[0]
 
     self.state_embed = nn.Sequential(
@@ -76,7 +76,7 @@ class Encoder(nn.Module):
 
   def forward(self, batch):
     acts = batch['acts']
-    state = batch['state']
+    state = batch['pstate']
     lcd = batch['lcd']
     emb = self.state_embed(th.cat([state, acts],-1))
     x = lcd
@@ -101,7 +101,7 @@ class Decoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.n_embed
-    state_n = env.observation_space.spaces['state'].shape[0]
+    state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_net = nn.Sequential(
       nn.Flatten(-3),
       nn.Linear(C.vqD*4*6, H*C.vidstack),
@@ -124,7 +124,7 @@ class Decoder(nn.Module):
   def forward(self, x):
     lcd_dist = tdib.Bernoulli(logits=self.net(x))
     state_dist = tdib.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'state': state_dist}
+    return {'lcd': lcd_dist, 'pstate': state_dist}
 
 class ResBlock(nn.Module):
   def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0):

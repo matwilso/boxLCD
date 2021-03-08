@@ -65,7 +65,7 @@ class Combined(nn.Module):
     return {
         'prior_loss': prior_loss,
         **{'image/' + key: val for key, val in imetrics.items()},
-        **{'state/' + key: val for key, val in smetrics.items()}
+        **{'pstate/' + key: val for key, val in smetrics.items()}
     }
 
   def evaluate(self, writer, batch, epoch):
@@ -78,7 +78,7 @@ class Combined(nn.Module):
 
     sloss, smetrics = self.state_vqvae.loss(batch, eval=True, return_idxs=True)
     pred_state = smetrics.pop('decoded').mean[:8].detach().cpu()
-    true_state = batch['state'][:8].cpu()
+    true_state = batch[''pstate'][:8].cpu()
     preds = []
     for s in pred_state:
       preds += [self.env.reset(state=s)['lcd']]
@@ -89,7 +89,7 @@ class Combined(nn.Module):
     truths = 1.0 * np.stack(truths)
     error = (preds - truths + 1.0) / 2.0
     stack = np.concatenate([truths, preds, error], -2)[:, None]
-    writer.add_image('state/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
+    writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
     # SAMPLE
     # image based on state
@@ -110,4 +110,4 @@ class Combined(nn.Module):
     lcd[4:] = lcd[4:5] # make the last 4 be all the same
     error = (sample_lcd - lcd + 1.0) / 2.0
     stack = th.cat([lcd, sample_lcd, error], -2)
-    writer.add_image('state2image_sample', utils.combine_imgs(stack, 1, 8)[None], epoch)
+    writer.add_image('pstate2image_sample', utils.combine_imgs(stack, 1, 8)[None], epoch)

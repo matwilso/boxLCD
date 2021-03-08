@@ -216,6 +216,6 @@ class MultiHead(nn.Module):
   def forward(self, x, past_o=None):
     xb, xs = self.layer(x).chunk(2, -1)
     bin = self.binary(xb) if 'image' in self.C.subset else None
-    state = self.state(xs) if 'state' in self.C.subset else None
+    state = self.state(xs) if 'pstate' in self.C.subset else None
     #return bin, GPTDist(self.state, xs)
     return bin, state

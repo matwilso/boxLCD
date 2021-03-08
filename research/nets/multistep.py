@@ -48,7 +48,7 @@ class Multistep(nn.Module):
     import ipdb; ipdb.set_trace()
 
   def train_step(self, batch):
-    bs = batch['state'].shape[0]
+    bs = batch['pstate'].shape[0]
     ebatch = self.flatbatch(batch)
     self.optimizer.zero_grad()
     loss, metrics = self.multi_encoder.loss(ebatch, return_idxs=True)
@@ -67,7 +67,7 @@ class Multistep(nn.Module):
     return metrics
 
   def evaluate(self, writer, batch, epoch):
-    bs = batch['state'].shape[0]
+    bs = batch['pstate'].shape[0]
     ebatch = self.flatbatch(batch)
     _, decoded, _, idxs = self.multi_encoder.forward(ebatch)
     pred_lcd = 1.0 * (decoded['lcd'].probs > 0.5)[:8]
@@ -76,8 +76,8 @@ class Multistep(nn.Module):
     stack = th.cat([lcd, pred_lcd, error], -2)[0][:,None]
     writer.add_image('image/decode', utils.combine_imgs(stack, 1, self.C.vidstack)[None], epoch)
 
-    pred_state = decoded['state'].mean[0].detach().cpu()
-    true_state = ebatch['state'][0].cpu()
+    pred_state = decoded['pstate'].mean[0].detach().cpu()
+    true_state = ebatch['pstate'][0].cpu()
     preds = []
     for s in pred_state:
       preds += [self.env.reset(state=s)['lcd']]
@@ -88,7 +88,7 @@ class Multistep(nn.Module):
     truths = 1.0 * np.stack(truths)
     error = (preds - truths + 1.0) / 2.0
     stack = np.concatenate([truths, preds, error], -2)[:, None]
-    writer.add_image('state/decode', utils.combine_imgs(stack, 1, self.C.vidstack)[None], epoch)
+    writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, self.C.vidstack)[None], epoch)
 
     idxs = idxs.detach().flatten(-2)
     code_idxs = F.one_hot(idxs, self.C.vqK).float()

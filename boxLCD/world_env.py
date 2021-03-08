@@ -10,7 +10,6 @@ import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 
 import gym
-from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
 from boxLCD.viewer import Viewer
@@ -114,15 +113,30 @@ class WorldEnv(gym.Env, EzPickle):
     if len(self.world_def.robots) == 0:  # because having a zero shaped array makes things break
       self.act_info['dummy'] = A[-1, 1]
 
+
     # take self.obs_info and self.act_info and pack them into the gym interface
     self.obs_info = utils.sortdict(self.obs_info)
     self.obs_size = len(self.obs_info)
     self.obs_keys = list(self.obs_info.keys())
-    self.observation_space = spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
+    # partial observation
+    self.pobs_keys = utils.nfiltlist(self.obs_keys, 'object')
+    self.pobs_size = len(self.pobs_keys)
+    self.pobs_idxs = [self.obs_keys.index(x) for x in self.pobs_keys]
+    # observation is a dict space
+    spaces = {}
+    spaces['full_state'] = gym.spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
+    # pstate = partial state
+    if self.pobs_size == 0:
+      spaces['pstate'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
+    else:
+      spaces['pstate'] = gym.spaces.Box(-1, +1, (self.pobs_size,), dtype=np.float32)
+    spaces['lcd'] = gym.spaces.Box(0, 1, (self.C.lcd_base, int(self.C.lcd_base*self.C.wh_ratio)), dtype=np.bool)
+    self.observation_space = gym.spaces.Dict(spaces)
+
     self.act_info = utils.sortdict(self.act_info)
     self.act_size = len(self.act_info)
     self.act_keys = list(self.act_info.keys())
-    self.action_space = spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
+    self.action_space = gym.spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
     self.seed()
 
   @property
@@ -286,7 +300,7 @@ class WorldEnv(gym.Env, EzPickle):
       body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       self.dynbodies[obj.name] = body
 
-  def reset(self, full_state=None):
+  def reset(self, full_state=None, pstate=None):
     self.ep_t = 0
     self._destroy()
     self.statics = {}
@@ -300,6 +314,9 @@ class WorldEnv(gym.Env, EzPickle):
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
     #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
+    if pstate is not None:
+      full_state = np.zeros(self.observation_space.spaces['full_state'].shape)
+      full_state[self.pobs_idxs] = pstate
     if full_state is not None:
       full_state = utils.NamedArray(np.array(full_state).astype(np.float), self.obs_info)
 
@@ -360,48 +377,51 @@ class WorldEnv(gym.Env, EzPickle):
           self.dynbodies[name].angle = offset_angle
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
-    return self._get_obs().arr
+    return self._get_obs()
 
   def _get_obs(self):
-    obs = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
+    full_state = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
     # GRAB OBJECT INFO
     for obj in self.world_def.objects:
       body = self.dynbodies[obj.name]
-      obs[f'{obj.name}:x:p'], obs[f'{obj.name}:y:p'] = body.position
+      full_state[f'{obj.name}:x:p'], full_state[f'{obj.name}:y:p'] = body.position
       if self.C.all_corners:
-        obs[f'{obj.name}:kx:p', f'{obj.name}:ky:p'] = A[body.transform * body.fixtures[0].shape.vertices[-1]]
+        full_state[f'{obj.name}:kx:p', f'{obj.name}:ky:p'] = A[body.transform * body.fixtures[0].shape.vertices[-1]]
       else:
-        obs[f'{obj.name}:cos'] = np.cos(body.angle)
-        obs[f'{obj.name}:sin'] = np.sin(body.angle)
+        full_state[f'{obj.name}:cos'] = np.cos(body.angle)
+        full_state[f'{obj.name}:sin'] = np.sin(body.angle)
     # GRAB ROBOT INFO
     for robot in self.world_def.robots:
       root = self.dynbodies[robot.name + ':root']
-      obs[f'{robot.name}:root:x:p'], obs[f'{robot.name}:root:y:p'] = root_xy = root.position
+      full_state[f'{robot.name}:root:x:p'], full_state[f'{robot.name}:root:y:p'] = root_xy = root.position
       if self.C.all_corners:
-        obs[f'{robot.name}:root:kx:p', f'{robot.name}:root:ky:p'] = A[root.transform * root.fixtures[0].shape.vertices[-1]]
+        full_state[f'{robot.name}:root:kx:p', f'{robot.name}:root:ky:p'] = A[root.transform * root.fixtures[0].shape.vertices[-1]]
       else:
-        obs[f'{robot.name}:root:cos'] = np.cos(root.angle)
-        obs[f'{robot.name}:root:sin'] = np.sin(root.angle)
+        full_state[f'{robot.name}:root:cos'] = np.cos(root.angle)
+        full_state[f'{robot.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in robot.joints.items():
         jnt = self.joints[f'{robot.name}:{joint_name}']
         if self.C.compact_obs:
-          obs[f'{robot.name}:{joint_name}:angle'] = jnt.angle
+          full_state[f'{robot.name}:{joint_name}:angle'] = jnt.angle
         else:
           if self.C.root_offset:
-            obs[f'{robot.name}:{joint_name}:x:p'], obs[f'{robot.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position - root_xy
+            full_state[f'{robot.name}:{joint_name}:x:p'], full_state[f'{robot.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position - root_xy
           else:
-            obs[f'{robot.name}:{joint_name}:x:p'], obs[f'{robot.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position
+            full_state[f'{robot.name}:{joint_name}:x:p'], full_state[f'{robot.name}:{joint_name}:y:p'] = jnt.bodyB.transform.position
           if self.C.angular_offset:
             angle = jnt.bodyB.transform.angle - root.angle
             angle = np.arctan2(np.sin(angle), np.cos(angle))
           else:
             angle = jnt.bodyB.transform.angle
           if self.C.all_corners:
-            obs[f'{robot.name}:{joint_name}:kx:p', f'{robot.name}:{joint_name}:ky:p'] = A[jnt.bodyB.transform * jnt.bodyB.fixtures[0].shape.vertices[-1]]
+            full_state[f'{robot.name}:{joint_name}:kx:p', f'{robot.name}:{joint_name}:ky:p'] = A[jnt.bodyB.transform * jnt.bodyB.fixtures[0].shape.vertices[-1]]
           else:
-            obs[f'{robot.name}:{joint_name}:cos'] = np.cos(angle)
-            obs[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
-    return obs
+            full_state[f'{robot.name}:{joint_name}:cos'] = np.cos(angle)
+            full_state[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
+    
+    full_state = full_state.arr
+    pstate = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
+    return {'full_state': full_state, 'pstate': pstate, 'lcd': self.lcd_render()}
 
   def step(self, action):
     self.ep_t += 1
@@ -419,13 +439,13 @@ class WorldEnv(gym.Env, EzPickle):
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
     # RUN SIM STEP
     self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
-    obs = self._get_obs()
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
     info = {}
     reward = 0.0  # no reward swag
     done = self.ep_t >= self.C.ep_len
-    return obs.arr, reward, done, info
+
+    return self._get_obs(), reward, done, info
 
   def lcd_render(self, width=None, height=None, pretty=False):
     """render the env using PIL at potentially very low resolution

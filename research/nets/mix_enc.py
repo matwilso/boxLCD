@@ -64,7 +64,7 @@ class Encoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.n_embed
-    state_n = env.observation_space.spaces['state'].shape[0]
+    state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_embed = nn.Sequential(
       nn.Linear(state_n, H),
       nn.ReLU(),
@@ -80,7 +80,7 @@ class Encoder(nn.Module):
     ])
 
   def forward(self, batch):
-    state = batch['state']
+    state = batch['pstate']
     lcd = batch['lcd']
     emb = self.state_embed(state)
     x = lcd

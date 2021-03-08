@@ -22,7 +22,7 @@ class FlatImageTransformer(nn.Module):
     if self.C.full_state:
       self.state_n = env.observation_space.spaces['full_state'].shape[0]
     else:
-      self.state_n = env.observation_space.spaces['state'].shape[0]
+      self.state_n = env.observation_space.spaces[''pstate'].shape[0]
     self.block_size = self.C.ep_len
     C.state_n = self.C.state_n = self.state_n
 
@@ -31,7 +31,7 @@ class FlatImageTransformer(nn.Module):
     if 'image' in self.C.subset:
       self.size += self.imsize
       self.gpt_size += self.imsize
-    if 'state' in self.C.subset:
+    if 'pstate' in self.C.subset:
       self.size += self.state_n
       self.gpt_size += 128
 
@@ -68,14 +68,14 @@ class FlatImageTransformer(nn.Module):
   def forward(self, batch):
     BS, EPL,*HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
-    state = batch['state']
+    state = batch[''pstate']
     acts = batch['acts']
-    if 'state' == self.C.subset:
+    if 'pstate' == self.C.subset:
       zstate = self.linear_up(state)
       x = zstate
     if 'image' == self.C.subset:
       x = lcd
-    if 'image' in self.C.subset and 'state' in self.C.subset:
+    if 'image' in self.C.subset and 'pstate' in self.C.subset:
       zstate = self.linear_up(state)
       x = torch.cat([lcd, zstate], -1)
     BS, T, E = x.shape
@@ -99,7 +99,7 @@ class FlatImageTransformer(nn.Module):
     BS, EPL,*HW = batch['lcd'].shape
     metrics = {}
     #noise_batch = {key: val for key,val in batch.items()}
-    #noise_batch['state'] += 1e-2*torch.randn(batch['state'].shape).to(batch['state'].device)
+    #noise_batch['pstate'] += 1e-2*torch.randn(batch['pstate'].shape).to(batch['pstate'].device)
 
     bindist, statedist = self.forward(batch)
     lcd_loss = torch.zeros(1, device=self.C.device)
@@ -107,8 +107,8 @@ class FlatImageTransformer(nn.Module):
     if 'image' in self.C.subset:
       lcd_loss = -bindist.log_prob(batch['lcd'].reshape(BS, EPL, np.prod(HW))).mean()
       metrics['loss/lcd'] = lcd_loss
-    if 'state' in self.C.subset:
-      state_loss = -statedist.log_prob(batch['state']).mean()
+    if 'pstate' in self.C.subset:
+      state_loss = -statedist.log_prob(batch['pstate']).mean()
       metrics['loss/state'] = state_loss
     loss = lcd_loss + 1e-4*state_loss
     return loss, metrics
@@ -126,13 +126,13 @@ class FlatImageTransformer(nn.Module):
         n = cond.shape[0]
       batch = {}
       batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.C.device)
-      batch['state'] = torch.zeros(n, self.block_size, self.state_n).to(self.C.device)
+      batch['pstate'] = torch.zeros(n, self.block_size, self.state_n).to(self.C.device)
       batch['acts'] = cond if cond is not None else (torch.rand(n, self.block_size, self.act_n)*2 - 1).to(self.C.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
         batch['lcd'][:, :5] = lcd
-        batch['state'][:, :5] = prompts['state']
+        batch['pstate'][:, :5] = prompts['pstate']
         start = lcd.shape[1]
 
       for i in range(start, self.block_size):
@@ -140,9 +140,9 @@ class FlatImageTransformer(nn.Module):
         bindist, statedist = self.forward(batch)
         if 'image' in self.C.subset:
          batch['lcd'][:, i] = bindist.sample()[:,i]
-        if 'state' in self.C.subset:
-          batch['state'][:, i] = statedist.mean[:,i]
-          #batch['state'][:, i+1] = statedist.sample()[:,i]
+        if 'pstate' in self.C.subset:
+          batch['pstate'][:, i] = statedist.mean[:,i]
+          #batch['pstate'][:, i+1] = statedist.sample()[:,i]
 
         if i == self.block_size-1:
           sample_loss = self.loss(batch)[0]

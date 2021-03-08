@@ -56,18 +56,18 @@ class WorldTrainer(Trainer):
         lcd = sample['lcd']
         lcd = lcd.cpu().detach().repeat_interleave(4,-1).repeat_interleave(4,-2)[:,1:]
         self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
-      if 'state' in self.C.subset:
-        state = sample['state'].cpu()
+      if 'pstate' in self.C.subset:
+        state = sample['pstate'].cpu()
         state_img = []
         for j in range(state.shape[1]):
           obs = self.tvenv.reset(np.arange(self.C.num_envs), state[:,j])
           state_img += [self.tvenv.render(pretty=True)]
         state_img = np.stack(state_img, 1).transpose(0, 1, -1, 2, 3)[...,-self.C.env_size//2:,:]
-        self.writer.add_video('state_samples', utils.force_shape(state_img), i, fps=50)
+        self.writer.add_video('pstate_samples', utils.force_shape(state_img), i, fps=50)
 
     if True:
       # EVAL
-      if len(self.env.env.world_def.robots) == 0:
+      if len(self.env.world_def.robots) == 0:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
         reset_states = [None]*N
@@ -100,8 +100,8 @@ class WorldTrainer(Trainer):
         out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
         out = out.repeat(4, -1).repeat(4,-2)
         self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
-      if 'state' in self.C.subset:
-        state_psamp = prompted_samples['state'].cpu()
+      if 'pstate' in self.C.subset:
+        state_psamp = prompted_samples['pstate'].cpu()
         imgs = []
         for j in range(state_psamp.shape[1]):
           obs = self.big_tvenv.reset(np.arange(self.C.num_envs), state_psamp[:,j])

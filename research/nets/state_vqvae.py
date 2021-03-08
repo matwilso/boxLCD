@@ -27,14 +27,14 @@ class State_VQVAE(nn.Module):
     super().__init__()
     H = C.n_embed
     # encoder -> VQ -> decoder
-    self.state_n = env.observation_space['state'].shape[0]
+    self.state_n = env.observation_space['pstate'].shape[0]
     self.encoder = Encoder(self.state_n, C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
     self.decoder = Decoder(self.state_n, C)
     self.C = C
 
   def loss(self, x, eval=False, return_idxs=False):
-    x = x['state']
+    x = x['pstate']
     embed_loss, dec_dist, perplexity, idxs = self.forward(x)
     recon_loss = -dec_dist.log_prob(x).mean()
     loss = recon_loss + embed_loss
