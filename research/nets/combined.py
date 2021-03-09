@@ -56,6 +56,7 @@ class Combined(nn.Module):
     image_idxs = imetrics.pop('idxs')
     idxs = th.cat([state_idxs, image_idxs.flatten(-2)], -1)
     code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
+    import ipdb; ipdb.set_trace()
     gpt_dist = self.gpt.forward(code_idxs)
     prior_loss = -gpt_dist.log_prob(code_idxs).mean()
     prior_loss.backward()

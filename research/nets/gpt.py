@@ -9,7 +9,7 @@ from .common import BinaryHead, CategoricalHead
 
 class GPT(nn.Module):
   """  the full GPT language model, with a context size of block_size """
-  def __init__(self, in_size, block_size, head='cat', C=None):
+  def __init__(self, in_size, block_size, head='cat', cond_size=None, C=None):
     super().__init__()
     assert C is not None, 'must pass in C'
     self.block_size = block_size
@@ -22,15 +22,27 @@ class GPT(nn.Module):
       self.dist_head = BinaryHead(C.n_embed, self.in_size, C)
     elif head == 'cat':
       self.dist_head = CategoricalHead(C.n_embed, self.in_size, C)
+
+    self.cond_size = cond_size
+    if cond_size is not None:
+      self.cond_in = nn.Sequential(
+        nn.Linear(self.cond_size, C.n_embed),
+        nn.ReLU(),
+        nn.Linear(C.n_embed, C.n_embed, bias=False),
+      )
     self.C = C
 
-  def forward(self, x):
+  def forward(self, x, cond=None):
     BS, T, C = x.shape
     # SHIFT RIGHT (add a padding on the left) so you can't see yourself 
     x = th.cat([th.zeros(BS, 1, C).to(self.C.device), x[:, :-1]], dim=1)
     # forward the GPT model
     x = self.embed(x)
     x += self.pos_emb # each position maps to a (learnable) vector
+    if cond is not None:
+      cond = self.cond_in(cond)
+      cond = th.cat([th.zeros(BS, 1, self.C.n_embed).to(self.C.device), cond[:, :-1]], dim=1)
+      x += cond
     # add padding on left so that we can't see ourself.
     x = self.blocks(x)
     logits = self.ln_f(x)
