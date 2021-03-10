@@ -22,10 +22,11 @@ def config():
   C.env = 'Bounce'
   # training stuff
   C.device = 'cuda'  # 'cuda', 'cpu'
-  C.num_epochs = 200
+  C.num_epochs = 30
+  C.log_n = 10
   C.bs = 64
   C.lr = 5e-4
-  C.n_layer = 2
+  C.n_layer = 3
   C.n_embed = 128
   C.n_head = 4
   # extra info that we set here for convenience and don't modify

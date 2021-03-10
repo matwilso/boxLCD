@@ -94,6 +94,7 @@ class Trainer:
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
     self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
+    self.logger['pixel_delta'] += [((real_lcd-lcd_psamp)**2).mean()]
 
   def test(self, i):
     self.model.eval()
@@ -103,7 +104,7 @@ class Trainer:
         loss = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
     sample_start = time.time()
-    if i % 10 == 0:
+    if i % self.C.log_n == 0:
       self.sample(i)
     self.logger['dt/sample'] = [time.time() - sample_start]
     self.logger['num_vars'] = self.num_vars

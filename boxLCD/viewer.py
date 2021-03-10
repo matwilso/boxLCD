@@ -4,8 +4,8 @@ import pyglet
 class Viewer:
   """use pyglet to render images that have already been generated, to show to user live"""
   def __init__(self, width, height, C):
-    self.window = pyglet.window.Window(2*width, height)
-    self.width = width
+    self.window = pyglet.window.Window(2*width + 2, height)
+    self.width = width+2
     self.height = height
     self.C = C
     self.lcd_w = int(self.C.lcd_base*self.C.wh_ratio)

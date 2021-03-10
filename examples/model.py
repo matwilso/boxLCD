@@ -117,7 +117,7 @@ class GPT(nn.Module):
 
   def loss(self, batch):
     dist = self.forward(batch)
-    lcd_loss = -dist.log_prob(batch['lcd'].reshape(dist.logits.shape)).mean()
+    lcd_loss = -dist.log_prob(batch['lcd'].reshape(dist.logits.shape)).mean() / np.log(2) # bits/dim
     return lcd_loss
 
   def sample(self, n, acts=None, prompts=None):
