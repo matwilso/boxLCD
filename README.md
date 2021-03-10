@@ -1,4 +1,4 @@
-![](assets/lcd_sideside.png)
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/lcd_sideside.png)
 
 boxLCD 📟
 =================
@@ -53,17 +53,17 @@ while True:
 Pretty rendering vs LCD rendering (upscaled for visualization) |  
 :-------------------------:|
 `envs.Dropbox()` (16x16) | 
-![](assets/demos/dropbox.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/dropbox.gif)  |  
 `envs.Bounce()` (16x16) | 
-![](assets/demos/bounce.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/bounce.gif)  |  
 `envs.Urchin()` (16x16) | 
-![](assets/demos/urchin.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/urchin.gif)  |  
 `envs.UrchinBall()` (16x24) | 
-![](assets/demos/urchin_ball.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/urchin_ball.gif)  |  
 `envs.UrchinBalls()` (16x32) | 
-![](assets/demos/urchin_balls.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/urchin_balls.gif)  |  
 `envs.UrchinCubes()` (16x32) | 
-![](assets/demos/urchin_cubes.gif)  |  
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/demos/urchin_cubes.gif)  |  
 
 
 ## Training examples 📉
@@ -85,11 +85,11 @@ The results below were trained on a single NVIDIA GTX 1080Ti desktop machine.
 | | Training Results for datasets of 10k rollouts |   |
 |:---:|:-------------------------:| :-------------------------:|
 |`envs.Dropbox`| 10 epochs |  100 epochs |
-|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](assets/samples/dropbox-10.gif)  |  ![](assets/samples/dropbox-100.gif) |
+|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/dropbox-10.gif)  |  ![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/dropbox-100.gif) |
 |`envs.Bounce()`| 10 epochs | 100 epochs |
-|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](assets/samples/bounce-10.gif)  |  ![](assets/samples/bounce-100.gif) |
+|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/bounce-10.gif)  |  ![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/bounce-100.gif) |
 |`envs.Urchin()`| 10 epochs | 100 epochs |
-|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](assets/samples/urchin-10.gif)  |  ![](assets/samples/urchin-100.gif) |
+|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/urchin-10.gif)  |  ![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/urchin-100.gif) |
 
 This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
 
@@ -119,7 +119,7 @@ Below is an example where the expected behavior occurs.
 On the far left, the model samples a ball instead of a box.
 On the 4th to the right, the model samples a box instead of a ball.
 
-![](assets/samples/domrand_good.gif) 
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/samples/domrand_good.gif) 
 
 ## Roadmap 📍
 
@@ -159,7 +159,7 @@ But in the future, we plan to expand this scope and design tasks that leverage o
 - more formal benchmarks and bits/dim baselines
 - adding modality of sound. possibly through some pseudo-audio signal. like some simple and short waveform if the robot's limb hits the ground. for a bouncing ball, a different waveform with amplitude proportional to distance from robot. also, some way to simply mix those "sounds".
 
-![](assets/roadmap_pic.png)
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/roadmap_pic.png)
 
 ## Related Work 📚
 

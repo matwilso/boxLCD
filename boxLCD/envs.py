@@ -43,11 +43,11 @@ class UrchinBall(WorldEnv):
 @cc(wh_ratio=2.0)
 class UrchinBalls(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1) for i in range(4)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1) for i in range(3)])
     super().__init__(w, C)
 
 @cc(wh_ratio=2.0)
 class UrchinCubes(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(4)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
     super().__init__(w, C)
