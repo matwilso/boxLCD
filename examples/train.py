@@ -65,7 +65,7 @@ class Trainer:
       if 'BoxOrCircle' == self.C.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
-        reset_states = np.c_[np.random.uniform(-1,1,N), np.random.uniform(-1,1,N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
+        reset_states = np.c_[np.random.uniform(-1, 1, N), np.random.uniform(-1, 1, N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
     else:
       reset_states = [None] * N
     obses = {key: [[] for ii in range(N)] for key in self.env.observation_space.spaces}
@@ -94,7 +94,7 @@ class Trainer:
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
     self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
-    self.logger['pixel_delta'] += [((real_lcd-lcd_psamp)**2).mean()]
+    self.logger['pixel_delta'] += [((real_lcd - lcd_psamp)**2).mean()]
 
   def test(self, i):
     self.model.eval()
@@ -112,12 +112,20 @@ class Trainer:
     self.writer.flush()
     self.model.train()
 
+  def save(self, i=0):
+    path = self.C.logdir / f'model.pt'
+    print("SAVED MODEL", path)
+    torch.save(self.model.state_dict(), path)
+
   def run(self):
     for i in itertools.count():
       self.train_epoch(i)
       self.test(i)
+      if i % self.C.save_n == 0:
+        self.save(i)
       if i >= self.C.num_epochs:
         break
+    self.save(i)
 
 if __name__ == '__main__':
   C = parse_args()

@@ -24,7 +24,8 @@ def config():
   C.device = 'cuda'  # 'cuda', 'cpu'
   C.num_epochs = 30
   C.log_n = 10
-  C.bs = 64
+  C.save_n = 10
+  C.bs = 128
   C.lr = 5e-4
   C.n_layer = 3
   C.n_embed = 128
