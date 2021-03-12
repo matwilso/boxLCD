@@ -10,8 +10,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
-import numpy as np
 import yaml
+import pandas as pd
 from datetime import datetime
 import argparse
 import PIL.ImageDraw as ImageDraw
@@ -45,19 +45,24 @@ def load_ds(C):
   test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   return train_loader, test_loader
 
+HISTORY = defaultdict(lambda: [])
 def dump_logger(logger, writer, i, C):
   print('=' * 30)
   print(i)
+  key = None
   for key in logger:
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
+      HISTORY[key] += [val]
     print(key, val)
+  if key is not None: HISTORY['time'] += [i]
   print(C.full_cmd)
   print(C.num_vars)
   pathlib.Path(C.logdir).mkdir(parents=True, exist_ok=True)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
     yaml.dump(dict(C), f)
+  pd.DataFrame(HISTORY).to_csv(pathlib.Path(C.logdir) / 'logger.csv')
   print('=' * 30)
   return defaultdict(lambda: [])
 
@@ -69,9 +74,9 @@ def force_shape(out):
   N, T, C, H, W = out.shape
   if isinstance(out, np.ndarray):
     out = out.transpose(1, 2, 3, 0, 4)
-    out = np.concatenate([out,np.zeros(out.shape[:-1], dtype=out.dtype)[...,None]], -1)
+    out = np.concatenate([out, np.zeros(out.shape[:-1], dtype=out.dtype)[..., None]], -1)
   else:
     out = out.permute(1, 2, 3, 0, 4)
-    out = torch.cat([out,torch.zeros(out.shape[:-1])[...,None]], -1)
-  out = out.reshape(T, C, H, N * (W+1))[None]
+    out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
+  out = out.reshape(T, C, H, N * (W + 1))[None]
   return out
