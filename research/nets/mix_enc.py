@@ -26,7 +26,7 @@ from .vqvae import VectorQuantizer
 class MultiEnc(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     # encoder -> VQ -> decoder
     self.encoder = Encoder(env, C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
@@ -63,7 +63,7 @@ class MultiEnc(nn.Module):
 class Encoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_embed = nn.Sequential(
       nn.Linear(state_n, H),
@@ -104,7 +104,7 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
 
     self.net = nn.Sequential(
         Upsample(C.vqD, H),

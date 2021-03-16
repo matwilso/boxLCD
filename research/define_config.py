@@ -45,6 +45,7 @@ def config():
   C.n_layer = 2
   C.n_head = 4
   C.n_embed = 128
+  C.hidden_size = 128
   C.vidstack = -1
   C.stacks_per_block = 32
 
@@ -54,7 +55,7 @@ def config():
 
 
   C.min_std = 1e-4
-  C.log_n = 1000
+  C.log_n = 1
   C.data_frac = 1.0
   C.vanished = 1
   C.num_envs = 8
@@ -63,6 +64,8 @@ def config():
   C.dist_delta = 0
   C.sample_sample = 0
   C.skip_train = 0
+
+  C.phase = 1
 
   C.env = 'dropbox'
 

@@ -25,7 +25,7 @@ from .vq import VectorQuantizer
 class VQVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     # encoder -> VQ -> decoder
     self.encoder = Encoder(C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
@@ -61,7 +61,7 @@ class VQVAE(nn.Module):
 class Encoder(nn.Module):
   def __init__(self, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     self.net = nn.Sequential(
         nn.Conv2d(1, H, 3, 2, padding=1),
         nn.ReLU(),
@@ -89,7 +89,7 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
 
     self.net = nn.Sequential(
         Upsample(C.vqD, H),

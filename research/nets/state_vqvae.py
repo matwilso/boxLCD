@@ -25,7 +25,7 @@ from .vqvae import VectorQuantizer
 class State_VQVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     # encoder -> VQ -> decoder
     self.state_n = env.observation_space['pstate'].shape[0]
     self.encoder = Encoder(self.state_n, C)
@@ -56,7 +56,7 @@ class State_VQVAE(nn.Module):
 class Encoder(nn.Module):
   def __init__(self, in_size, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     self.net = nn.Sequential(
       nn.Linear(in_size, H),
       nn.ReLU(),
@@ -74,7 +74,7 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, out_size, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     self.net = nn.Sequential(
        nn.Linear(8*C.vqD, H),
        nn.ReLU(),

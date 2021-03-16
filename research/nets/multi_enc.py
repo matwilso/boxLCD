@@ -25,7 +25,7 @@ import utils
 class MultiEnc(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     # encoder -> VQ -> decoder
     self.encoder = Encoder(env, C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
@@ -38,8 +38,7 @@ class MultiEnc(nn.Module):
       recon_losses['recon_'+key] = -decoded[key].log_prob(batch[key]).mean()
     recon_loss = sum(recon_losses.values())
     loss = recon_loss + embed_loss
-    prior_loss = th.zeros(1)
-    metrics = {'vq_vae_loss': loss, 'embed_loss': embed_loss, 'perplexity': perplexity, 'prior_loss': prior_loss, **recon_losses, 'recon_loss': recon_loss}
+    metrics = {'vq_vae_loss': loss, 'embed_loss': embed_loss, 'perplexity': perplexity, **recon_losses, 'recon_loss': recon_loss}
     if eval: metrics['decoded'] = decoded
     if return_idxs: metrics['idxs'] = idxs
     return loss, metrics
@@ -53,7 +52,7 @@ class MultiEnc(nn.Module):
 class Encoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     act_n = env.action_space.shape[0]
 
@@ -100,7 +99,7 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.n_embed
+    H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_net = nn.Sequential(
       nn.Flatten(-3),
