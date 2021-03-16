@@ -70,7 +70,8 @@ class Multistep(nn.Module):
   def forward(self, batch):
     import ipdb; ipdb.set_trace()
 
-  def train_step(self, batch):
+  def train_step(self, batch, dry=False):
+    """dry means don't update"""
     bs = batch['pstate'].shape[0]
     if self.C.phase == 1:
       #import ipdb; ipdb.set_trace()
@@ -78,8 +79,9 @@ class Multistep(nn.Module):
       self.optimizer.zero_grad()
       loss, metrics = self.multi_encoder.loss(batch, return_idxs=True)
       idxs = metrics.pop('idxs').detach().flatten(-2)
-      loss.backward()
-      self.optimizer.step()
+      if not dry:
+        loss.backward()
+        self.optimizer.step()
     elif self.C.phase == 2:
       metrics = {}
       self.gpt_optimizer.zero_grad()
@@ -99,11 +101,13 @@ class Multistep(nn.Module):
         acts = acts.repeat_interleave(self.num_stack_tokens, 1)
         gpt_dist = self.gpt.forward(code_idxs, cond=acts)
         prior_loss = -gpt_dist.log_prob(code_idxs).mean()
-        self.scaler.scale(prior_loss).backward()
-        #self.scaler.unscale_(self.gpt_optimizer)
-        #clip grads if want
-        self.scaler.step(self.gpt_optimizer)
-        self.scaler.update()
+        if not dry:
+          self.optimizer.step()
+          self.scaler.scale(prior_loss).backward()
+          #self.scaler.unscale_(self.gpt_optimizer)
+          #clip grads if want
+          self.scaler.step(self.gpt_optimizer)
+          self.scaler.update()
       #prior_loss.backward()
       #self.gpt_optimizer.step()
       metrics['prior_loss'] = prior_loss

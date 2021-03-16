@@ -31,14 +31,11 @@ def config():
   C.amp = 0
   C.num_epochs = 1000000
   C.save_n = 5
-  C.full_state = 0
 
   C.decode = 'multi'
   C.conv_io = 0
   C.collect_n = 100
   C.grad_clip = 10.0
-
-  C.subset = 'image'
 
   C.bs = 64
   C.lr = 1e-4

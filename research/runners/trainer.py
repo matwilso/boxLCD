@@ -54,7 +54,12 @@ class Trainer:
       if epoch % self.C.log_n == 0:
         self.model.eval()
         with th.no_grad():
-          test_batch = self.b(next(iter(self.test_ds)))
+          test_time = time.time()
+          # compute loss on all data
+          for test_batch in self.test_ds:
+            metrics = self.model.train_step(self.b(test_batch), dry=True)
+            for key in metrics: self.logger['test/'+key] += [metrics[key].detach().cpu()]
+          self.logger['dt/test'] = time.time() - test_time
           # run the model specific evaluate function. usually draws samples and creates other relevant visualizations.
           eval_time = time.time()
           self.model.evaluate(self.writer, test_batch, epoch)

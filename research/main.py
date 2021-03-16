@@ -107,5 +107,6 @@ if __name__ == '__main__':
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       pbar.set_description(f'fps: {C.ep_len/(time.time()-start)}')
     C.logdir.mkdir(parents=True, exist_ok=True)
-    data = np.savez(f'{C.logdir}/dump.npz', acts=acts, **obses)
+    if (C.logdir / 'pause.marker').exists(): import ipdb; ipdb.set_trace()
+    data = np.savez_compressed(f'{C.logdir}/dump.npz', acts=acts, **obses)
     utils.dump_logger({}, None, 0, C)
