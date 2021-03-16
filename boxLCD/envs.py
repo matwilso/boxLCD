@@ -24,6 +24,7 @@ class Bounce(WorldEnv):
     w = WorldDef(robots=[], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
     super().__init__(w, C)
 
+
 class BoxOrCircle(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[], objects=[Object('object0', shape='random', size=0.7, density=0.1, rand_angle=0)])
@@ -43,11 +44,36 @@ class UrchinBall(WorldEnv):
 @cc(wh_ratio=2.0)
 class UrchinBalls(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1) for i in range(4)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1) for i in range(3)])
     super().__init__(w, C)
 
 @cc(wh_ratio=2.0)
 class UrchinCubes(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(4)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
     super().__init__(w, C)
+
+class Bounce2(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1, restitution=0.9) for i in range(2)])
+    super().__init__(w, C)
+
+class Legs(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='legs', name='legs0')], objects=[])
+    super().__init__(w, C)
+
+class Luxo(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[])
+    super().__init__(w, C)
+
+@cc(wh_ratio=1.5)
+class LuxoBall(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
+    super().__init__(w, C)
+
+
+
+

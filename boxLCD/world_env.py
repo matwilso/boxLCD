@@ -275,6 +275,8 @@ class WorldEnv(gym.Env, EzPickle):
       shape = obj_shapes[shape_name]
       if obj.restitution is None:
         restitution = 0 if shape_name == 'box' else 0.7
+      else:
+        restitution = obj.restitution
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=restitution)
       # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
       if obj.rangex is None: rangex = 1 - (2*obj_size / self.WIDTH)

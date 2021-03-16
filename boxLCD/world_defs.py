@@ -88,6 +88,24 @@ def make_urchin(robot, C):
   }
   return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.5)
 
+@register('legs')
+def make_legs(robot, C):
+  LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
+  SHAPES = {}
+  SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
+  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+  root_body = Body(SHAPES['root'])
+  bodies = {
+      'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+      'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+  }
+  joints = {
+      'aleg': Joint('root', -1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+      'bleg': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+  }
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5)
+
+
 # urchin is the best robot. the rest need some work.
 # it's actually a bit hard to design a robot that can do interesting things in 2D space.
 # i guess i maybe oughta have some top down views, but then how do you control with joints?
@@ -245,15 +263,17 @@ def make_luxo(robot, C):
       name=robot.name,
       root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
       bodies={
-          'lhip': Body(SHAPES['hip']),
-          'lknee': Body(SHAPES['knee']),
-          'lfoot': Body(SHAPES['foot']),
+          'lhip': Body(SHAPES['hip'], maskBits=0x011),
+          'lknee': Body(SHAPES['knee'], maskBits=0x011),
+          'lfoot': Body(SHAPES['foot'], maskBits=0x011),
       },
       joints={
           'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-0.1, 0.1]),
           'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
           'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
-      },)
+      },
+      bound=2.0
+      )
 
 
 @register('gingy')
