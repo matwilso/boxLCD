@@ -3,9 +3,9 @@ import time
 import argparse
 import numpy as np
 from tqdm import tqdm
-from boxLCD import envs
+from boxLCD import envs, env_map
 from boxLCD.utils import A, AttrDict, args_type
-from define_config import env_fn, parse_args
+from utils import parse_args
 
 import matplotlib.pyplot as plt
 import itertools
@@ -23,7 +23,7 @@ from boxLCD.utils import A
 
 if __name__ == '__main__':
   C = parse_args()
-  env = env_fn(C)()
+  env = env_map[C.env](C)
   N = C.collect_n
   obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
   acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
@@ -39,4 +39,4 @@ if __name__ == '__main__':
       obs, rew, done, info = env.step(act)
     pbar.set_description(f'fps: {C.ep_len/(time.time()-start)}')
   os.makedirs('rollouts', exist_ok=True)
-  np.savez(f'rollouts/{C.env}-{N}.npz', acts=acts, **obses)
+  np.savez_compressed(f'rollouts/{C.env}-{N}.npz', acts=acts, **obses)

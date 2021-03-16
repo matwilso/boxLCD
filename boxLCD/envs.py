@@ -63,6 +63,7 @@ class Legs(WorldEnv):
     w = WorldDef(robots=[Robot(type='legs', name='legs0')], objects=[])
     super().__init__(w, C)
 
+@cc(wh_ratio=1.5)
 class Luxo(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[])

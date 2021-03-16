@@ -6,7 +6,7 @@ import time
 import argparse
 import numpy as np
 from tqdm import tqdm
-from boxLCD import envs
+from boxLCD import envs, env_map
 from boxLCD.utils import A, AttrDict, args_type
 import copy
 import matplotlib.pyplot as plt
@@ -23,12 +23,12 @@ import argparse
 from boxLCD.utils import A
 from model import GPT
 import utils
-from define_config import env_fn, parse_args
+from utils import parse_args
 
 class Trainer:
   def __init__(self, C):
     self.C = C
-    self.env = env_fn(C)()
+    self.env = env_map[C.env](C)
     self.act_dim = self.env.action_space.shape[0]
     self.C.lcd_w = int(self.C.lcd_base * self.C.wh_ratio)
     self.C.lcd_h = self.C.lcd_base

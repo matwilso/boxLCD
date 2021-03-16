@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from define_config import parse_args
+from utils import parse_args
 import time
 from pyglet.gl import glClearColor
 import argparse
