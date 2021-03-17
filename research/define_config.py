@@ -63,6 +63,7 @@ def config():
   C.skip_train = 0
 
   C.phase = 1
+  C.window = 200
 
   C.env = 'dropbox'
 

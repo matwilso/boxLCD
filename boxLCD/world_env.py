@@ -1,6 +1,6 @@
 from functools import partial
 from gym.envs.classic_control import rendering
-from boxLCD.world_defs import FPS, SCALE, ROBOT_FILLER
+from boxLCD.world_defs import SCALE, ROBOT_FILLER
 import time
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
@@ -27,7 +27,6 @@ class WorldEnv(gym.Env, EzPickle):
   """
   metadata = {
       'render.modes': ['human', 'rgb_array'],
-      'video.frames_per_second': FPS
   }
   # ENVIRONMENT DEFAULT CONFIG
   ENV_DC = utils.AttrDict()
@@ -43,6 +42,7 @@ class WorldEnv(gym.Env, EzPickle):
   ENV_DC.all_corners = 0  # use corner keypoint obs instead of sin+cos of theta
   ENV_DC.walls = 1  # bound the environment with walls on both sides
   ENV_DC.debug = 0
+  ENV_DC.fps = 30
 
   def __init__(self, world_def, C={}):
     """
@@ -159,7 +159,7 @@ class WorldEnv(gym.Env, EzPickle):
 
   @property
   def FPS(self):
-    return FPS
+    return self.C.fps
 
   @property
   def SCALE(self):
@@ -442,7 +442,7 @@ class WorldEnv(gym.Env, EzPickle):
           self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name + ':torque']))
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
     # RUN SIM STEP
-    self.b2_world.Step(1.0 / FPS, 6 * 30, 2 * 30)
+    self.b2_world.Step(1.0 / self.FPS, 6 * 30, 2 * 30)
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
     info = {}

@@ -38,7 +38,7 @@ if __name__ == '__main__':
   obs_log = False
   omax = 0.0
   ret = 0
-  delay = 1 / 80.0
+  delay = 1 / C.fps
 
   # KEY BINDINGS
   # 0 - reset env

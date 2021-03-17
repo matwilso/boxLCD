@@ -111,7 +111,7 @@ class MDNHead(nn.Module):
     shape = self.C.mdn_k + 2 * self.out_n * self.C.mdn_k
     self.layer = nn.Linear(in_n, shape)
 
-  def forward(self, x, past_o=None):
+  def forward(self, x):
     dx = self.C.mdn_k * self.out_n
     out = self.layer(x)
     mu = out[..., :dx]
@@ -151,19 +151,21 @@ class ConvBinHead(nn.Module):
     self.C = C
     self.in_n = in_n
     self.out_n = out_n
-    self.shape = int(self.C.wh_ratio)
     #self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 7, stride=2)
     #self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=2)
-    self.d1 = nn.ConvTranspose2d(self.in_n//self.shape, 64, 4, stride=4)
-    self.d2 = nn.ConvTranspose2d(64, 1, 4, stride=4)
-    # TODO: try a version like I have below. where it is just in place. perhaps that could smooth things out
+    first_kernel = int(self.C.wh_ratio * 4)
+    self.net = nn.Sequential(
+      nn.ConvTranspose2d(self.in_n, 64, (4,first_kernel), stride=2),
+      nn.ReLU(),
+      nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1),
+      nn.ReLU(),
+      nn.ConvTranspose2d(64, 1, 4, stride=2, padding=1),
+    )
 
-  def forward(self, x, past_o=None):
+  def forward(self, x):
     BS, LEN, C = x.shape
-    x = x.reshape(BS * LEN, -1, self.shape, 1)
-    x = self.d1(x)
-    x = F.relu(x)
-    x = self.d2(x)
+    x = x.reshape(BS * LEN, C, 1, 1)
+    x = self.net(x)
     x = x.reshape(BS, LEN, -1)
     return tdib.Bernoulli(logits=x)
 
@@ -174,7 +176,7 @@ class ConvEmbed(nn.Module):
     self.c1 = nn.Conv2d(1, 64, 3, stride=1, padding=1)
     self.c2 = nn.Conv2d(64, 1, 3, stride=1, padding=1)
 
-  def forward(self, x, past_o=None):
+  def forward(self, x):
     BS, LEN, C = x.shape
     x = x.reshape(BS * LEN, -1, self.C.lcd_h, self.C.lcd_w)
     x = self.c1(x)
@@ -213,7 +215,7 @@ class MultiHead(nn.Module):
     self.state = MDNHead(in_n, out_n-self.split, C) 
     #self.state = GPT(1, block_size=out_n-self.split, dist='mdn', cond=in_n, C=C) 
 
-  def forward(self, x, past_o=None):
+  def forward(self, x):
     xb, xs = self.layer(x).chunk(2, -1)
     bin = self.binary(xb) 
     state = self.state(xs)

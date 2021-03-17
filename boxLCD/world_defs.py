@@ -5,7 +5,6 @@ from typing import NamedTuple, List, Set, Tuple, Dict
 from boxLCD import utils
 A = utils.A
 
-FPS = 50
 SCALE = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 
 # STRUCTS THAT ARE USED TO DEFINE A WORLD

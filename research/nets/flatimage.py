@@ -21,12 +21,12 @@ class FlatImageTransformer(nn.Module):
     self.env = env
     self.imsize = self.C.lcd_h * self.C.lcd_w
     self.act_n = env.action_space.shape[0]
-    self.block_size = self.C.ep_len
+    self.block_size = self.C.window
 
     self.size = self.imsize
     self.gpt_size = self.imsize
     self.dist = self.C.decode
-    self.block_size = self.C.ep_len
+    self.block_size = self.C.window
 
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, C.n_embed))
     self.cond_in = nn.Linear(self.act_n, C.n_embed // 2, bias=False)
@@ -38,6 +38,7 @@ class FlatImageTransformer(nn.Module):
     self.ln_f = nn.LayerNorm(C.n_embed)
     if self.C.conv_io:
       self.dist_head = ConvBinHead(C.n_embed, self.gpt_size, C)
+      self.custom_embed = ConvEmbed(self.imsize, C.n_embed//2, C)
     else:
       self.dist_head = BinaryHead(C.n_embed, self.gpt_size, C)
     self.optimizer = Adam(self.parameters(), lr=C.lr)
@@ -124,11 +125,11 @@ class FlatImageTransformer(nn.Module):
   def evaluate(self, writer, batch, epoch):
     N = self.C.num_envs
     # unpropted
-    acts = (th.rand(N, self.C.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
+    acts = (th.rand(N, self.C.window, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
     sample, sample_loss = self.sample(N, acts=acts)
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=50)
+    writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
     # prompted
     if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.C.env:
@@ -142,7 +143,7 @@ class FlatImageTransformer(nn.Module):
     for ii in range(N):
       for key, val in self.env.reset(reset_states[ii]).items():
         obses[key][ii] += [val]
-      for _ in range(self.C.ep_len - 1):
+      for _ in range(self.C.window - 1):
         act = self.env.action_space.sample()
         obs = self.env.step(act)[0]
         for key, val in obs.items():
@@ -161,4 +162,4 @@ class FlatImageTransformer(nn.Module):
     blank = np.zeros_like(real_lcd)[..., :1, :]
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
-    writer.add_video('prompted_lcd', utils.force_shape(out), epoch, fps=50)
+    writer.add_video('prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)

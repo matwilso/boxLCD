@@ -41,7 +41,7 @@ def env_fn(C, seed=None):
   return _make
 
 
-def write_gif(name, frames, fps=50):
+def write_gif(name, frames, fps=30):
   start = time.time()
   from moviepy.editor import ImageSequenceClip
   # make the moviepy clip
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     #else:
     if i > env.C.ep_len:
       print(i)
-      write_gif(f'{C.env}.gif', imgs, fps=50)
+      write_gif(f'{C.env}.gif', imgs, fps=env.C.fps)
       break
 
     if KEY.ESCAPE in key_handler:

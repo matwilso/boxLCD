@@ -59,7 +59,6 @@ if __name__ == '__main__':
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base
   C.imsize = C.lcd_w*C.lcd_h
-  C.window = C.vidstack * C.stacks_per_block
   env = env_fn(C)()
   if C.mode not in ['collect']:
     if C.model == 'frame_token':

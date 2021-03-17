@@ -20,7 +20,7 @@ import pyglet
 KEY = pyglet.window.key
 A = boxLCD.utils.A
 
-def write_gif(name, frames, fps=50):
+def write_gif(name, frames, fps=30):
   start = time.time()
   from moviepy.editor import ImageSequenceClip
   # make the moviepy clip
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     #else:
     if i > 400:
-      write_gif('test.gif', imgs, fps=50)
+      write_gif('test.gif', imgs, fps=30)
       break
 
     if KEY.ESCAPE in key_handler:

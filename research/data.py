@@ -1,3 +1,4 @@
+from sys import maxsize
 from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
@@ -33,14 +34,19 @@ class RolloutDataset(Dataset):
 
   def __getitem__(self, idx):
     max_start = self.C.ep_len-self.C.window
-    if self.C.datamode == 'video' and self.C.vidstack != self.C.ep_len and max_start != 0:
+    if max_start > 0:
       start = np.random.randint(0, max_start)
-      if self.C.phase == 1:
-        elem = {key: torch.as_tensor(val[idx, start:start+self.C.vidstack], dtype=torch.float32) for key, val in self.bufs.items()}
-      else:
-        elem = {key: torch.as_tensor(val[idx, start:start+self.C.window], dtype=torch.float32) for key, val in self.bufs.items()}
+      elem = {key: torch.as_tensor(val[idx, start:start+self.C.window], dtype=torch.float32) for key, val in self.bufs.items()}
     else:
       elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
+
+    #if self.C.datamode == 'video' and self.C.vidstack != self.C.ep_len and max_start != 0:
+    #  if self.C.phase == 1:
+    #    elem = {key: torch.as_tensor(val[idx, start:start+self.C.vidstack], dtype=torch.float32) for key, val in self.bufs.items()}
+    #  else:
+    #    elem = {key: torch.as_tensor(val[idx, start:start+self.C.window], dtype=torch.float32) for key, val in self.bufs.items()}
+    #else:
+    #  elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
     elem['lcd'] /= 255.0
     return elem
 

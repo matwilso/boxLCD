@@ -59,7 +59,7 @@ class Trainer:
     self.logger['sample_loss'] += [sample_loss]
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
+    self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=self.C.fps)
     # EVAL
     if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.C.env:
@@ -93,7 +93,7 @@ class Trainer:
     blank = np.zeros_like(real_lcd)[..., :1, :]
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
-    self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
+    self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=self.C.fps)
 
   def test(self, i):
     self.model.eval()
