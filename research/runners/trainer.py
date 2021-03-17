@@ -27,6 +27,10 @@ class Trainer:
     if C.phase == 2:
       C.logdir = C.logdir / 'phase2'
     self.writer = SummaryWriter(C.logdir)
+    #self.writer.add_hparams({
+    #    'lr': C.lr,
+    #    'bs': C.bs,
+    #})
     self.logger = utils.dump_logger({}, self.writer, 0, C)
     self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
     self.env = env
@@ -53,27 +57,28 @@ class Trainer:
       if (self.C.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
 
-      if itr % self.C.log_n == 0:
+      if itr % self.C.log_n == 0 or self.C.skip_train:
         self.model.eval()
         with th.no_grad():
           with Timer(self.logger, 'test'):
             # compute loss on all data
             for test_batch in self.test_ds:
               metrics = self.model.train_step(self.b(test_batch), dry=True)
-              for key in metrics: self.logger['test/' + key] += [metrics[key].detach().cpu()]
+              for key in metrics:
+                self.logger['test/' + key] += [metrics[key].detach().cpu()]
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
             self.model.evaluate(self.writer, test_batch, itr)
         self.model.train()
 
         # LOGGING
-        self.logger['dt/total'] = time.time()-total_time
-        self.logger['dt/epoch'] = time.time()-epoch_time
+        self.logger['dt/total'] = time.time() - total_time
+        self.logger['dt/epoch'] = time.time() - epoch_time
         epoch_time = time.time()
         self.logger['num_vars'] = self.num_vars
         self.logger = utils.dump_logger(self.logger, self.writer, itr, self.C)
         self.writer.flush()
-        if time.time() - last_save >= 300 or itr % (self.C.log_n*self.C.save_n) == 0:
+        if time.time() - last_save >= 300 or itr % (self.C.log_n * self.C.save_n) == 0:
           self.model.save(self.C.logdir)
           last_save = time.time()
       if itr >= self.C.total_itr:

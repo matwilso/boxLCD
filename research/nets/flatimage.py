@@ -129,7 +129,8 @@ class FlatImageTransformer(nn.Module):
     sample, sample_loss = self.sample(N, acts=acts)
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
+    #writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
+    utils.add_video(writer, 'lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
     # prompted
     if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.C.env:
@@ -162,4 +163,5 @@ class FlatImageTransformer(nn.Module):
     blank = np.zeros_like(real_lcd)[..., :1, :]
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
-    writer.add_video('prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)
+    #writer.add_video('prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)
+    utils.add_video(writer, 'prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)

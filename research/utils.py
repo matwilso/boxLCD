@@ -1,3 +1,5 @@
+import os
+import subprocess
 import time
 import pathlib
 from collections import defaultdict
@@ -43,7 +45,7 @@ def dump_logger(logger, writer, i, C):
   print('=' * 30)
   return defaultdict(lambda: [])
 
-def write_gif(name, frames, fps=20):
+def write_gif(name, frames, fps=30):
   start = time.time()
   from moviepy.editor import ImageSequenceClip
   # make the moviepy clip
@@ -109,3 +111,51 @@ class Timer:
   def __exit__(self, exc_type, exc_val, exc_tb):
     new_time = time.time() - self.time_start
     self.logger['dt/' + self.message] += [new_time]
+
+
+
+def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
+  th._C._log_api_usage_once("tensorboard.logging.add_video")
+  from torch.utils.tensorboard import _convert_np, _utils, summary
+  from tensorboard.compat.proto.summary_pb2 import Summary
+  tensor = _convert_np.make_np(vid_tensor)
+  tensor = _utils._prepare_video(tensor)
+  scale_factor = summary._calc_scale_factor(tensor)
+  tensor = tensor.astype(np.float32)
+  tensor = (tensor * scale_factor).astype(np.uint8)
+  video = make_video(tensor, fps)
+  summ = Summary(value=[Summary.Value(tag=tag, image=video)])
+  writer._get_file_writer().add_summary(summ, global_step, walltime)
+
+def make_video(tensor, fps):
+  from tensorboard.compat.proto.summary_pb2 import Summary
+  try:
+    import moviepy  # noqa: F401
+  except ImportError:
+    print('add_video needs package moviepy')
+    return
+  try:
+    from moviepy import editor as mpy
+  except ImportError:
+    print("moviepy is installed, but can't import moviepy.editor. Some packages could be missing [imageio, requests]")
+    return
+  import tempfile
+  t, h, w, c = tensor.shape
+  # encode sequence of images into gif string
+  clip = mpy.ImageSequenceClip(list(tensor), fps=fps)
+  filename = tempfile.NamedTemporaryFile(suffix='.gif', delete=False).name
+  try:  # newer version of moviepy use logger instead of progress_bar argument.
+    clip.write_gif(filename, verbose=False, logger=None)
+  except TypeError:
+    try:  # older version of moviepy does not support progress_bar argument.
+      clip.write_gif(filename, verbose=False, progress_bar=False)
+    except TypeError:
+      clip.write_gif(filename, verbose=False)
+  subprocess.run(['gifsicle', '--lossy=30', '-o', filename, filename])
+  with open(filename, 'rb') as f:
+    tensor_string = f.read()
+  try:
+    os.remove(filename)
+  except OSError:
+    logging.warning('The temporary file used by moviepy cannot be deleted.')
+  return Summary.Image(height=h, width=w, colorspace=c, encoded_image_string=tensor_string)
