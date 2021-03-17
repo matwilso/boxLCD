@@ -1,5 +1,5 @@
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 

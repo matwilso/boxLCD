@@ -5,16 +5,16 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
-import torchvision
+import torch as torchvision
 from torch.optim import Adam
 from itertools import chain, count
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
@@ -36,7 +36,7 @@ class MultiEnc(nn.Module):
     embed_loss, decoded, perplexity, idxs = self.forward(batch)
     import ipdb; ipdb.set_trace()
 
-    recon_loss = -tdib.Bernoulli(logits=decoded).log_prob(x).mean()
+    recon_loss = -thd.Bernoulli(logits=decoded).log_prob(x).mean()
     loss = recon_loss + embed_loss
     prior_loss = th.zeros(1)
     metrics = {'vq_vae_loss': loss, 'recon_loss': recon_loss, 'embed_loss': embed_loss, 'perplexity': perplexity, 'prior_loss': prior_loss}

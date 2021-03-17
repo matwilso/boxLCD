@@ -10,7 +10,7 @@ from utils import parse_args
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
-import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 import numpy as np

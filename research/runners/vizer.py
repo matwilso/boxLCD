@@ -6,7 +6,7 @@ from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
-import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import yaml
@@ -59,7 +59,7 @@ class AutoEnv:
     obs, rew, done, info = self.env.step(act)
     truth = obs['lcd']
     self.window_batch['acts'][:, self.count] = act[None]
-    batch = {key: torch.as_tensor(1.0 * val).float().to(self.C.device) for key, val in self.window_batch.items()}
+    batch = {key: th.as_tensor(1.0 * val).float().to(self.C.device) for key, val in self.window_batch.items()}
     lcd_shape = batch['lcd'].shape
     batch['lcd'] = batch['lcd'].flatten(-2)
     out = self.model.onestep(batch, self.count)
@@ -93,7 +93,7 @@ class Vizer:
     #bigC.lcd_w *= 4
     # self.big_tvenv = SyncVectorEnv([env_fn(bigC, 0 + i) for i in range(C.num_envs)], C=bigC)  # test vector env
     loadpath = self.C.weightdir / 'weights.pt'
-    self.model.load_state_dict(torch.load(loadpath))
+    self.model.load_state_dict(th.load(loadpath))
     self.window = pyglet.window.Window(1280, 720)
     self.C = C
     self.paused = False
@@ -174,8 +174,8 @@ class Vizer:
     acts += [np.zeros_like(act)]
     obses = {key: np.stack(val, 0)[None] for key, val in obses.items()}
     acts = np.stack(acts, 0)
-    acts = torch.as_tensor(acts, dtype=torch.float32).to(self.C.device)[None]
-    prompts = {key: torch.as_tensor(1.0 * val[:, :5]).to(self.C.device) for key, val in obses.items()}
+    acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)[None]
+    prompts = {key: th.as_tensor(1.0 * val[:, :5]).to(self.C.device) for key, val in obses.items()}
     lcds = []
     lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
     lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]

@@ -1,7 +1,7 @@
 import numpy as np
 from torch.optim import Adam
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from .common import BinaryHead, CategoricalHead

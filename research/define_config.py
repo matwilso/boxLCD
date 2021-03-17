@@ -34,7 +34,7 @@ def config():
 
   C.decode = 'multi'
   C.conv_io = 0
-  C.collect_n = 100
+  C.num_barrels = 10
   C.grad_clip = 10.0
 
   C.bs = 64

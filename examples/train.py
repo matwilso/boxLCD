@@ -12,7 +12,7 @@ import copy
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
-import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 import numpy as np
@@ -54,7 +54,7 @@ class Trainer:
   def sample(self, i):
     # TODO: prompt to a specific point and sample from there. to compare against ground truth.
     N = 5
-    acts = (torch.rand(N, self.C.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
+    acts = (th.rand(N, self.C.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
     sample, sample_loss = self.model.sample(N, acts=acts)
     self.logger['sample_loss'] += [sample_loss]
     lcd = sample['lcd']
@@ -82,8 +82,8 @@ class Trainer:
       acts[ii] += [np.zeros_like(act)]
     obses = {key: np.array(val) for key, val in obses.items()}
     acts = np.array(acts)
-    acts = torch.as_tensor(acts, dtype=torch.float32).to(self.C.device)
-    prompts = {key: torch.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
+    acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
+    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
     prompted_samples, prompt_loss = self.model.sample(N, acts=acts, prompts=prompts)
     self.logger['prompt_sample_loss'] += [prompt_loss]
     real_lcd = obses['lcd'][:, :, None]
@@ -97,7 +97,7 @@ class Trainer:
 
   def test(self, i):
     self.model.eval()
-    with torch.no_grad():
+    with th.no_grad():
       for batch in self.test_ds:
         batch = {key: val.to(self.C.device) for key, val in batch.items()}
         loss = self.model.loss(batch)

@@ -4,11 +4,11 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
-import torchvision
+import torch as torchvision
 from torch.optim import Adam
 from itertools import chain, count
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead

@@ -13,18 +13,19 @@ def cc(**kwargs):
     return CustomWorldEnv
   return decorator
 
-@cc(ep_len=100)
+@cc(ep_len=50)
 class Dropbox(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[], objects=[Object('object0', shape='box', size=0.7, density=0.1)])
     super().__init__(w, C)
 
+@cc(ep_len=100)
 class Bounce(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
     super().__init__(w, C)
 
-
+@cc(ep_len=100)
 class BoxOrCircle(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[], objects=[Object('object0', shape='random', size=0.7, density=0.1, rand_angle=0)])

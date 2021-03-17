@@ -5,11 +5,11 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
-import torchvision
+import torch as torchvision
 from torch.optim import Adam
 from itertools import chain, count
-import torch
-from torch import distributions as tdib
+import torch as th
+from torch import distributions as thd
 import torch.distributions.transforms as tran
 from torch import nn
 import torch.nn.functional as F
@@ -23,17 +23,17 @@ def aggregate(x, dim=1, catdim=-1):
   returns (BS, 4E) where 4E is min, max, std, mean aggregations.
                    using all of these rather than just one leads to better coverage. see paper
   """
-  min = torch.min(x, dim=dim)[0]
-  max = torch.max(x, dim=dim)[0]
-  std = torch.std(x, dim=dim)
-  mean = torch.mean(x, dim=dim)
-  return torch.cat([min, max, std, mean], dim=catdim)
+  min = th.min(x, dim=dim)[0]
+  max = th.max(x, dim=dim)[0]
+  std = th.std(x, dim=dim)
+  mean = th.mean(x, dim=dim)
+  return th.cat([min, max, std, mean], dim=catdim)
 
 
 class CausalSelfAttention(nn.Module):
   """
   A vanilla multi-head masked self-attention layer with a projection at the end.
-  It is possible to use torch.nn.MultiheadAttention here but I am including an
+  It is possible to use th.nn.MultiheadAttention here but I am including an
   explicit implementation here to show that there is nothing too scary here.
   """
 
@@ -48,7 +48,7 @@ class CausalSelfAttention(nn.Module):
     # output projection
     self.proj = nn.Linear(C.n_embed, C.n_embed)
     # causal mask to ensure that attention is only applied to the left in the input sequence
-    self.register_buffer("mask", torch.tril(torch.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
+    self.register_buffer("mask", th.tril(th.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
     self.C = C
 
   def forward(self, x, layer_past=None):
@@ -98,9 +98,9 @@ class GaussHead(nn.Module):
     std = F.softplus(log_std) + self.C.min_std
     if past_z is not None:
       mu = mu + past_z
-    #dist = tdib.Independent(tdib.Normal(mu, std), 1)
-    #dist = tdib.Normal(mu, std)
-    dist = tdib.MultivariateNormal(mu, torch.diag_embed(std))
+    #dist = thd.Independent(thd.Normal(mu, std), 1)
+    #dist = thd.Normal(mu, std)
+    dist = thd.MultivariateNormal(mu, th.diag_embed(std))
     return dist
 
 class MDNHead(nn.Module):
@@ -122,8 +122,8 @@ class MDNHead(nn.Module):
     std = std.reshape(list(std.shape[:-1]) + [self.C.mdn_k, -1])
     if past_o is not None:
       mu = mu + past_o[..., None, :]
-    cat = tdib.Categorical(logits=logits)
-    dist = tdib.MixtureSameFamily(cat, tdib.MultivariateNormal(mu, torch.diag_embed(std)))
+    cat = thd.Categorical(logits=logits)
+    dist = thd.MixtureSameFamily(cat, thd.MultivariateNormal(mu, th.diag_embed(std)))
     return dist
 
 class CategoricalHead(nn.Module):
@@ -133,7 +133,7 @@ class CategoricalHead(nn.Module):
     self.layer = nn.Linear(in_n, out_n)
   def forward(self, x):
     x = self.layer(x)
-    return tdib.Multinomial(logits=x)
+    return thd.Multinomial(logits=x)
 
 class BinaryHead(nn.Module):
   """take logits and produce a bernoulli distribution independently"""
@@ -142,7 +142,7 @@ class BinaryHead(nn.Module):
     self.layer = nn.Linear(in_n, out_n)
   def forward(self, x):
     x = self.layer(x)
-    return tdib.Bernoulli(logits=x)
+    return thd.Bernoulli(logits=x)
 
 
 class ConvBinHead(nn.Module):
@@ -167,7 +167,7 @@ class ConvBinHead(nn.Module):
     x = x.reshape(BS * LEN, C, 1, 1)
     x = self.net(x)
     x = x.reshape(BS, LEN, -1)
-    return tdib.Bernoulli(logits=x)
+    return thd.Bernoulli(logits=x)
 
 class ConvEmbed(nn.Module):
   def __init__(self, in_n, out_n, C):

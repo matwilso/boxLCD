@@ -17,7 +17,6 @@ import utils
 import data
 from define_config import env_fn
 
-
 class Trainer:
   def __init__(self, model, env, C):
     super().__init__()

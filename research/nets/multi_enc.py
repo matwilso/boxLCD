@@ -5,16 +5,16 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
-import torchvision
+import torch as torchvision
 from torch.optim import Adam
 from itertools import chain, count
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
@@ -121,8 +121,8 @@ class Decoder(nn.Module):
         nn.Conv2d(H, C.vidstack, 3, padding=1),
     )
   def forward(self, x):
-    lcd_dist = tdib.Bernoulli(logits=self.net(x))
-    state_dist = tdib.Normal(self.state_net(x), 1)
+    lcd_dist = thd.Bernoulli(logits=self.net(x))
+    state_dist = thd.Normal(self.state_net(x), 1)
     return {'lcd': lcd_dist, 'pstate': state_dist}
 
 class ResBlock(nn.Module):

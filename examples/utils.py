@@ -1,4 +1,4 @@
-import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import yaml
@@ -48,7 +48,7 @@ def parse_args():
 class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, C=None):
     data = np.load(npzfile, allow_pickle=True)
-    self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
+    self.bufs = {key: th.as_tensor(data[key]) for key in data.keys()}
     cut = int(len(self.bufs['acts']) * 0.8)
     if train:
       self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
@@ -59,7 +59,7 @@ class RolloutDataset(Dataset):
     return len(self.bufs['acts'])
 
   def __getitem__(self, idx):
-    elem = {key: torch.as_tensor(val[idx], dtype=torch.float32) for key, val in self.bufs.items()}
+    elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in self.bufs.items()}
     elem['lcd'] /= 255.0
     return elem
 
@@ -97,6 +97,6 @@ def force_shape(out):
     out = np.concatenate([out, np.zeros(out.shape[:-1], dtype=out.dtype)[..., None]], -1)
   else:
     out = out.permute(1, 2, 3, 0, 4)
-    out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
+    out = th.cat([out, th.zeros(out.shape[:-1])[..., None]], -1)
   out = out.reshape(T, C, H, N * (W + 1))[None]
   return out

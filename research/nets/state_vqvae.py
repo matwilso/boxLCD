@@ -4,16 +4,16 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
-import torchvision
+import torch as torchvision
 from torch.optim import Adam
 from itertools import chain, count
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
-from torch import distributions as tdib
+from torch import distributions as thd
 from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
@@ -50,7 +50,7 @@ class State_VQVAE(nn.Module):
     embed_loss, z_q, perplexity, idxs = self.vq(z_e)
     z_q = z_q.reshape(-1, self.C.vqD*8)
     decoded = self.decoder(z_q)
-    dec_dist = tdib.Normal(decoded, 1)
+    dec_dist = thd.Normal(decoded, 1)
     return embed_loss, dec_dist, perplexity, idxs
 
 class Encoder(nn.Module):

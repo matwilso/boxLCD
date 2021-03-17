@@ -3,12 +3,12 @@ import pathlib
 from collections import defaultdict
 import yaml
 from shutil import copyfile
-import torch
+import torch as th
 import scipy
 import re
 import numpy as np
 
-def tileN(x, N): return torch.tile(x[None], [N] + [1] * len(x.shape))
+def tileN(x, N): return th.tile(x[None], [N] + [1] * len(x.shape))
 
 def combined_shape(length, shape=None):
   if shape is None:
@@ -76,7 +76,7 @@ def force_shape(out):
     out = np.concatenate([out, np.zeros(out.shape[:-1], dtype=out.dtype)[..., None]], -1)
   else:
     out = out.permute(1, 2, 3, 0, 4)
-    out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
+    out = th.cat([out, th.zeros(out.shape[:-1])[..., None]], -1)
   out = out.reshape(T, C, H, N * (W + 1))[None]
   return out
 
