@@ -32,10 +32,12 @@ def config():
   C.total_itr = int(1e9)
   C.log_n = int(1e4)
   C.save_n = 5
+  C.refresh_data = 0
 
   C.decode = 'multi'
   C.conv_io = 0
-  C.num_barrels = 10
+  C.train_barrels = -1  # -1 means all. any other number is how many to use
+  C.test_barrels = 1 
   C.grad_clip = 10.0
 
   C.bs = 64
