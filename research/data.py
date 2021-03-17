@@ -57,18 +57,25 @@ def collect(make_env, C):
     total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
 
 class RolloutDataset(IterableDataset):
-  def __init__(self, barrel_path, window=int(1e9)):
+  def __init__(self, barrel_path, window=int(1e9), infinite=True):
     super().__init__()
     self.barrel_files = list(barrel_path.glob('*.barrel.npz'))
     self.nbarrels = len(self.barrel_files)
     self.window = window
+    self.infinite = infinite
 
   def __iter__(self):
     worker_info = th.utils.data.get_worker_info()
     if worker_info is not None:
       np.random.seed(worker_info.id)
+
+    ct = 0
     while True:
-      curr_file = self.barrel_files[np.random.randint(self.nbarrels)]
+      if self.infinite:
+        curr_file = self.barrel_files[np.random.randint(self.nbarrels)]
+      else:
+        curr_file = self.barrel_files[ct]
+        ct += 1
       curr_barrel = np.load(curr_file, allow_pickle=True)
       elems = {key: th.as_tensor(curr_barrel[key], dtype=th.float32) for key in curr_barrel.keys()}
       idxs = np.arange(BARREL_SIZE)
@@ -83,10 +90,12 @@ class RolloutDataset(IterableDataset):
         elem['lcd'] /= 255.0
         yield elem
       curr_barrel.close()
+      if ct >= self.nbarrels and not self.infinite:
+        break
 
 def load_ds(C):
   train_dset = RolloutDataset(C.datapath / 'train', C.window)
-  test_dset = RolloutDataset(C.datapath / 'test', C.window)
+  test_dset = RolloutDataset(C.datapath / 'test', C.window, infinite=False)
   train_loader = DataLoader(train_dset, batch_size=C.bs, pin_memory=C.device == 'cuda', num_workers=8, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=C.bs, pin_memory=C.device == 'cuda', num_workers=8, drop_last=True)
   return train_loader, test_loader

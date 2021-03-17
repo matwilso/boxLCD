@@ -97,3 +97,15 @@ def combine_imgs(arr, row=5, col=5):
     return x
   else:
     assert False, (arr.shape, arr.ndim)
+
+class Timer:
+  def __init__(self, logger, message):
+    self.logger = logger
+    self.message = message
+
+  def __enter__(self):
+    self.time_start = time.time()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    new_time = time.time() - self.time_start
+    self.logger['dt/' + self.message] += [new_time]

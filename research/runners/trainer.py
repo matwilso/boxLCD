@@ -14,6 +14,7 @@ import argparse
 
 from boxLCD.utils import A
 import utils
+from utils import Timer
 import data
 from define_config import env_fn
 
@@ -36,43 +37,44 @@ class Trainer:
     self.b = lambda x: {key: val.to(C.device) for key, val in x.items()}
 
   def run(self):
+    total_time = time.time()
+    epoch_time = time.time()
     last_save = time.time()
-    for epoch in itertools.count():
+    train_iter = iter(self.train_ds)
+    for itr in itertools.count(1):
       # TRAIN
-      if not self.C.skip_train:
-        train_time = time.time()
-        for batch in self.train_ds:
-          metrics = self.model.train_step(self.b(batch))
-          for key in metrics: self.logger[key] += [metrics[key].detach().cpu()]
-        self.logger['dt/train'] += [time.time() - train_time]
+      with Timer(self.logger, 'sample_batch'):
+        train_batch = self.b(next(train_iter))
+      with Timer(self.logger, 'train_step'):
+        metrics = self.model.train_step(train_batch)
+        for key in metrics:
+          self.logger[key] += [metrics[key].detach().cpu()]
 
       if (self.C.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
 
-      # TEST
-      if epoch % self.C.log_n == 0:
+      if itr % self.C.log_n == 0:
         self.model.eval()
         with th.no_grad():
-          test_time = time.time()
-          # compute loss on all data
-          for test_batch in self.test_ds:
-            metrics = self.model.train_step(self.b(test_batch), dry=True)
-            for key in metrics: self.logger['test/'+key] += [metrics[key].detach().cpu()]
-          self.logger['dt/test'] = time.time() - test_time
-          # run the model specific evaluate function. usually draws samples and creates other relevant visualizations.
-          eval_time = time.time()
-          self.model.evaluate(self.writer, test_batch, epoch)
-          self.logger['dt/evaluate'] = time.time() - eval_time
+          with Timer(self.logger, 'test'):
+            # compute loss on all data
+            for test_batch in self.test_ds:
+              metrics = self.model.train_step(self.b(test_batch), dry=True)
+              for key in metrics: self.logger['test/' + key] += [metrics[key].detach().cpu()]
+          with Timer(self.logger, 'evaluate'):
+            # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
+            self.model.evaluate(self.writer, test_batch, itr)
         self.model.train()
 
         # LOGGING
+        self.logger['dt/total'] = time.time()-total_time
+        self.logger['dt/epoch'] = time.time()-epoch_time
+        epoch_time = time.time()
         self.logger['num_vars'] = self.num_vars
-        self.logger = utils.dump_logger(self.logger, self.writer, epoch, self.C)
+        self.logger = utils.dump_logger(self.logger, self.writer, itr, self.C)
         self.writer.flush()
-        if time.time() - last_save >= 300 or epoch % self.C.save_n == 0:
+        if time.time() - last_save >= 300 or itr % (self.C.log_n*self.C.save_n) == 0:
           self.model.save(self.C.logdir)
           last_save = time.time()
-      if epoch >= self.C.num_epochs:
+      if itr >= self.C.total_itr:
         break
-
-

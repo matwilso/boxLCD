@@ -29,7 +29,8 @@ def config():
 
   #C.data_mode = 'image'
   C.amp = 0
-  C.num_epochs = 1000000
+  C.total_itr = int(1e9)
+  C.log_n = int(1e4)
   C.save_n = 5
 
   C.decode = 'multi'
@@ -52,7 +53,6 @@ def config():
 
 
   C.min_std = 1e-4
-  C.log_n = 1
   C.data_frac = 1.0
   C.vanished = 1
   C.num_envs = 8
