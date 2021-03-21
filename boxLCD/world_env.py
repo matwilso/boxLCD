@@ -57,7 +57,8 @@ class WorldEnv(gym.Env, EzPickle):
     self.C = utils.AttrDict(self.ENV_DC)
     if not isinstance(C, dict):
       C = C.__dict__
-    for key in C: self.C[key] = C[key] # update with what gets passed in 
+    for key in C:
+      self.C[key] = C[key]  # update with what gets passed in
     # box2D stuff
     self.scroll = 0.0
     self.viewer = None
@@ -115,7 +116,6 @@ class WorldEnv(gym.Env, EzPickle):
     if len(self.world_def.robots) == 0:  # because having a zero shaped array makes things break
       self.act_info['dummy'] = A[-1, 1]
 
-
     # take self.obs_info and self.act_info and pack them into the gym interface
     self.obs_info = utils.sortdict(self.obs_info)
     self.obs_size = len(self.obs_info)
@@ -132,7 +132,7 @@ class WorldEnv(gym.Env, EzPickle):
       spaces['pstate'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
     else:
       spaces['pstate'] = gym.spaces.Box(-1, +1, (self.pobs_size,), dtype=np.float32)
-    spaces['lcd'] = gym.spaces.Box(0, 1, (self.C.lcd_base, int(self.C.lcd_base*self.C.wh_ratio)), dtype=np.bool)
+    spaces['lcd'] = gym.spaces.Box(0, 1, (self.C.lcd_base, int(self.C.lcd_base * self.C.wh_ratio)), dtype=np.bool)
     self.observation_space = gym.spaces.Dict(spaces)
 
     self.act_info = utils.sortdict(self.act_info)
@@ -202,8 +202,8 @@ class WorldEnv(gym.Env, EzPickle):
       root_body = robot.root_body
       fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = robot.name + ':root'
-      rangex = 1 - (2*robot.bound / self.WIDTH)
-      rangey = 1 - (2*robot.bound / self.HEIGHT)
+      rangex = 1 - (2 * robot.bound / self.WIDTH)
+      rangey = 1 - (2 * robot.bound / self.HEIGHT)
       root_xy = A[self._sample(name + ':x:p', -rangex, rangex), self._sample(name + ':y:p', -rangey, -rangey)]
 
       if self.C.all_corners:
@@ -279,13 +279,15 @@ class WorldEnv(gym.Env, EzPickle):
         restitution = obj.restitution
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=restitution)
       # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
-      if obj.rangex is None: rangex = 1 - (2*obj_size / self.WIDTH)
-      if obj.rangey is None: rangey = 1 - (2*obj_size / self.HEIGHT)
+      if obj.rangex is None:
+        rangex = 1 - (2 * obj_size / self.WIDTH)
+      if obj.rangey is None:
+        rangey = 1 - (2 * obj_size / self.HEIGHT)
       if len(self.world_def.robots) == 0:
         pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, rangey))]
       else:
         pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, -0.25))]
-      # ANGLE OR NOT 
+      # ANGLE OR NOT
       if obj.rand_angle:
         if self.C.all_corners:
           samp = self._sample(obj.name + ':kx:p'), self._sample(obj.name + ':ky:p')
@@ -422,7 +424,7 @@ class WorldEnv(gym.Env, EzPickle):
           else:
             full_state[f'{robot.name}:{joint_name}:cos'] = np.cos(angle)
             full_state[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
-    
+
     full_state = full_state.arr
     pstate = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
     return {'full_state': full_state, 'pstate': pstate, 'lcd': self.lcd_render()}
@@ -453,6 +455,8 @@ class WorldEnv(gym.Env, EzPickle):
 
   def lcd_render(self, width=None, height=None, pretty=False):
     """render the env using PIL at potentially very low resolution
+
+    # TODO: deal with scrolling
     """
     if width is None and height is None:
       width = int(self.C.lcd_base * self.C.wh_ratio)
@@ -467,7 +471,6 @@ class WorldEnv(gym.Env, EzPickle):
     image = Image.new(mode, (width, height))
     draw = ImageDraw.Draw(image)
     draw.rectangle([0, 0, width, height], fill=backgrond)
-    # for body in reversed(list(self.dynbodies.values())):
     for body in self.dynbodies.values():
       pos = A[body.position]
       shape = body.fixtures[0].shape
@@ -493,8 +496,9 @@ class WorldEnv(gym.Env, EzPickle):
         draw.polygon(points, fill=color, outline=outline)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     lcd = np.array(image)
+    if pretty:
+      lcd = 255 - lcd
     return lcd
-    # TODO: deal with scrolling
 
   def render(self, mode='rgb_array', pretty=False, return_pyglet_view=False):
     width = int(self.C.lcd_base * self.C.wh_ratio)
@@ -506,7 +510,7 @@ class WorldEnv(gym.Env, EzPickle):
       # use a pyglet viewer to show the images to the user in realtime.
       if self.viewer is None:
         self.viewer = Viewer(width * 8, height * 8, self.C)
-      high_res = 255 * self.lcd_render(width * 8, height * 8, pretty=True).astype(np.uint8)
+      high_res = self.lcd_render(width * 8, height * 8, pretty=True).astype(np.uint8)
       if False:
         high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
       low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)

@@ -54,7 +54,7 @@ if __name__ == '__main__':
       shape = 256 // img.shape[1]
       return 255 * img.astype(np.uint8)[..., None].repeat(shape, 0).repeat(shape, 1).repeat(3, 2)
 
-    pretty = 255*env.lcd_render(256, 128, pretty=True)
+    pretty = env.lcd_render(256, 128, pretty=True)
     lcd = proc(env.lcd_render(32, 16))
 
     idx = np.clip(0.9*(i-30), 0, 255).astype(np.int)
