@@ -38,7 +38,7 @@ class FlatImageTransformer(nn.Module):
     self.ln_f = nn.LayerNorm(C.n_embed)
     if self.C.conv_io:
       self.dist_head = ConvBinHead(C.n_embed, self.gpt_size, C)
-      self.custom_embed = ConvEmbed(self.imsize, C.n_embed//2, C)
+      self.custom_embed = ConvEmbed(self.imsize, C.n_embed // 2, C)
     else:
       self.dist_head = BinaryHead(C.n_embed, self.gpt_size, C)
     self.optimizer = Adam(self.parameters(), lr=C.lr)
@@ -49,11 +49,11 @@ class FlatImageTransformer(nn.Module):
     path = dir / 'flattie.pt'
     th.save(self.state_dict(), path)
     print(path)
+
   def load(self, path):
     path = path / 'flattie.pt'
     self.load_state_dict(th.load(path))
     print(f'LOADED {path}')
-
 
   def forward(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
@@ -75,7 +75,7 @@ class FlatImageTransformer(nn.Module):
     x += self.pos_emb  # each position maps to a (learnable) vector
     x = self.blocks(x)
     logits = self.ln_f(x)
-    return self.dist_head(logits)
+    return logits
 
   def train_step(self, batch, dry=False):
     self.optimizer.zero_grad()
@@ -88,15 +88,17 @@ class FlatImageTransformer(nn.Module):
   def loss(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     metrics = {}
-    dist = self.forward(batch)
+    logits = self.forward(batch)
+    dist = self.dist_head(logits)
     lcd_loss = -dist.log_prob(batch['lcd'].reshape(BS, EPL, np.prod(HW))).mean()
     metrics['loss/lcd'] = lcd_loss
     loss = lcd_loss
     return loss, metrics
 
-  def onestep(self, batch, i):
-    dist = self.forward(batch)
-    batch['lcd'][:, i + 1] = dist.sample()[:, i]
+  def onestep(self, batch, i, temp=1.0):
+    logits = self.forward(batch)
+    dist = self.dist_head(logits/temp)
+    batch['lcd'][:, i] = dist.sample()[:, i]
     return batch
 
   def sample(self, n, acts=None, prompts=None):
@@ -110,12 +112,13 @@ class FlatImageTransformer(nn.Module):
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
-        batch['lcd'][:, :5] = lcd
+        batch['lcd'][:, :10] = lcd
         start = lcd.shape[1]
 
       for i in range(start, self.block_size):
         # TODO: check this setting since we have modified things
-        dist = self.forward(batch)
+        logits = self.forward(batch)
+        dist = self.dist_head(logits)
         batch['lcd'][:, i] = dist.sample()[:, i]
         if i == self.block_size - 1:
           sample_loss = self.loss(batch)[0]
@@ -136,7 +139,7 @@ class FlatImageTransformer(nn.Module):
       if 'BoxOrCircle' == self.C.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
-        reset_states = np.c_[np.random.uniform(-1,1,N), np.random.uniform(-1,1,N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
+        reset_states = np.c_[np.random.uniform(-1, 1, N), np.random.uniform(-1, 1, N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
     else:
       reset_states = [None] * N
     obses = {key: [[] for ii in range(N)] for key in self.env.observation_space.spaces}
@@ -154,7 +157,10 @@ class FlatImageTransformer(nn.Module):
     obses = {key: np.array(val) for key, val in obses.items()}
     acts = np.array(acts)
     acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
-    prompts = {key: th.as_tensor(1.0 * val[:, :5]).to(self.C.device) for key, val in obses.items()}
+    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
+    # dupe
+    for key in prompts: prompts[key][4:] = prompts[key][4:5]
+    acts[4:] = acts[4:5]
     prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
     real_lcd = obses['lcd'][:, :, None]
     lcd_psamp = prompted_samples['lcd']

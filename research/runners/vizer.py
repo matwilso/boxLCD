@@ -33,7 +33,7 @@ class AutoEnv:
     self.tot_count = 0
     obses = {key: [] for key in self.env.observation_space.spaces}
     obs = self.env.reset()
-    for key, val in self.env.reset().items():
+    for key, val in obs.items():
       obses[key] += [val]
     acts = []
     for _ in range(9):
@@ -50,7 +50,7 @@ class AutoEnv:
     self.count = self.window_batch['lcd'].shape[1] - 1
     for key, val in self.window_batch.items():
       bs, lenk, *extra = val.shape
-      pad = np.zeros([bs, 200-lenk, *extra])
+      pad = np.zeros([bs, self.C.window-lenk, *extra])
       self.window_batch[key] = np.concatenate([val, pad], 1)
     return img, img
 
@@ -62,38 +62,30 @@ class AutoEnv:
     batch = {key: th.as_tensor(1.0 * val).float().to(self.C.device) for key, val in self.window_batch.items()}
     lcd_shape = batch['lcd'].shape
     batch['lcd'] = batch['lcd'].flatten(-2)
-    out = self.model.onestep(batch, self.count)
+    out = self.model.onestep(batch, self.count, temp=0.1)
     batch['lcd'] = out['lcd'].reshape(lcd_shape)
     self.window_batch = {key: val.detach().cpu().numpy() for key, val in batch.items()}
     pred = self.window_batch['lcd'][:,self.count][0]
-    if self.count == 198:
+    if self.count == self.C.window-2:
       self.window_batch = {key: np.concatenate([val[:,1:], val[:,:1]], axis=1) for key, val in self.window_batch.items()}
       #val = self.window_batch['lcd']
       #self.window_batch['lcd'] = np.concatenate([val[:,1:], val[:,:1]], axis=1)
-    self.count = min(1+self.count, 198)
+    self.count = min(1+self.count, self.C.window-2)
     return outproc(truth), outproc(pred)
 
   def make_prompt(self):
     pass
 
 class Vizer:
-  def __init__(self, C):
-    super().__init__(C)
-    C.block_size = C.ep_len
+  def __init__(self, model, env, C):
+    super().__init__()
     print('wait dataload')
     self.train_ds, self.test_ds = data.load_ds(C)
     print('dataloaded')
-    self.writer = SummaryWriter(C.logdir)
-    self.logger = utils.dump_logger({}, self.writer, 0, C)
-    self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
+    self.model = model
+    self.env = env
     self.autoenv = AutoEnv(self.model, C)
-
-    #bigC = copy.deepcopy(C)
-    #bigC.lcd_h *= 4
-    #bigC.lcd_w *= 4
-    # self.big_tvenv = SyncVectorEnv([env_fn(bigC, 0 + i) for i in range(C.num_envs)], C=bigC)  # test vector env
-    loadpath = self.C.weightdir / 'weights.pt'
-    self.model.load_state_dict(th.load(loadpath))
+    self.model.load(C.weightdir)
     self.window = pyglet.window.Window(1280, 720)
     self.C = C
     self.paused = False
@@ -109,8 +101,12 @@ class Vizer:
         exit()
       if symbol == KEY.S:
         self.messages['sample'] = 1
-      if symbol == KEY._0:
+      if symbol == KEY._0 or symbol == KEY.NUM_0:
         self.messages['reset'] = 1
+      if symbol == KEY.R:
+        print('RELOAD WEIGHTS')
+        self.model.load(C.weightdir)
+
       self.held_down[symbol] = 1
     def on_key_release(symbol, modifiers):
       self.held_down[symbol] = 0
@@ -137,7 +133,7 @@ class Vizer:
       if self.check_message('sample'):
         acts, lcds = self.sample()
       imgs = []
-      k = (i + 1) % self.C.ep_len
+      k = (i + 1) % self.C.window
       for j in range(len(lcds)):
         imgs += [((2*j,0), lcds[j][k])]
       imgs += [
@@ -145,8 +141,9 @@ class Vizer:
         ((2.1, 3), apred),
         ]
       kwargs['imgs'] = imgs
-      atruth, apred = self.autoenv.step(self.env.action_space.sample())
-      kwargs['texts'] = [((0.5,3.5), self.autoenv.tot_count)]
+      if not self.paused:
+        atruth, apred = self.autoenv.step(self.env.action_space.sample())
+      kwargs['texts'] = [((0.5,3.5), f'truth. {self.autoenv.tot_count}')]
 
       if self.check_message('reset'):
         print('reset')
@@ -165,7 +162,7 @@ class Vizer:
       obses[key] += [val]
 
     acts = []
-    for _ in range(self.C.ep_len - 1):
+    for _ in range(self.C.window - 1):
       act = self.env.action_space.sample()
       obs = self.env.step(act)[0]
       for key, val in obs.items():
@@ -194,7 +191,7 @@ class Vizer:
     xys = []
     for xy_img in imgs:
       xy, img = xy_img
-      xy = np.array(xy) * self.C.env_size
+      xy = np.array(xy) * self.C.lcd_base*self.C.wh_ratio*8
       xys += [xy]
       images += [pyglet.image.ImageData(img.shape[1], img.shape[0], 'RGB', img.tobytes(), pitch=img.shape[1] * -3)]
 
@@ -205,7 +202,7 @@ class Vizer:
       images[i].blit(*xys[i])
     for xy_text in texts:
       xy, text = xy_text
-      xy = np.array(xy) * self.C.env_size
+      xy = np.array(xy) * self.C.lcd_base*self.C.wh_ratio*8
       label = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size="{size}">{text}</font>', x=xy[0], y=xy[1], anchor_x='center', anchor_y='center')
       label.draw()
     arr = None

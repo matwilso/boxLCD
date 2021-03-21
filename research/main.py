@@ -74,7 +74,7 @@ if __name__ == '__main__':
     trainer = runners.Trainer(model, env, C)
     trainer.run()
   elif C.mode == 'viz':
-    vizer = runners.Vizer(C)
+    vizer = runners.Vizer(model, env, C)
     if C.ipython_mode:
       import IPython
       from traitlets.config import Config
