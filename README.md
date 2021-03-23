@@ -123,6 +123,8 @@ On the 4th to the right, the model samples a box instead of a ball.
 
 ## Roadmap 📍
 
+>A complex system that works is invariably found to have evolved from a simple system that worked. A complex system designed from scratch never works and cannot be patched up to make it work. You have to start over with a working simple system. - [Gall's Law](https://en.wikipedia.org/wiki/John_Gall_(author)#Gall's_law)
+
 Some of the reasoning behind this project can be found in some blog posts I have written on 
 the [future of robot learning](https://matwilso.github.io/robot-future/), and [learned simualtors](https://matwilso.github.io/learned-sims/).
 
