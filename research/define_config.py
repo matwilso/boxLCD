@@ -66,8 +66,9 @@ def config():
 
   C.phase = 1
   C.window = 200
+  C.seed = 0
 
-  C.env = 'dropbox'
+  C.env = 'Dropbox'
 
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

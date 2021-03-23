@@ -110,7 +110,6 @@ def filtdict(dict, phrase): return {key: dict[key] for key in dict if re.match(p
 def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
 def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]
 def nfiltlist(list, phrase): return [item for item in list if re.match(phrase, item) is None]
-
 # env specific stuff
 def get_angle(sin, cos): return np.arctan2(sin, cos)
 def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]

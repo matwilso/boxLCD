@@ -159,3 +159,22 @@ def make_video(tensor, fps):
   except OSError:
     logging.warning('The temporary file used by moviepy cannot be deleted.')
   return Summary.Image(height=h, width=w, colorspace=c, encoded_image_string=tensor_string)
+
+
+# general dictionary and list utils
+def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
+def sortdict(x): return subdict(x, sorted(x))
+def subdlist(dict, subkeys): return [dict[key] for key in subkeys]
+# filter or negative filter
+def filtdict(dict, phrase, fkey=lambda x: x, fval = lambda x: x):
+  return {fkey(key): fval(dict[key]) for key in dict if re.match(phrase, key) is not None}
+def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
+def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]
+def nfiltlist(list, phrase): return [item for item in list if re.match(phrase, item) is None]
+# env specific stuff
+def get_angle(sin, cos): return np.arctan2(sin, cos)
+def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
+# map from -1,1 to bounds
+def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
+# map from bounds to -1,1
+def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
