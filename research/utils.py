@@ -95,7 +95,10 @@ def combine_imgs(arr, row=5, col=5):
   elif len(arr.shape) == 5:  # video
     BS, T, C, H, W = arr.shape
     assert BS == row * col, (BS, T, row, col, H, W)
-    x = arr.reshape([row, col, T, H, W]).permute(2, 0, 3, 1, 4).flatten(1, 2).flatten(-2)
+    if isinstance(arr, np.ndarray):
+      x = arr.reshape([row, col, T, H, W]).transpose(2, 0, 3, 1, 4).reshape([T, row * H, col * W])
+    else:
+      x = arr.reshape([row, col, T, H, W]).permute(2, 0, 3, 1, 4).flatten(1, 2).flatten(-2)
     return x
   else:
     assert False, (arr.shape, arr.ndim)
@@ -111,7 +114,6 @@ class Timer:
   def __exit__(self, exc_type, exc_val, exc_tb):
     new_time = time.time() - self.time_start
     self.logger['dt/' + self.message] += [new_time]
-
 
 
 def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
@@ -166,7 +168,7 @@ def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
 def sortdict(x): return subdict(x, sorted(x))
 def subdlist(dict, subkeys): return [dict[key] for key in subkeys]
 # filter or negative filter
-def filtdict(dict, phrase, fkey=lambda x: x, fval = lambda x: x):
+def filtdict(dict, phrase, fkey=lambda x: x, fval=lambda x: x):
   return {fkey(key): fval(dict[key]) for key in dict if re.match(phrase, key) is not None}
 def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
 def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]

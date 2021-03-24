@@ -60,23 +60,34 @@ class QFunction(nn.Module):
     super().__init__()
     H = C.hidden_size
     size = obs_space['pstate'].shape[0]*2  + act_dim
-    self.base = BaseMLP(size, 1, C)
-    #self.base = BaseCNN(obs_space, H, C)
+    #self.base = BaseMLP(size, 1, C)
+    self.base = BaseCNN(obs_space, H, C)
+    self.actin = nn.Linear(act_dim, H)
+    self.act_head = nn.Sequential(
+      nn.Linear(2*H, H),
+      nn.ReLU(),
+      nn.Linear(H, 1),
+    )
 
   def forward(self, obs, act):
-    x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
-    return self.base(x).squeeze(-1)
+    #x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
+    #return self.base(x).squeeze(-1)
+    x = self.base(obs)
+    act = self.actin(act)
+    x = th.cat([x, act], -1)
+    x = self.act_head(x)
+    return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, C):
     super().__init__()
     size = obs_space['pstate'].shape[0]*2
-    self.net = BaseMLP(size, 2*act_dim, C)
-    #self.net = BaseCNN(obs_space, 2*act_dim, C)
+    #self.net = BaseMLP(size, 2*act_dim, C)
+    self.net = BaseCNN(obs_space, 2*act_dim, C)
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
-    obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
+    #obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
     net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 

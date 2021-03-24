@@ -31,9 +31,7 @@ class RewardGoalEnv:
    return base_space
 
   def reset(self, *args, **kwargs):
-    self._env.seed(5)
     self.goal = self._env.reset()
-    self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
@@ -56,14 +54,14 @@ class RewardGoalEnv:
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
     delta = ((obs['goal:pstate'] - obs['pstate'])**2)
-    keys = utils.filtlist(self._env.obs_keys, '.*x:p')
+    keys = utils.filtlist(self._env.obs_keys, '.*(x|y):p')
     idxs = [self._env.obs_keys.index(x) for x in keys]
     delta = delta[idxs].mean()
     rew = -delta
     #similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
-    if delta < 0.005:
+    if delta < 0.010:
       done = True
     info['simi'] = delta
     return obs, rew, done, info

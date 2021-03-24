@@ -180,9 +180,9 @@ def sac(C):
     o = {key: th.as_tensor(val, dtype=th.float32).to(C.device) for key, val in o.items()}
     return ac.act(o, deterministic)
 
-  def test_agent(video=False):
-    frames = []
+  def test_agent():
     for j in range(C.num_test_episodes):
+      frames = []
       o, d, ep_ret, ep_len = tenv.reset(), False, 0, 0
       while not(d or (ep_len == C.ep_len)):
         # Take deterministic actions at test time
@@ -205,13 +205,13 @@ def sac(C):
       frames += [np.zeros_like(frames[-1])]
       frames += [np.zeros_like(frames[-1])]
 
-    if len(frames) != 0:
-      vid = np.stack(frames)
-      vid_tensor = vid.transpose(0, 3, 1, 2)[None]
-      utils.add_video(writer, 'rollout', vid_tensor, epoch, fps=C.fps)
-      frames = []
-      print('wrote video')
-  test_agent(video=True)
+      if len(frames) != 0:
+        vid = np.stack(frames)
+        vid_tensor = vid.transpose(0, 3, 1, 2)[None]
+        utils.add_video(writer, f'rollout{j}', vid_tensor, epoch, fps=C.fps)
+        frames = []
+        print('wrote video')
+  test_agent()
 
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
@@ -255,6 +255,7 @@ def sac(C):
       logger['EpRet'] += [ep_ret]
       logger['EpLen'] += [ep_len]
       o, ep_ret, ep_len = env.reset(), 0, 0
+      #replay_buffer.mark_done()
 
     # Update handling
     if t >= C.update_after and t % C.update_every == 0:
@@ -272,7 +273,19 @@ def sac(C):
 
       # Test the performance of the deterministic version of the agent.
       if epoch % 1 == 0:
-        test_agent(video=epoch % 1 == 0)
+        test_agent()
+        #test_agent(video=epoch % 1 == 0)
+        #if replay_buffer.ptr > C.ep_len*4:
+        #  eps = replay_buffer.get_last(4)
+        #  goal = eps['obs']['goal:lcd']
+        #  lcd = eps['obs']['lcd']
+        #  goal = goal.reshape([4, -1, *goal.shape[1:]])
+        #  lcd = lcd.reshape([4, -1, *lcd.shape[1:]])
+        #  error = (goal - lcd + 1) / 2
+        #  out = np.concatenate([goal, lcd, error], 2)
+        #  out = utils.combine_imgs(out[:,:,None], row=1, col=4)[None,:,None]
+        #  utils.add_video(writer, 'samples', out, epoch, fps=C.fps)
+          
 
       # Log info about epoch
       print('=' * 30)
@@ -309,7 +322,7 @@ _C.num_test_episodes = 2
 _C.update_every = 50
 _C.start_steps = 10000
 _C.update_after = 1000
-_C.use_done = 1
+_C.use_done = 0
 
 if __name__ == '__main__':
   import argparse
