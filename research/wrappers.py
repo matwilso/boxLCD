@@ -8,7 +8,8 @@ import gym
 import numpy as np
 from PIL import Image
 from gym.utils import seeding, EzPickle
-from boxLCD import utils
+import utils
+
 
 class RewardGoalEnv:
   def __init__(self, env):
@@ -26,12 +27,16 @@ class RewardGoalEnv:
   def observation_space(self):
    base_space = self._env.observation_space
    base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
+   base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
    return base_space
 
   def reset(self, *args, **kwargs):
+    self._env.seed(5)
     self.goal = self._env.reset()
+    self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
+    obs['goal:pstate'] = np.array(self.goal['pstate'])
     return obs
 
   def simi2rew(self, similarity):
@@ -49,12 +54,18 @@ class RewardGoalEnv:
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
-    similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
+    obs['goal:pstate'] = np.array(self.goal['pstate'])
+    delta = ((obs['goal:pstate'] - obs['pstate'])**2)
+    keys = utils.filtlist(self._env.obs_keys, '.*x:p')
+    idxs = [self._env.obs_keys.index(x) for x in keys]
+    delta = delta[idxs].mean()
+    rew = -delta
+    #similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
-    rew = self.simi2rew(similarity)
-    if similarity > 0.9:
+    #rew = self.simi2rew(similarity)
+    if delta < 0.005:
       done = True
-    info['simi'] = similarity
+    info['simi'] = delta
     return obs, rew, done, info
 
 if __name__ == '__main__':
@@ -73,5 +84,4 @@ if __name__ == '__main__':
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:
       break
-
 

@@ -5,13 +5,12 @@ from collections import defaultdict
 from copy import deepcopy
 import itertools
 import numpy as np
-import torch
+import torch as th
 from torch.optim import Adam
 import gym
 import time
 import numpy as np
 import scipy.signal
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
@@ -19,7 +18,7 @@ from torch.distributions.normal import Normal
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
-class Basenet(nn.Module):
+class BaseCNN(nn.Module):
   def __init__(self, obs_space, out_size, C):
     super().__init__()
     size = (C.lcd_h*C.lcd_w) // 64
@@ -40,34 +39,49 @@ class Basenet(nn.Module):
     x = self.linear(s-g)
     return x
 
+class BaseMLP(nn.Module):
+  def __init__(self, in_size, out_size, C):
+    super().__init__()
+    self.net = nn.Sequential(
+      nn.Linear(in_size, C.hidden_size),
+      nn.ReLU(),
+      nn.Linear(C.hidden_size, C.hidden_size),
+      nn.ReLU(),
+      nn.Linear(C.hidden_size, C.hidden_size),
+      nn.ReLU(),
+      nn.Linear(C.hidden_size, out_size),
+    )
+
+  def forward(self, x):
+    return self.net(x)
+
 class QFunction(nn.Module):
   def __init__(self, obs_space, act_dim, C):
     super().__init__()
     H = C.hidden_size
-    self.base = Basenet(obs_space, H, C)
-    self.actpost = nn.Sequential(
-        nn.Linear(H + act_dim, H),
-        nn.ReLU(),
-        nn.Linear(H, 1),
-    )
+    size = obs_space['pstate'].shape[0]*2  + act_dim
+    self.base = BaseMLP(size, 1, C)
+    #self.base = BaseCNN(obs_space, H, C)
+
   def forward(self, obs, act):
-    x = self.base(obs)
-    x = torch.cat([x, act], -1)
-    x = self.actpost(x).squeeze(-1)
-    return x
+    x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
+    return self.base(x).squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, C):
     super().__init__()
-    self.net = Basenet(obs_space, 2*act_dim, C)
+    size = obs_space['pstate'].shape[0]*2
+    self.net = BaseMLP(size, 2*act_dim, C)
+    #self.net = BaseCNN(obs_space, 2*act_dim, C)
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
+    obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
     net_out = self.net(obs)
-    mu, log_std = torch.split(net_out, self.act_dim, dim=-1)
+    mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
-    log_std = torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
-    std = torch.exp(log_std)
+    log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
+    std = th.exp(log_std)
 
     # Pre-squash distribution and sample
     pi_distribution = Normal(mu, std)
@@ -88,7 +102,7 @@ class SquashedGaussianActor(nn.Module):
     else:
       logp_pi = None
 
-    pi_action = torch.tanh(pi_action)
+    pi_action = th.tanh(pi_action)
     return pi_action, logp_pi
 
 class ActorCritic(nn.Module):
@@ -101,9 +115,9 @@ class ActorCritic(nn.Module):
     self.q2 = QFunction(obs_space, act_dim, C=C)
     if C.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
-      self.log_alpha = torch.nn.Parameter(torch.zeros(1))
+      self.log_alpha = th.nn.Parameter(th.zeros(1))
 
   def act(self, obs, deterministic=False):
-    with torch.no_grad():
+    with th.no_grad():
       a, _ = self.pi(obs, deterministic, False)
       return a.cpu().numpy()

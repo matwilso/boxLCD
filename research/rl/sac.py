@@ -16,8 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
-from gym.vector.async_vector_env import AsyncVectorEnv
-from buffers import ReplayBuffer
+from buffers import OGRB, ReplayBuffer
 from sacnets import ActorCritic
 from define_config import config, args_type
 from boxLCD import env_map
@@ -26,8 +25,8 @@ import utils
 
 def sac(C):
   print(C.full_cmd)
-  th.manual_seed(C.seed)
-  np.random.seed(C.seed)
+  # th.manual_seed(C.seed)
+  # np.random.seed(C.seed)
 
   def env_fn(C, seed=None):
     def _thunk():
@@ -42,7 +41,7 @@ def sac(C):
   logger = defaultdict(lambda: [])
   writer = SummaryWriter(C.logdir)
 
-  venv = AsyncVectorEnv([env_fn(C, C.seed + i) for i in range(C.num_envs)])  # vector env
+  env = env_fn(C, C.seed)()
   tenv = env_fn(C, C.seed)()  # test env
   obs_space = tenv.observation_space
   act_space = tenv.action_space
@@ -60,7 +59,7 @@ def sac(C):
   q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
 
   # Experience buffer
-  replay_buffer = ReplayBuffer(C, obs_space=obs_space, act_space=act_space)
+  replay_buffer = OGRB(C, obs_space=obs_space, act_space=act_space)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
   var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
@@ -114,7 +113,8 @@ def sac(C):
     pi_info = dict(LogPi=logp_pi.detach().cpu().numpy())
 
     if C.learned_alpha:
-      loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
+      #loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
+      loss_alpha = -(ac.log_alpha * (logp_pi + ac.target_entropy).detach()).mean()
     else:
       loss_alpha = 0.0
 
@@ -184,23 +184,26 @@ def sac(C):
     frames = []
     for j in range(C.num_test_episodes):
       o, d, ep_ret, ep_len = tenv.reset(), False, 0, 0
-      while not(d or (ep_len == C.max_ep_len)):
+      while not(d or (ep_len == C.ep_len)):
         # Take deterministic actions at test time
         o = {key: val[None] for key, val in o.items()}
-        o, r, d, info = tenv.step(get_action(o, True)[0])
+        o, r, d, info = tenv.step(get_action(o, False)[0])
         ep_ret += r
         ep_len += 1
-        delta = (1.0*o['lcd'] - 1.0*o['goal:lcd'] + 1) / 2 
-        frame = np.c_[1.0*o['goal:lcd'], 1.0*o['lcd'], delta]
+        delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
+        frame = np.c_[1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta]
         frame = frame.repeat(8, 0).repeat(8, 1)[..., None].repeat(3, -1)
-        pframe = PIL.Image.fromarray((frame*255).astype(np.uint8))
+        pframe = PIL.Image.fromarray((frame * 255).astype(np.uint8))
         # get a drawing context
         draw = PIL.ImageDraw.Draw(pframe)
-        draw.text((10,10), f'reward: {r:.2f} simi: {info["simi"]:.2f}', fill=(255,0,0,))
+        draw.text((10, 10), f'reward: {r:.4f} simi: {info["simi"]:.4f}', fill=(255, 0, 0,))
         frames += [np.array(pframe)]
 
       logger['TestEpRet'] += [ep_ret]
       logger['TestEpLen'] += [ep_len]
+      frames += [np.zeros_like(frames[-1])]
+      frames += [np.zeros_like(frames[-1])]
+      frames += [np.zeros_like(frames[-1])]
 
     if len(frames) != 0:
       vid = np.stack(frames)
@@ -213,7 +216,7 @@ def sac(C):
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
-  o, ep_ret, ep_len = venv.reset(), np.zeros(C.num_envs), np.zeros(C.num_envs)
+  o, ep_ret, ep_len = env.reset(), 0, 0
   # Main loop: collect experience in venv and update/log each epoch
   for t in range(total_steps):
 
@@ -223,42 +226,39 @@ def sac(C):
     if t > C.start_steps:
       a = get_action(o)
     else:
-      a = venv.action_space.sample()
+      a = env.action_space.sample()
 
     # Step the venv
-    o2, r, d, _ = venv.step(a)
+    o2, r, d, _ = env.step(a)
     ep_ret += r
     ep_len += 1
 
     # Ignore the "done" signal if it comes from hitting the time
     # horizon (that is, when it's an artificial terminal signal
     # that isn't based on the agent's state)
-    time_horizon = ep_len == C.max_ep_len
-    d[ep_len == C.max_ep_len] = False
+    d = False if ep_len == C.ep_len else d
 
     # Store experience to replay buffer
     trans = {'act': a, 'rew': r, 'done': d}
     for key in o:
       trans[f'o:{key}'] = o[key]
     for key in o2:
-      trans[f'o2:{key}'] = o[key]
-    replay_buffer.store_n(trans)
+      trans[f'o2:{key}'] = o2[key]
+    replay_buffer.store(trans)
 
     # Super critical, easy to overlook step: make sure to update
     # most recent observation!
     o = o2
 
     # End of trajectory handling
-    done = np.logical_or(d, ep_len == C.max_ep_len)
-    for idx in np.nonzero(done)[0]:
-      logger['EpRet'] += [ep_ret[idx]]
-      logger['EpLen'] += [ep_len[idx]]
-      ep_ret[idx] = 0
-      ep_len[idx] = 0
+    if d or (ep_len == C.ep_len):
+      logger['EpRet'] += [ep_ret]
+      logger['EpLen'] += [ep_len]
+      o, ep_ret, ep_len = env.reset(), 0, 0
 
     # Update handling
     if t >= C.update_after and t % C.update_every == 0:
-      for j in range(int(C.update_every * 1.5)):
+      for j in range(int(C.update_every)):
         batch = replay_buffer.sample_batch(C.bs)
         update(data=batch)
 
@@ -296,22 +296,20 @@ def sac(C):
 _C = boxLCD.utils.AttrDict()
 _C.replay_size = int(1e6)
 _C.epochs = 100
-_C.steps_per_epoch = 1000
+_C.steps_per_epoch = 4000
 _C.save_freq = 10
 _C.pi_lr = 1e-3
 _C.vf_lr = 1e-3
 _C.alpha_lr = 1e-3  # for SAC w/ learned alpha
-_C.split_share = 0  # whether or not to share weights in the split network
-_C.max_ep_len = 1000
 _C.gamma = 0.99
 _C.learned_alpha = 1
 _C.alpha = 0.1  # for SAC w/o learned alpha
 _C.polyak = 0.995
 _C.num_test_episodes = 2
-_C.update_every = 40
-_C.start_steps = 1000
+_C.update_every = 50
+_C.start_steps = 10000
 _C.update_after = 1000
-_C.use_done = 0
+_C.use_done = 1
 
 if __name__ == '__main__':
   import argparse
