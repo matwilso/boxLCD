@@ -21,35 +21,73 @@ LOG_STD_MIN = -20
 class BaseCNN(nn.Module):
   def __init__(self, obs_space, out_size, C):
     super().__init__()
-    size = (C.lcd_h*C.lcd_w) // 64
+    size = (C.lcd_h * C.lcd_w) // 64
     self.net = nn.Sequential(
-        nn.Conv2d(1, C.hidden_size, 3, 2, padding=1),
+        nn.Conv2d(1, C.nfilter, 3, 2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(C.hidden_size, C.hidden_size, 3, 2, padding=1),
+        nn.Conv2d(C.nfilter, C.nfilter, 3, 2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(C.hidden_size, C.hidden_size//4, 3, 2, padding=1),
+        nn.Conv2d(C.nfilter, C.nfilter, 3, 2, padding=1),
         nn.Flatten(-3)
     )
-    self.linear = nn.Linear(size*C.hidden_size//4, out_size)
+    mult = 1 if C.zdelta else 2
+    #self.linear = nn.Linear(mult * size * C.nfilter, out_size)
+    self.linear = nn.Sequential(
+      nn.Linear(mult * size * C.nfilter, C.hidden_size),
+      nn.ReLU(),
+      nn.Linear(C.hidden_size, out_size),
+    )
+    self.C = C
 
   def forward(self, obs):
     s, g = obs['lcd'], obs['goal:lcd']
-    s = self.net(s[:,None])
-    g = self.net(g[:,None])
-    x = self.linear(s-g)
+    s = self.net(s[:, None])
+    g = self.net(g[:, None])
+    if self.C.zdelta:
+      x = g - s
+    else:
+      x = th.cat([s, g], -1)
+    x = self.linear(x)
     return x
+
+class BaseCMLP(nn.Module):
+  def __init__(self, obs_space, out_size, C):
+    super().__init__()
+    size = C.lcd_h * C.lcd_w
+    self.net = nn.Sequential(
+        nn.Linear(size, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, C.hidden_size),
+    )
+    mult = 1 if C.zdelta else 2
+    self.linear = nn.Linear(mult * C.hidden_size, out_size)
+    self.C = C
+
+  def forward(self, obs):
+    s, g = obs['lcd'], obs['goal:lcd']
+    s = self.net(s.flatten(-2))
+    g = self.net(g.flatten(-2))
+    if self.C.zdelta:
+      x = g- s
+    else:
+      x = th.cat([s, g], -1)
+    x = self.linear(x)
+    return x
+
 
 class BaseMLP(nn.Module):
   def __init__(self, in_size, out_size, C):
     super().__init__()
     self.net = nn.Sequential(
-      nn.Linear(in_size, C.hidden_size),
-      nn.ReLU(),
-      nn.Linear(C.hidden_size, C.hidden_size),
-      nn.ReLU(),
-      nn.Linear(C.hidden_size, C.hidden_size),
-      nn.ReLU(),
-      nn.Linear(C.hidden_size, out_size),
+        nn.Linear(in_size, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, out_size),
     )
 
   def forward(self, x):
@@ -59,35 +97,48 @@ class QFunction(nn.Module):
   def __init__(self, obs_space, act_dim, C):
     super().__init__()
     H = C.hidden_size
-    size = obs_space['pstate'].shape[0]*2  + act_dim
-    #self.base = BaseMLP(size, 1, C)
-    self.base = BaseCNN(obs_space, H, C)
+    self.C = C
+    size = obs_space['pstate'].shape[0] * 2 + act_dim
+    if self.C.net == 'mlp':
+      self.base = BaseMLP(size, 1, C)
+    elif self.C.net == 'cmlp':
+      self.base = BaseCMLP(obs_space, H, C)
+    elif self.C.net == 'cnn':
+      self.base = BaseCNN(obs_space, H, C)
     self.actin = nn.Linear(act_dim, H)
     self.act_head = nn.Sequential(
-      nn.Linear(2*H, H),
-      nn.ReLU(),
-      nn.Linear(H, 1),
+        nn.Linear(2 * H, H),
+        nn.ReLU(),
+        nn.Linear(H, 1),
     )
 
   def forward(self, obs, act):
-    #x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
-    #return self.base(x).squeeze(-1)
-    x = self.base(obs)
-    act = self.actin(act)
-    x = th.cat([x, act], -1)
-    x = self.act_head(x)
-    return x.squeeze(-1)
+    if self.C.net == 'mlp':
+      x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
+      return self.base(x).squeeze(-1)
+    else:
+      x = self.base(obs)
+      act = self.actin(act)
+      x = th.cat([x, act], -1)
+      x = self.act_head(x)
+      return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, C):
     super().__init__()
-    size = obs_space['pstate'].shape[0]*2
-    #self.net = BaseMLP(size, 2*act_dim, C)
-    self.net = BaseCNN(obs_space, 2*act_dim, C)
+    self.C = C
+    size = obs_space['pstate'].shape[0] * 2
+    if self.C.net == 'mlp':
+      self.net = BaseMLP(size, 2 * act_dim, C)
+    elif self.C.net == 'cmlp':
+      self.net = BaseCMLP(obs_space, 2 * act_dim, C)
+    elif self.C.net == 'cnn':
+      self.net = BaseCNN(obs_space, 2 * act_dim, C)
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
-    #obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
+    if self.C.net == 'mlp':
+      obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
     net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 

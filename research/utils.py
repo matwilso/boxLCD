@@ -115,6 +115,12 @@ class Timer:
     new_time = time.time() - self.time_start
     self.logger['dt/' + self.message] += [new_time]
 
+  def start(self):
+    self.__enter__()
+
+  def stop(self):
+    self.__exit__(None, None, None)
+
 
 def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
   th._C._log_api_usage_once("tensorboard.logging.add_video")
@@ -180,3 +186,7 @@ def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), n
 def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
 # map from bounds to -1,1
 def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
+
+class AttrDict(dict):
+  __setattr__ = dict.__setitem__
+  __getattr__ = dict.__getitem__

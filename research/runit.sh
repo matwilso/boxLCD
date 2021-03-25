@@ -1,12 +1,33 @@
-#python main.py --mode=train --env=UrchinBall --datapath=logs/datadump/urchinball/update/1e4/dump.npz --model=multistep --device=cuda --weightdir=logs/biphase/x2/ --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/nl3_512_16/1e-3 --n_layer=3 --n_embed=512 --n_head=16 --bs=16 --amp=0 --lr=1e-3 --num_epochs=5
+if [ $1 == 0 ]; then
+    args="--env=Luxo --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --state_rew=1 --net=mlp --epochs=50"
+    python rl/sac.py $args --logdir=logs/rl/exp/3e-4 --lr=3e-4 
+    python rl/sac.py $args --logdir=logs/rl/exp/3e-4_done --lr=3e-4 --use_done=1
+    python rl/sac.py $args --logdir=logs/rl/exp/3e-4_lalp1e-4 --lr=3e-4 --alpha_lr=1e-4
+    python rl/sac.py $args --logdir=logs/rl/exp/1e-3_lalp1e-4 --lr=1e-3 --alpha_lr=1e-4
+    python rl/sac.py $args --logdir=logs/rl/exp/5e-4_lalp1e-4 --lr=5e-4 --alpha_lr=1e-4
+elif [ $1 == 1 ]; then
+    #python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs1024/cnn_delt --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=1024 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cmlp_delt --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cmlp_delt_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --lr=5e-4
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cnn_delt_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --lr=5e-4
 
-python main.py --mode=train --env=UrchinBall --datapath=logs/datadump/urchinball/update/1e4/dump.npz --model=multistep --device=cuda --weightdir=logs/biphase/x2/ --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/fewer_stack/nl3_512_16/ --n_layer=3 --n_embed=512 --n_head=16 --bs=16 --amp=0 --stacks_per_block=16 --num_epochs=5
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cnn_delt --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cmlp_delt --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cmlp_delt_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --lr=5e-4
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/bs512/cnn_delt_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --lr=5e-4
 
 
-python main.py --mode=train --env=UrchinBall --datapath=logs/datadump/urchinball/update/1e4/dump.npz --model=multistep --device=cuda --weightdir=logs/biphase/x2/ --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/fewer_stack/nl3_1024_32/ --n_layer=3 --n_embed=1024 --n_head=32 --bs=16 --amp=0 --stacks_per_block=16 --num_epochs=5
 
-python main.py --mode=train --env=UrchinBall --datapath=logs/datadump/urchinball/update/1e4/dump.npz --model=multistep --device=cuda --weightdir=logs/biphase/x2/ --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/fewer_stack/nl4_1024_32/ --n_layer=4 --n_embed=1024 --n_head=32 --bs=16 --amp=0 --stacks_per_block=16 --num_epochs=5
+    #python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/fix/cmlp_cat --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --zdelta=0
+    #python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/fix/cnn_cat --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --zdelta=0
+    #python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/fix/cmlp_cat_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --lr=5e-4 --zdelta=0
+    #python rl/sac.py --env=Luxo --logdir=logs/rl/exp/state_based/fix/cnn_cat_5e-4 --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=512 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --lr=5e-4 --zdelta=0
 
-python main.py --mode=train --env=UrchinBall --datapath=logs/datadump/urchinball/update/1e4/dump.npz --model=multistep --device=cuda --weightdir=logs/biphase/x2/ --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/fewer_stack/nl3_512_16/bs32 --n_layer=3 --n_embed=512 --n_head=16 --bs=32 --amp=0 --stacks_per_block=16 --num_epochs=5
 
-
+elif [ $1 == 2 ]; then
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/mlp --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=mlp --epochs=50 --state_rew=-0
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/cmlp --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --state_rew=0
+    python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/cnn --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --state_rew=0
+else
+    echo "null"
+fi

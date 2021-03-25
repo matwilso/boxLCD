@@ -46,6 +46,7 @@ def config():
   C.n_head = 4
   C.n_embed = 128
   C.hidden_size = 128
+  C.nfilter = 64
   C.vidstack = -1
   C.stacks_per_block = 32
 

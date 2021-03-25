@@ -12,9 +12,10 @@ import utils
 
 
 class RewardGoalEnv:
-  def __init__(self, env):
+  def __init__(self, env, C):
     self._env = env
     self.SCALE = 2
+    self.C = C
 
   def __getattr__(self, name):
     return getattr(self._env, name)
@@ -53,24 +54,34 @@ class RewardGoalEnv:
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
-    delta = ((obs['goal:pstate'] - obs['pstate'])**2)
-    keys = utils.filtlist(self._env.obs_keys, '.*(x|y):p')
-    idxs = [self._env.obs_keys.index(x) for x in keys]
-    delta = delta[idxs].mean()
-    rew = -delta
-    #similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
+
+    if self.C.state_rew:
+      delta = ((obs['goal:pstate'] - obs['pstate'])**2)
+      keys = utils.filtlist(self._env.obs_keys, '.*(x|y):p')
+      idxs = [self._env.obs_keys.index(x) for x in keys]
+      delta = delta[idxs].mean()
+      rew = -delta**0.5
+      info['simi'] = delta
+      if delta < 0.010:
+        done = True
+    else:
+      similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
+      rew = -1 + similarity
+      info['simi'] = similarity
+      if similarity > 0.9:
+        done = True
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
-    if delta < 0.010:
-      done = True
-    info['simi'] = delta
     return obs, rew, done, info
 
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
   from boxLCD.envs import Luxo
+  import utils
+  C = utils.AttrDict()
+  C.state_rew = 1
   env = Luxo()
-  env = RewardGoalEnv(env)
+  env = RewardGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   env.reset()
   while True:

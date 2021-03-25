@@ -22,6 +22,7 @@ from define_config import config, args_type
 from boxLCD import env_map
 import boxLCD
 import utils
+from async_vector_env import AsyncVectorEnv
 
 def sac(C):
   print(C.full_cmd)
@@ -33,15 +34,16 @@ def sac(C):
       env = env_map[C.env](C)
       if seed is not None:
         env.seed(seed)
-      env = RewardGoalEnv(env)
+      env = RewardGoalEnv(env, C)
       return env
     return _thunk
 
   # Set up logger and save configuration
   logger = defaultdict(lambda: [])
   writer = SummaryWriter(C.logdir)
-
-  env = env_fn(C, C.seed)()
+  env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+  #env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+  #env = env_fn(C, C.seed)()
   tenv = env_fn(C, C.seed)()  # test env
   obs_space = tenv.observation_space
   act_space = tenv.action_space
@@ -59,7 +61,7 @@ def sac(C):
   q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
 
   # Experience buffer
-  replay_buffer = OGRB(C, obs_space=obs_space, act_space=act_space)
+  replay_buffer = ReplayBuffer(C, obs_space=obs_space, act_space=act_space)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
   var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
@@ -121,8 +123,8 @@ def sac(C):
     return loss_pi, loss_alpha, pi_info
 
   # Set up optimizers for policy and q-function
-  q_optimizer = Adam(q_params, lr=C.vf_lr)
-  pi_optimizer = Adam(ac.pi.parameters(), lr=C.pi_lr)
+  q_optimizer = Adam(q_params, lr=C.lr)
+  pi_optimizer = Adam(ac.pi.parameters(), lr=C.lr)
   if C.learned_alpha:
     alpha_optimizer = Adam([ac.log_alpha], lr=C.alpha_lr)
 
@@ -187,7 +189,7 @@ def sac(C):
       while not(d or (ep_len == C.ep_len)):
         # Take deterministic actions at test time
         o = {key: val[None] for key, val in o.items()}
-        o, r, d, info = tenv.step(get_action(o, False)[0])
+        o, r, d, info = tenv.step(get_action(o)[0])
         ep_ret += r
         ep_len += 1
         delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
@@ -201,9 +203,6 @@ def sac(C):
 
       logger['TestEpRet'] += [ep_ret]
       logger['TestEpLen'] += [ep_len]
-      frames += [np.zeros_like(frames[-1])]
-      frames += [np.zeros_like(frames[-1])]
-      frames += [np.zeros_like(frames[-1])]
 
       if len(frames) != 0:
         vid = np.stack(frames)
@@ -216,15 +215,16 @@ def sac(C):
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
-  o, ep_ret, ep_len = env.reset(), 0, 0
+  o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
   # Main loop: collect experience in venv and update/log each epoch
   for t in range(total_steps):
-
     # Until start_steps have elapsed, randomly sample actions
     # from a uniform distribution for better exploration. Afterwards,
     # use the learned policy.
     if t > C.start_steps:
-      a = get_action(o)
+      with utils.Timer(logger, 'action'):
+        o = {key: val for key, val in o.items()}
+        a = get_action(o)
     else:
       a = env.action_space.sample()
 
@@ -236,7 +236,7 @@ def sac(C):
     # Ignore the "done" signal if it comes from hitting the time
     # horizon (that is, when it's an artificial terminal signal
     # that isn't based on the agent's state)
-    d = False if ep_len == C.ep_len else d
+    d[ep_len == C.ep_len] = False
 
     # Store experience to replay buffer
     trans = {'act': a, 'rew': r, 'done': d}
@@ -244,24 +244,32 @@ def sac(C):
       trans[f'o:{key}'] = o[key]
     for key in o2:
       trans[f'o2:{key}'] = o2[key]
-    replay_buffer.store(trans)
+    replay_buffer.store_n(trans)
 
     # Super critical, easy to overlook step: make sure to update
     # most recent observation!
     o = o2
 
     # End of trajectory handling
-    if d or (ep_len == C.ep_len):
-      logger['EpRet'] += [ep_ret]
-      logger['EpLen'] += [ep_len]
-      o, ep_ret, ep_len = env.reset(), 0, 0
-      #replay_buffer.mark_done()
+    done = np.logical_or(d, ep_len == C.ep_len)
+    dixs = np.nonzero(done)[0]
+    for idx in dixs:
+      logger['EpRet'] += [ep_ret[idx]]
+      logger['EpLen'] += [ep_len[idx]]
+      ep_ret[idx] = 0
+      ep_len[idx] = 0
+    if len(dixs) != 0:
+      o = env.reset(dixs)
+      assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
+      #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
     # Update handling
     if t >= C.update_after and t % C.update_every == 0:
-      for j in range(int(C.update_every)):
-        batch = replay_buffer.sample_batch(C.bs)
-        update(data=batch)
+      for j in range(int(C.update_every*1.5)):
+        with utils.Timer(logger, 'sample_batch'):
+         batch = replay_buffer.sample_batch(C.bs)
+        with utils.Timer(logger, 'update'):
+          update(data=batch)
 
     # End of epoch handling
     if (t + 1) % C.steps_per_epoch == 0:
@@ -275,7 +283,7 @@ def sac(C):
       if epoch % 1 == 0:
         test_agent()
         #test_agent(video=epoch % 1 == 0)
-        #if replay_buffer.ptr > C.ep_len*4:
+        # if replay_buffer.ptr > C.ep_len*4:
         #  eps = replay_buffer.get_last(4)
         #  goal = eps['obs']['goal:lcd']
         #  lcd = eps['obs']['lcd']
@@ -285,20 +293,21 @@ def sac(C):
         #  out = np.concatenate([goal, lcd, error], 2)
         #  out = utils.combine_imgs(out[:,:,None], row=1, col=4)[None,:,None]
         #  utils.add_video(writer, 'samples', out, epoch, fps=C.fps)
-          
 
       # Log info about epoch
       print('=' * 30)
       print('Epoch', epoch)
       logger['var_count'] = [sum_count]
+      logger['dt'] = dt = time.time() - epoch_time
+      logger['env_interactions'] = env_interactions = t*C.num_envs
       for key in logger:
         val = np.mean(logger[key])
         writer.add_scalar(key, val, epoch)
         print(key, val)
       writer.flush()
-      print('TotalEnvInteracts', t * C.num_envs)
+      print('TotalEnvInteracts', env_interactions)
       print('Time', time.time() - start_time)
-      print('dt', time.time() - epoch_time)
+      print('dt', dt)
       print(C.logdir)
       print(C.full_cmd)
       print('=' * 30)
@@ -311,18 +320,19 @@ _C.replay_size = int(1e6)
 _C.epochs = 100
 _C.steps_per_epoch = 4000
 _C.save_freq = 10
-_C.pi_lr = 1e-3
-_C.vf_lr = 1e-3
 _C.alpha_lr = 1e-3  # for SAC w/ learned alpha
 _C.gamma = 0.99
 _C.learned_alpha = 1
 _C.alpha = 0.1  # for SAC w/o learned alpha
 _C.polyak = 0.995
 _C.num_test_episodes = 2
-_C.update_every = 50
-_C.start_steps = 10000
+_C.update_every = 40
+_C.start_steps = 1000
 _C.update_after = 1000
 _C.use_done = 0
+_C.state_rew = 1
+_C.net = 'mlp'
+_C.zdelta = 1
 
 if __name__ == '__main__':
   import argparse
