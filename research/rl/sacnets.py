@@ -165,7 +165,7 @@ class SquashedGaussianActor(nn.Module):
       logp_pi = None
 
     pi_action = th.tanh(pi_action)
-    return pi_action, logp_pi
+    return pi_action, logp_pi, {'std': std}
 
 class ActorCritic(nn.Module):
   def __init__(self, obs_space, act_space, C=None):
@@ -181,5 +181,5 @@ class ActorCritic(nn.Module):
 
   def act(self, obs, deterministic=False):
     with th.no_grad():
-      a, _ = self.pi(obs, deterministic, False)
+      a, _, ainfo = self.pi(obs, deterministic, False)
       return a.cpu().numpy()

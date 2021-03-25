@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import yaml
 from datetime import datetime
 import PIL
@@ -42,7 +43,8 @@ def sac(C):
   logger = defaultdict(lambda: [])
   writer = SummaryWriter(C.logdir)
   env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
-  #env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+  TN = 4
+  tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
   #env = env_fn(C, C.seed)()
   tenv = env_fn(C, C.seed)()  # test env
   obs_space = tenv.observation_space
@@ -81,7 +83,7 @@ def sac(C):
     # Bellman backup for Q functions
     with th.no_grad():
       # Target actions come from *current* policy
-      a2, logp_a2 = ac.pi(o2)
+      a2, logp_a2, ainfo = ac.pi(o2)
 
       # Target Q-values
       q1_pi_targ = ac_targ.q1(o2, a2)
@@ -95,15 +97,14 @@ def sac(C):
     loss_q = loss_q1 + loss_q2
 
     # Useful info for logging
-    q_info = dict(Q1Vals=q1.detach().cpu().numpy(), Q2Vals=q2.detach().cpu().numpy())
-
+    q_info = dict(Q1Vals=q1.mean().detach().cpu(), Q2Vals=q2.mean().detach().cpu())
     return loss_q, q_info
 
   # Set up function for computing SAC pi loss
   def compute_loss_pi(data):
     alpha = C.alpha if not C.learned_alpha else th.exp(ac.log_alpha).detach()
     o = data['obs']
-    pi, logp_pi = ac.pi(o)
+    pi, logp_pi, ainfo = ac.pi(o)
     q1_pi = ac.q1(o, pi)
     q2_pi = ac.q2(o, pi)
     q_pi = th.min(q1_pi, q2_pi)
@@ -112,11 +113,11 @@ def sac(C):
     loss_pi = (alpha * logp_pi - q_pi).mean()
 
     # Useful info for logging
-    pi_info = dict(LogPi=logp_pi.detach().cpu().numpy())
+    pi_info = dict(LogPi=logp_pi.mean().detach().cpu(), action_std=ainfo['std'].mean().detach().cpu())
 
     if C.learned_alpha:
-      #loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
-      loss_alpha = -(ac.log_alpha * (logp_pi + ac.target_entropy).detach()).mean()
+      loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
+      #loss_alpha = -(ac.log_alpha * (logp_pi + ac.target_entropy).detach()).mean()
     else:
       loss_alpha = 0.0
 
@@ -183,33 +184,31 @@ def sac(C):
     return ac.act(o, deterministic)
 
   def test_agent():
-    for j in range(C.num_test_episodes):
+    frames = []
+    o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+    for i in range(C.ep_len):
+      # Take deterministic actions at test time
+      o, r, d, info = tvenv.step(get_action(o))
+      ep_ret += r
+      ep_len += 1
+      delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
+      frame = delta
+      #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
+      frame = frame.repeat(8, 1).repeat(8, 2)[..., None].repeat(3, -1)
+      frame = frame.transpose(1, 0, 2, 3).reshape([C.lcd_h*1*8, TN*C.lcd_w*8, 3])
+      pframe = PIL.Image.fromarray((frame * 255).astype(np.uint8))
+      # get a drawing context
+      draw = PIL.ImageDraw.Draw(pframe)
+      for j in range(TN):
+        draw.text((C.lcd_w*8*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f} done: {d[j]}', fill=(255, 0, 0,))
+      frames += [np.array(pframe)]
+    
+    if len(frames) != 0:
+      vid = np.stack(frames)
+      vid_tensor = vid.transpose(0, 3, 1, 2)[None]
+      utils.add_video(writer, f'rollout', vid_tensor, epoch, fps=C.fps)
       frames = []
-      o, d, ep_ret, ep_len = tenv.reset(), False, 0, 0
-      while not(d or (ep_len == C.ep_len)):
-        # Take deterministic actions at test time
-        o = {key: val[None] for key, val in o.items()}
-        o, r, d, info = tenv.step(get_action(o)[0])
-        ep_ret += r
-        ep_len += 1
-        delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
-        frame = np.c_[1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta]
-        frame = frame.repeat(8, 0).repeat(8, 1)[..., None].repeat(3, -1)
-        pframe = PIL.Image.fromarray((frame * 255).astype(np.uint8))
-        # get a drawing context
-        draw = PIL.ImageDraw.Draw(pframe)
-        draw.text((10, 10), f'reward: {r:.4f} simi: {info["simi"]:.4f}', fill=(255, 0, 0,))
-        frames += [np.array(pframe)]
-
-      logger['TestEpRet'] += [ep_ret]
-      logger['TestEpLen'] += [ep_len]
-
-      if len(frames) != 0:
-        vid = np.stack(frames)
-        vid_tensor = vid.transpose(0, 3, 1, 2)[None]
-        utils.add_video(writer, f'rollout{j}', vid_tensor, epoch, fps=C.fps)
-        frames = []
-        print('wrote video')
+      print('wrote video')
   test_agent()
 
   # Prepare for interaction with environment
@@ -258,6 +257,7 @@ def sac(C):
       logger['EpLen'] += [ep_len[idx]]
       ep_ret[idx] = 0
       ep_len[idx] = 0
+      logger['success_rate'] += [d[idx]]
     if len(dixs) != 0:
       o = env.reset(dixs)
       assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
@@ -320,9 +320,9 @@ _C.replay_size = int(1e6)
 _C.epochs = 100
 _C.steps_per_epoch = 4000
 _C.save_freq = 10
-_C.alpha_lr = 1e-3  # for SAC w/ learned alpha
 _C.gamma = 0.99
 _C.learned_alpha = 1
+_C.alpha_lr = 5e-4  # for SAC w/ learned alpha
 _C.alpha = 0.1  # for SAC w/o learned alpha
 _C.polyak = 0.995
 _C.num_test_episodes = 2
