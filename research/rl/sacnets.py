@@ -108,18 +108,17 @@ class BaseMLP(nn.Module):
     return self.net(x)
 
 class QFunction(nn.Module):
-  def __init__(self, obs_space, act_dim, C, base=None):
+  def __init__(self, obs_space, act_dim, C):
     super().__init__()
     H = C.hidden_size
     self.C = C
-    self.base = base
     size = obs_space['pstate'].shape[0] * 2 + act_dim
     if self.C.net == 'mlp':
       self.base = BaseMLP(size, 1, C)
     elif self.C.net == 'cmlp':
       self.base = BaseCMLP(obs_space, H, C)
-    #elif self.C.net == 'cnn':
-    #  self.base = BaseCNN(obs_space, H, C)
+    elif self.C.net == 'cnn':
+      self.base = BaseCNN(obs_space, H, C)
     self.actin = nn.Linear(act_dim, H)
     self.act_head = nn.Sequential(
         nn.Linear(2 * H, H),
@@ -139,34 +138,22 @@ class QFunction(nn.Module):
       return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
-  def __init__(self, obs_space, act_dim, C, base=None):
+  def __init__(self, obs_space, act_dim, C):
     super().__init__()
     self.C = C
-    self.base = base
     size = obs_space['pstate'].shape[0] * 2
     if self.C.net == 'mlp':
       self.net = BaseMLP(size, 2 * act_dim, C)
     elif self.C.net == 'cmlp':
       self.net = BaseCMLP(obs_space, 2 * act_dim, C)
     elif self.C.net == 'cnn':
-    #  self.net = BaseCNN(obs_space, 2 * act_dim, C)
-      self.head = nn.Sequential(
-          nn.Linear(C.hidden_size, C.hidden_size),
-          nn.ReLU(),
-          nn.Linear(C.hidden_size, 2*act_dim),
-      )
+      self.net = BaseCNN(obs_space, 2 * act_dim, C)
     self.act_dim = act_dim
-
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
       obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
-
-    if self.C.net == 'cnn':
-      x = self.base(obs)
-      net_out = self.head(x)
-    else:
-      net_out = self.net(obs)
+    net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
     log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
@@ -199,17 +186,9 @@ class ActorCritic(nn.Module):
     super().__init__()
     act_dim = act_space.shape[0]
     # build policy and value functions
-    # TODO: share network
-
-    if C.net == 'cnn':
-      self.base = BaseCNN(obs_space, C.hidden_size, C)
-      self.pi = SquashedGaussianActor(obs_space, act_dim, C=C, base=self.base)
-      self.q1 = QFunction(obs_space, act_dim, C=C, base=self.base)
-      self.q2 = QFunction(obs_space, act_dim, C=C, base=self.base)
-    else:
-      self.pi = SquashedGaussianActor(obs_space, act_dim, C=C)
-      self.q1 = QFunction(obs_space, act_dim, C=C)
-      self.q2 = QFunction(obs_space, act_dim, C=C)
+    self.pi = SquashedGaussianActor(obs_space, act_dim, C=C)
+    self.q1 = QFunction(obs_space, act_dim, C=C)
+    self.q2 = QFunction(obs_space, act_dim, C=C)
     if C.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
       self.log_alpha = th.nn.Parameter(th.zeros(1))

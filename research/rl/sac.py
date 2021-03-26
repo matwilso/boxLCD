@@ -140,7 +140,7 @@ def sac(C):
     q_optimizer.zero_grad()
     loss_q, q_info = compute_loss_q(data)
     loss_q.backward()
-    logger['Q/grad_norm'] += [utils.compute_grad_norm(q_params).detach().cpu()]
+    logger['Q/grad_norm'] += [utils.compute_grad_norm(ac.q1.parameters()).detach().cpu()]
     q_optimizer.step()
 
     # Record things
@@ -208,7 +208,7 @@ def sac(C):
       draw = ImageDraw.Draw(pframe)
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
-        color = (255, 255, 50) if d[j] else (255, 255, 255)
+        color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
         draw.text((C.lcd_w*8*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f}', fill=color, fnt=fnt)
       frames += [np.array(pframe)]
     
