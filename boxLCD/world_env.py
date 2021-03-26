@@ -495,7 +495,8 @@ class WorldEnv(gym.Env, EzPickle):
         points = tuple([tuple(xy) for xy in points])
         draw.polygon(points, fill=color, outline=outline)
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
-    lcd = np.array(image)
+    lcd = np.asarray(image)
+    lcd = lcd.astype(np.float).astype(np.bool)  # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
     if pretty:
       lcd = 255 - lcd
     return lcd
