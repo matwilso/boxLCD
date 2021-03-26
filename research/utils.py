@@ -190,3 +190,14 @@ def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (
 class AttrDict(dict):
   __setattr__ = dict.__setitem__
   __getattr__ = dict.__getitem__
+
+
+def compute_grad_norm(parameters):
+  if isinstance(parameters, th.Tensor):
+    parameters = [parameters]
+  parameters = [p for p in parameters if p.grad is not None]
+  if len(parameters) == 0:
+    return th.tensor(0.)
+  device = parameters[0].grad.device
+  total_norm = th.norm(th.stack([th.norm(p.grad.detach()).to(device) for p in parameters]))
+  return total_norm

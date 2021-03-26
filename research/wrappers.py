@@ -1,3 +1,4 @@
+import copy
 import atexit
 import functools
 import sys
@@ -17,25 +18,28 @@ class RewardGoalEnv:
     self.SCALE = 2
     self.C = C
 
-  def __getattr__(self, name):
-    return getattr(self._env, name)
-
-  # @property
-  # def action_space(self):
-  #  return self.env.action_space
+  @property
+  def action_space(self):
+    return self._env.action_space
 
   @property
   def observation_space(self):
    base_space = self._env.observation_space
+   base_space.spaces['history'] = copy.deepcopy(base_space.spaces['lcd'])
+   base_space.spaces['history'].shape = (4,)+base_space.spaces['history'].shape
    base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
    base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
    return base_space
 
   def reset(self, *args, **kwargs):
+    self._env.seed(0)
     self.goal = self._env.reset()
+    self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
+    self.history = obs['lcd'][None].repeat(4, 0)
+    obs['history'] = np.array(self.history)
     return obs
 
   def simi2rew(self, similarity):
@@ -49,11 +53,14 @@ class RewardGoalEnv:
   #  """map [-1,0] --> [-1,0] in a log mapping."""
   #  assert rew >= -1.0 and rew <= 0.0
   #  return (np.log(rew + 1) / self.SCALE) + 1
+  def render(self, *args, **kwargs):
+    self._env.render(*args, **kwargs)
 
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
+    self.history = np.concatenate([self.history[1:], obs['lcd'][None]])
 
     if self.C.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
@@ -72,7 +79,11 @@ class RewardGoalEnv:
         done = True
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
+    obs['history'] = np.array(self.history)
     return obs, rew, done, info
+
+  def close(self):
+      self._env.close()
 
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
@@ -80,7 +91,8 @@ if __name__ == '__main__':
   import utils
   C = utils.AttrDict()
   C.state_rew = 1
-  env = Luxo()
+  #C.lcd_base = 32
+  env = Luxo(C)
   env = RewardGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   env.reset()
@@ -89,7 +101,7 @@ if __name__ == '__main__':
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
     print(rew, info['simi'])
-    plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
+    #plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:
       break

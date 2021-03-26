@@ -91,6 +91,9 @@ class ReplayBuffer:
     self.size = min(self.size + shape, self.max_size)
 
   def sample_batch(self, batch_size=32):
+    #import matplotlib.pyplot as plt
+    #for i in range(800)[::8]:
+    #  plt.imsave(f'test{i}.png', self.bufs['o:lcd'][i][...,None].repeat(3,-1))
     idxs = np.random.randint(0, self.size, size=batch_size)
     batch = tree_map(lambda x: x[idxs], self.bufs)
     o = utils.filtdict(batch, 'o:', fkey=lambda x: x[2:])

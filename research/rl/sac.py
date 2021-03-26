@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import yaml
 from datetime import datetime
 import PIL
+from PIL import Image, ImageDraw, ImageFont
 from collections import defaultdict
 from copy import deepcopy
 import itertools
@@ -24,6 +25,7 @@ from boxLCD import env_map
 import boxLCD
 import utils
 from async_vector_env import AsyncVectorEnv
+from wrappers import RewardGoalEnv
 
 def sac(C):
   print(C.full_cmd)
@@ -47,6 +49,7 @@ def sac(C):
   tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
   #env = env_fn(C, C.seed)()
   tenv = env_fn(C, C.seed)()  # test env
+  #tenv.reset()
   obs_space = tenv.observation_space
   act_space = tenv.action_space
   epoch = -1
@@ -113,7 +116,7 @@ def sac(C):
     loss_pi = (alpha * logp_pi - q_pi).mean()
 
     # Useful info for logging
-    pi_info = dict(LogPi=logp_pi.mean().detach().cpu(), action_std=ainfo['std'].mean().detach().cpu())
+    pi_info = dict(LogPi=logp_pi.mean().detach().cpu(), action_abs=ainfo['mean'].abs().mean().detach().cpu(), action_std=ainfo['std'].mean().detach().cpu())
 
     if C.learned_alpha:
       loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
@@ -137,6 +140,7 @@ def sac(C):
     q_optimizer.zero_grad()
     loss_q, q_info = compute_loss_q(data)
     loss_q.backward()
+    logger['Q/grad_norm'] += [utils.compute_grad_norm(q_params).detach().cpu()]
     q_optimizer.step()
 
     # Record things
@@ -153,6 +157,7 @@ def sac(C):
     pi_optimizer.zero_grad()
     loss_pi, loss_alpha, pi_info = compute_loss_pi(data)
     loss_pi.backward()
+    logger['Pi/grad_norm'] += [utils.compute_grad_norm(ac.pi.parameters()).detach().cpu()]
     pi_optimizer.step()
     # and optionally the alpha
     if C.learned_alpha:
@@ -180,7 +185,7 @@ def sac(C):
         p_targ.data.add_((1 - C.polyak) * p.data)
 
   def get_action(o, deterministic=False):
-    o = {key: th.as_tensor(val, dtype=th.float32).to(C.device) for key, val in o.items()}
+    o = {key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}
     return ac.act(o, deterministic)
 
   def test_agent():
@@ -196,11 +201,15 @@ def sac(C):
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
       frame = frame.repeat(8, 1).repeat(8, 2)[..., None].repeat(3, -1)
       frame = frame.transpose(1, 0, 2, 3).reshape([C.lcd_h*1*8, TN*C.lcd_w*8, 3])
-      pframe = PIL.Image.fromarray((frame * 255).astype(np.uint8))
+      for k in range(TN):
+        frame[:,k*8*C.lcd_w] = 0.0
+      pframe = Image.fromarray((frame * 255).astype(np.uint8))
       # get a drawing context
-      draw = PIL.ImageDraw.Draw(pframe)
+      draw = ImageDraw.Draw(pframe)
+      fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
-        draw.text((C.lcd_w*8*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f} done: {d[j]}', fill=(255, 0, 0,))
+        color = (255, 255, 50) if d[j] else (255, 255, 255)
+        draw.text((C.lcd_w*8*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f}', fill=color, fnt=fnt)
       frames += [np.array(pframe)]
     
     if len(frames) != 0:
@@ -317,7 +326,7 @@ def sac(C):
 
 _C = boxLCD.utils.AttrDict()
 _C.replay_size = int(1e6)
-_C.epochs = 100
+_C.epochs = 100000
 _C.steps_per_epoch = 4000
 _C.save_freq = 10
 _C.gamma = 0.99
@@ -336,7 +345,6 @@ _C.zdelta = 1
 
 if __name__ == '__main__':
   import argparse
-  from wrappers import RewardGoalEnv
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)

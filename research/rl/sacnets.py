@@ -18,6 +18,13 @@ from torch.distributions.normal import Normal
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
+def init_weights(m):
+  if type(m) == nn.Linear:
+    pass
+  elif type(m) == nn.Conv2d:
+    nn.init.orthogonal_(m.weight)
+    m.bias.data.fill_(0.0)
+
 class BaseCNN(nn.Module):
   def __init__(self, obs_space, out_size, C):
     super().__init__()
@@ -37,14 +44,20 @@ class BaseCNN(nn.Module):
       nn.ReLU(),
       nn.Linear(C.hidden_size, out_size),
     )
+    nn.init.zeros_(self.linear[-1].weight)
+    nn.init.zeros_(self.linear[-1].bias)
+    #self.net.apply(init_weights)
     self.C = C
 
   def forward(self, obs):
+    assert obs['lcd'].max().detach().cpu() <= 1.0
     s, g = obs['lcd'], obs['goal:lcd']
-    s = self.net(s[:, None])
-    g = self.net(g[:, None])
+    #s = self.net(s[:, None])
+    #g = self.net(g[:, None])
+    s = self.net(obs['lcd'][:,None])
     if self.C.zdelta:
-      x = g - s
+      x = s
+      #x = g - s
     else:
       x = th.cat([s, g], -1)
     x = self.linear(x)
@@ -70,7 +83,8 @@ class BaseCMLP(nn.Module):
     s = self.net(s.flatten(-2))
     g = self.net(g.flatten(-2))
     if self.C.zdelta:
-      x = g- s
+      x = s
+      #x = g- s
     else:
       x = th.cat([s, g], -1)
     x = self.linear(x)
@@ -165,13 +179,14 @@ class SquashedGaussianActor(nn.Module):
       logp_pi = None
 
     pi_action = th.tanh(pi_action)
-    return pi_action, logp_pi, {'std': std}
+    return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
 
 class ActorCritic(nn.Module):
   def __init__(self, obs_space, act_space, C=None):
     super().__init__()
     act_dim = act_space.shape[0]
     # build policy and value functions
+    # TODO: share network
     self.pi = SquashedGaussianActor(obs_space, act_dim, C=C)
     self.q1 = QFunction(obs_space, act_dim, C=C)
     self.q2 = QFunction(obs_space, act_dim, C=C)
