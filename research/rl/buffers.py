@@ -1,7 +1,7 @@
 from collections import defaultdict
 import torch as th
 import numpy as np
-import utils
+from research import utils
 from jax.tree_util import tree_multimap, tree_map
 
 def combined_shape(size, shape):

@@ -159,7 +159,7 @@ def make_video(tensor, fps):
       clip.write_gif(filename, verbose=False, progress_bar=False)
     except TypeError:
       clip.write_gif(filename, verbose=False)
-  subprocess.run(['gifsicle', '--lossy=30', '-o', filename, filename])
+  #subprocess.run(['gifsicle', '--lossy=30', '-o', filename, filename])
   with open(filename, 'rb') as f:
     tensor_string = f.read()
   try:

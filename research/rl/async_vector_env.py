@@ -1,4 +1,3 @@
-from mbrl import utils
 import numpy as np
 import multiprocessing as mp
 import time
@@ -81,9 +80,6 @@ class AsyncVectorEnv(VectorEnv):
       dummy_env.close()
       del dummy_env
     super(AsyncVectorEnv, self).__init__(num_envs=len(env_fns), observation_space=observation_space, action_space=action_space)
-
-    self.obs_mean = utils.RunningMeanStd(shape=observation_space.shape)
-    self.rew_mean = utils.RunningMeanStd()
 
     if self.shared_memory:
       _obs_buffer = create_shared_memory(self.single_observation_space, n=self.num_envs, ctx=ctx)

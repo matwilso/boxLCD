@@ -20,12 +20,12 @@ from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 from buffers import OGRB, ReplayBuffer
 from sacnets import ActorCritic
-from define_config import config, args_type
+from research.define_config import config, args_type
 from boxLCD import env_map
 import boxLCD
-import utils
+from research import utils
 from async_vector_env import AsyncVectorEnv
-from wrappers import RewardGoalEnv
+from research.wrappers import RewardGoalEnv
 
 def sac(C):
   print(C.full_cmd)
