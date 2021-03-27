@@ -44,7 +44,7 @@ class BaseCNN(nn.Module):
       nn.ReLU(),
       nn.Linear(C.hidden_size, out_size),
     )
-    nn.init.zeros_(self.linear[-1].weight)
+    #nn.init.zeros_(self.linear[-1].weight)
     nn.init.zeros_(self.linear[-1].bias)
     #self.net.apply(init_weights)
     self.C = C
