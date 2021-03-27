@@ -274,7 +274,7 @@ def sac(C):
 
     # Update handling
     if t >= C.update_after and t % C.update_every == 0:
-      for j in range(int(C.update_every*1.5)):
+      for j in range(int(C.update_every*1.0)):
         with utils.Timer(logger, 'sample_batch'):
          batch = replay_buffer.sample_batch(C.bs)
         with utils.Timer(logger, 'update'):
@@ -330,7 +330,7 @@ _C.epochs = 100000
 _C.steps_per_epoch = 4000
 _C.save_freq = 10
 _C.gamma = 0.99
-_C.learned_alpha = 1
+_C.learned_alpha = 0
 _C.alpha_lr = 5e-4  # for SAC w/ learned alpha
 _C.alpha = 0.1  # for SAC w/o learned alpha
 _C.polyak = 0.995

@@ -75,7 +75,7 @@ class RewardGoalEnv:
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
       rew = -1 + similarity
       info['simi'] = similarity
-      if similarity > 0.9:
+      if similarity > 0.8:
         done = True
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
