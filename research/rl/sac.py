@@ -190,6 +190,7 @@ def sac(C):
 
   def test_agent():
     frames = []
+    REP = 4
     o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
@@ -199,17 +200,17 @@ def sac(C):
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
       frame = delta
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
-      frame = frame.repeat(8, 1).repeat(8, 2)[..., None].repeat(3, -1)
-      frame = frame.transpose(1, 0, 2, 3).reshape([C.lcd_h*1*8, TN*C.lcd_w*8, 3])
+      frame = frame.repeat(REP, 1).repeat(REP, 2)[..., None].repeat(3, -1)
+      frame = frame.transpose(1, 0, 2, 3).reshape([C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
       for k in range(TN):
-        frame[:,k*8*C.lcd_w] = 0.0
+        frame[:,k*REP*C.lcd_w] = 0.0
       pframe = Image.fromarray((frame * 255).astype(np.uint8))
       # get a drawing context
       draw = ImageDraw.Draw(pframe)
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
         color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
-        draw.text((C.lcd_w*8*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f}', fill=color, fnt=fnt)
+        draw.text((C.lcd_w*REP*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f}', fill=color, fnt=fnt)
       frames += [np.array(pframe)]
     
     if len(frames) != 0:
