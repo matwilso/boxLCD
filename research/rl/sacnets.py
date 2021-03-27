@@ -191,7 +191,7 @@ class ActorCritic(nn.Module):
     self.q2 = QFunction(obs_space, act_dim, C=C)
     if C.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
-      self.log_alpha = th.nn.Parameter(th.zeros(1))
+      self.log_alpha = th.nn.Parameter(-0.5*th.ones(1))
 
   def act(self, obs, deterministic=False):
     with th.no_grad():
