@@ -100,6 +100,8 @@ class Decoder(nn.Module):
         nn.ReLU(),
         nn.ConvTranspose2d(H, H, 4, 4, padding=0),
         nn.ReLU(),
+        nn.Conv2d(H, H, 3, 1, padding=1),
+        nn.ReLU(),
         nn.ConvTranspose2d(H, 1, 4, 2, padding=1),
     )
 
