@@ -38,6 +38,18 @@ elif [ $1 == 3 ]; then
     python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/mlp --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=mlp --epochs=50 --state_rew=-0
     python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/cmlp --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=cmlp --epochs=50 --state_rew=0
     python rl/sac.py --env=Luxo --logdir=logs/rl/exp/img/cnn --learned_alpha=1 --ep_len=500 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --net=cnn --epochs=50 --state_rew=0
+elif [ $1 == 4 ]; then
+    args="python3 rl/sac.py --env=Luxo --ep_len=200 --hidden_size=256 --use_done=0 --wh_ratio=2.0 --epochs=50 --state_rew=0 --net=cnn"
+    #$args --logdir=logs/rl/image_based/cnn_lalp5e-5_lr3e-4_256 --learned_alpha=1 --lr=3e-4 --alpha_lr=5e-5 --bs=256
+    #$args --logdir=logs/rl/image_based/cnn_lalp5e-5_lr3e-4_512 --learned_alpha=1 --lr=3e-4 --alpha_lr=5e-5 --bs=512
+    #$args --logdir=logs/rl/image_based/cnn_nolap0.2_lr3e-4_512 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=512
+    #$args --logdir=logs/rl/image_based/cnn_nolap0.2_lr1e-4_512 --learned_alpha=0 --lr=1e-4 --alpha=0.2 --bs=512
+    #$args --logdir=logs/rl/image_based/cnn_nolap0.2_lr1e-3_1024 --learned_alpha=0 --lr=1e-3 --alpha=0.2 --bs=1024
+    #$args --logdir=logs/rl/image_based/cnn_lalp1e-4_lr3e-4_512 --learned_alpha=1 --lr=3e-4 --alpha_lr=1e-4 --bs=512
+    #$args --logdir=logs/rl/image_based/cnn_nolap0.2_lr3e-4_512_12env --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=512 --num_envs=12
+
+    $args --logdir=logs/rl/image_based/cnn_nolap0.2_lr3e-4_1024_12env --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=1024 --num_envs=12
 else
     echo "null"
 fi
+

@@ -98,7 +98,7 @@ class RolloutDataset(IterableDataset):
           elem = {key: th.as_tensor(val[idx, start:start + self.window], dtype=th.float32) for key, val in elems.items()}
         else:
           elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in elems.items()}
-        elem['lcd'] /= 255.0
+        assert elem['lcd'].max() <= 1.0 and elem['lcd'].min() >= 0.0
         yield elem
       curr_barrel.close()
       if ct >= self.nbarrels-1 and not self.infinite:

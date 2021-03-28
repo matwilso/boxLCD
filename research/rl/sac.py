@@ -188,13 +188,21 @@ def sac(C):
     o = {key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}
     return ac.act(o, deterministic)
 
+  def get_action_val(o, deterministic=False):
+    with th.no_grad():
+      o = {key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}
+      a, _, ainfo = ac.pi(o, deterministic, False)
+      q = ac.value(o, a)
+    return a.cpu().numpy(), q
+
   def test_agent():
     frames = []
     REP = 4
     o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
-      o, r, d, info = tvenv.step(get_action(o))
+      a, q = get_action_val(o)
+      o, r, d, info = tvenv.step(a)
       ep_ret += r
       ep_len += 1
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
@@ -210,7 +218,7 @@ def sac(C):
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
         color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
-        draw.text((C.lcd_w*REP*j + 10, 10), f'reward: {r[j]:.4f} simi: {info[j]["simi"]:.4f}', fill=color, fnt=fnt)
+        draw.text((C.lcd_w*REP*j + 10, 10), f'R: {r[j]:.2f} Q: {q[j]:.2f}', fill=color, fnt=fnt)
       frames += [np.array(pframe)]
     
     if len(frames) != 0:
@@ -287,7 +295,10 @@ def sac(C):
 
       # Save model
       if (epoch % C.save_freq == 0) or (epoch == C.epochs):
-        pass
+        th.save(ac, C.logdir / 'weights.pt')
+
+      if (C.logdir / 'pause.marker').exists():
+        import ipdb; ipdb.set_trace()
 
       # Test the performance of the deterministic version of the agent.
       if epoch % 1 == 0:
@@ -323,6 +334,8 @@ def sac(C):
       print('=' * 30)
       logger = defaultdict(lambda: [])
       epoch_time = time.time()
+      with open(C.logdir / 'hps.yaml', 'w') as f:
+        yaml.dump(C, f)
 
 
 _C = boxLCD.utils.AttrDict()

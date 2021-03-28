@@ -22,6 +22,7 @@ import utils
 import runners
 from nets.combined import Combined
 from nets.flatimage import FlatImageTransformer
+from nets.vae import VAE
 import data
 
 if __name__ == '__main__':
@@ -40,11 +41,11 @@ if __name__ == '__main__':
   ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weightdir']
   if data_yaml.exists():
     with data_yaml.open('r') as f:
-      load_cfg = yaml.load(f, Loader=yaml.Loader)
-    for key in load_cfg.__dict__.keys():
+      data_cfg = yaml.load(f, Loader=yaml.Loader)
+    for key in data_cfg.__dict__.keys():
       if key in ignore:
         continue
-      defaults[key] = load_cfg.__dict__[key]
+      defaults[key] = data_cfg.__dict__[key]
   if weight_yaml.exists():
     with weight_yaml.open('r') as f:
       weight_cfg = yaml.load(f, Loader=yaml.Loader)
@@ -57,6 +58,7 @@ if __name__ == '__main__':
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base
   C.imsize = C.lcd_w * C.lcd_h
+  #assert C.lcd_w == data_cfg.lcd_w and C.lcd_h == data_cfg.lcd_w, "mismatch of env dims"
   env = env_fn(C)()
   if C.mode not in ['collect']:
     if C.model == 'frame_token':
@@ -67,6 +69,8 @@ if __name__ == '__main__':
     elif C.model == 'multistep':
       assert C.vidstack < C.ep_len
       model = Multistep(env, C)
+    elif C.model == 'vae':
+      model = VAE(env, C)
     model.to(C.device)
     C.num_vars = utils.count_vars(model)
 

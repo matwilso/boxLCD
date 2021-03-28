@@ -68,7 +68,7 @@ class Trainer:
                 self.logger['test/' + key] += [metrics[key].detach().cpu()]
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            self.model.evaluate(self.writer, test_batch, itr)
+            self.model.evaluate(self.writer, self.b(test_batch), itr)
         self.model.train()
 
         # LOGGING
