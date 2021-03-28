@@ -36,6 +36,7 @@ class RewardGoalEnv:
     self.goal = self._env.reset()
     self._env.seed()
     obs = self._env.reset(*args, **kwargs)
+    #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
     self.history = obs['lcd'][None].repeat(4, 0)
@@ -70,12 +71,16 @@ class RewardGoalEnv:
       rew = -delta**0.5
       info['simi'] = delta
       if delta < 0.010:
+        rew = 0
+        #done = False
         done = True
     else:
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
       rew = -1 + similarity
       info['simi'] = similarity
-      if similarity > 0.8:
+      if similarity > 0.75:
+        rew = 0
+        #done = False
         done = True
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
@@ -89,18 +94,35 @@ if __name__ == '__main__':
   import matplotlib.pyplot as plt
   from boxLCD.envs import Luxo
   import utils
+  from rl.sacnets import ActorCritic
+  import torch as th
+  import pathlib
   C = utils.AttrDict()
   C.state_rew = 1
+  C.net = 'vae'
+  C.nfilter = 128
+  C.hidden_size = 128
+  C.learned_alpha = 0
+  C.alpha = 0.2
+  C.device = 'cpu'
+  C.lcd_h = 16
+  C.lcd_w = 32
+  C.wh_ratio = 2.0
+  C.lr = 1e-3
+  C.weightdir = pathlib.Path('logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/')
   #C.lcd_base = 32
   env = Luxo(C)
   env = RewardGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   env.reset()
+  ac = ActorCritic(env.observation_space, env.action_space, C=C).to(C.device)
   while True:
     env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
-    print(rew, info['simi'])
+    o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
+    r = ac.comp_rew(o)
+    print(rew, info['simi'], r)
     #plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:

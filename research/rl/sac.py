@@ -79,7 +79,8 @@ def sac(C):
     o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
     if not C.use_done:
       d = 0
-
+    if C.net == 'vae':
+      r = ac.comp_rew(o)
     q1 = ac.q1(o, a)
     q2 = ac.q2(o, a)
 

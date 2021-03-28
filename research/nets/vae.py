@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import utils
 
 class VAE(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, C):
     super().__init__()
     self.C = C
     self.z_size = 128

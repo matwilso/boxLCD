@@ -14,6 +14,7 @@ import scipy.signal
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
+from nets.vae import VAE
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
@@ -40,13 +41,13 @@ class BaseCNN(nn.Module):
     mult = 1 if C.zdelta else 2
     #self.linear = nn.Linear(mult * size * C.nfilter, out_size)
     self.linear = nn.Sequential(
-      nn.Linear(mult * size * C.nfilter, C.hidden_size),
-      nn.ReLU(),
-      nn.Linear(C.hidden_size, out_size),
+        nn.Linear(mult * size * C.nfilter, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, out_size),
     )
-    #nn.init.zeros_(self.linear[-1].weight)
+    # nn.init.zeros_(self.linear[-1].weight)
     nn.init.zeros_(self.linear[-1].bias)
-    #self.net.apply(init_weights)
+    # self.net.apply(init_weights)
     self.C = C
 
   def forward(self, obs):
@@ -54,7 +55,7 @@ class BaseCNN(nn.Module):
     s, g = obs['lcd'], obs['goal:lcd']
     #s = self.net(s[:, None])
     #g = self.net(g[:, None])
-    s = self.net(obs['lcd'][:,None])
+    s = self.net(obs['lcd'][:, None])
     if self.C.zdelta:
       x = s
       #x = g - s
@@ -108,7 +109,7 @@ class BaseMLP(nn.Module):
     return self.net(x)
 
 class QFunction(nn.Module):
-  def __init__(self, obs_space, act_dim, C):
+  def __init__(self, obs_space, act_dim, C, preproc=None):
     super().__init__()
     H = C.hidden_size
     self.C = C
@@ -120,16 +121,31 @@ class QFunction(nn.Module):
     elif self.C.net == 'cnn':
       self.base = BaseCNN(obs_space, H, C)
     self.actin = nn.Linear(act_dim, H)
-    self.act_head = nn.Sequential(
-        nn.Linear(2 * H, H),
-        nn.ReLU(),
-        nn.Linear(H, 1),
-    )
+
+    if self.C.net == 'vae':
+      self.prepoc = preproc
+      self.act_head = nn.Sequential(
+          nn.Linear(self.prepoc.z_size + H, H),
+          nn.ReLU(),
+          nn.Linear(H, 1),
+      )
+    else:
+      self.act_head = nn.Sequential(
+          nn.Linear(2 * H, H),
+          nn.ReLU(),
+          nn.Linear(H, 1),
+      )
 
   def forward(self, obs, act):
     if self.C.net == 'mlp':
       x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
       return self.base(x).squeeze(-1)
+    elif self.C.net == 'vae':
+      x = self.prepoc.encoder(obs['lcd'][:,None]).mean
+      xa = self.actin(act)
+      x = th.cat([x, xa], -1)
+      x = self.act_head(x)
+      return x.squeeze(-1)
     else:
       x = self.base(obs)
       act = self.actin(act)
@@ -138,7 +154,7 @@ class QFunction(nn.Module):
       return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
-  def __init__(self, obs_space, act_dim, C):
+  def __init__(self, obs_space, act_dim, C, preproc=None):
     super().__init__()
     self.C = C
     size = obs_space['pstate'].shape[0] * 2
@@ -148,11 +164,22 @@ class SquashedGaussianActor(nn.Module):
       self.net = BaseCMLP(obs_space, 2 * act_dim, C)
     elif self.C.net == 'cnn':
       self.net = BaseCNN(obs_space, 2 * act_dim, C)
+    elif self.C.net == 'vae':
+      self.preproc = preproc
+      self.net = nn.Sequential(
+          nn.Linear(self.preproc.z_size, C.hidden_size),
+          nn.ReLU(),
+          nn.Linear(C.hidden_size, C.hidden_size),
+          nn.ReLU(),
+          nn.Linear(C.hidden_size, 2*act_dim),
+      )
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
       obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
+    if self.C.net == 'vae':
+      obs = self.preproc.encoder.forward(obs['lcd'][:,None]).mean
     net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
@@ -185,13 +212,27 @@ class ActorCritic(nn.Module):
   def __init__(self, obs_space, act_space, C=None):
     super().__init__()
     act_dim = act_space.shape[0]
+
+    self.preproc = None
+    if C.net == 'vae':
+      self.preproc = VAE(C)
+      self.preproc.load(C.weightdir)
+      for p in self.preproc.parameters():
+        p.requires_grad = False
+      self.preproc.eval()
+
     # build policy and value functions
-    self.pi = SquashedGaussianActor(obs_space, act_dim, C=C)
-    self.q1 = QFunction(obs_space, act_dim, C=C)
-    self.q2 = QFunction(obs_space, act_dim, C=C)
+    self.pi = SquashedGaussianActor(obs_space, act_dim, C=C, preproc=self.preproc)
+    self.q1 = QFunction(obs_space, act_dim, C=C, preproc=self.preproc)
+    self.q2 = QFunction(obs_space, act_dim, C=C, preproc=self.preproc)
     if C.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
-      self.log_alpha = th.nn.Parameter(-0.5*th.ones(1))
+      self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))
+
+  def comp_rew(self, batch):
+    zo = self.preproc.encoder(batch['lcd'][:,None]).mean
+    zg = self.preproc.encoder(batch['goal:lcd'][:,None]).mean
+    return th.linalg.norm(zo-zg, dim=1)
 
   def act(self, obs, deterministic=False):
     with th.no_grad():
@@ -202,4 +243,4 @@ class ActorCritic(nn.Module):
     with th.no_grad():
       q1 = self.q1(obs, act)
       q2 = self.q1(obs, act)
-      return ((q1+q2)/2).cpu().numpy()
+      return ((q1 + q2) / 2).cpu().numpy()
