@@ -51,11 +51,22 @@ elif [ $1 == 4 ]; then
     python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=vae --window=16 --logdir=logs/vaes/x2_beta0.25_5e-4/ --log_n=1000 --beta=0.25 --lr=5e-4 --total_itr=5000
 elif [ $1 == 5 ]; then
     python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=vae --window=16 --logdir=logs/vaes/x2_beta0.1_1e-3_bigger128_bs32/ --log_n=1000 --beta=0.1 --lr=1e-3 --refresh_data=1 --nfilter=128 --bs=32
-elif [ $1 == 5 ]; then
-    args="python3 rl/sac.py --env=Luxo --ep_len=200 --hidden_size=256 --use_done=0 --wh_ratio=2.0 --state_rew=0 --net=vae"
+elif [ $1 == 9 ]; then
+    # first run an easier cnn test to see how it goes.
+    python rl/sac.py --env=Luxo --logdir=logs/rl/image_based/cnn_lowthresh_0.2_rerun_easier --learned_alpha=1 --ep_len=200 --hidden_size=256 --bs=100 --use_done=0 --wh_ratio=2.0 --lr=3e-4 --net=cnn --bs=128 --learned_alpha=0 --alpha=0.2 --state_rew=0 --epochs=30
 
-    $args --logdir=logs/rl/image_based/vae_b0.1_bs128 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/ 
-    $args --logdir=logs/rl/image_based/vae_b0.5_bs128 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/x2_beta0.5_1e-3_bigger128_bs32/
+    # then run with vaes
+    args="python3 rl/sac.py --env=Luxo --ep_len=200 --hidden_size=256 --use_done=0 --wh_ratio=2.0 --state_rew=0 --net=vae --epochs=50 --nfilter=128"
+
+    $args --logdir=logs/rl/image_based/vae_b0.1_bs128 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/ --vae_rew=0
+    $args --logdir=logs/rl/image_based/vae_b0.5_bs128 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/x2_beta0.5_1e-3_bigger128_bs32/ --vae_rew=0
+
+    $args --logdir=logs/rl/image_based/vae_b0.1_bs128_vae_rew --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/ --vae_rew=1
+    $args --logdir=logs/rl/image_based/vae_b0.5_bs128_vae_rew --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=128 --weightdir=logs/vaes/x2_beta0.5_1e-3_bigger128_bs32/ --vae_rew=1
+
+
+    $args --logdir=logs/rl/image_based/vae_b0.1_bs512 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=512 --weightdir=logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/ --vae_rew=0
+
 else
     echo "null"
 fi

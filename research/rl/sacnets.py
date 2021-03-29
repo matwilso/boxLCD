@@ -232,7 +232,7 @@ class ActorCritic(nn.Module):
   def comp_rew(self, batch):
     zo = self.preproc.encoder(batch['lcd'][:,None]).mean
     zg = self.preproc.encoder(batch['goal:lcd'][:,None]).mean
-    return th.linalg.norm(zo-zg, dim=1)
+    return -th.linalg.norm(zo-zg, dim=1)
 
   def act(self, obs, deterministic=False):
     with th.no_grad():

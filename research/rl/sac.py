@@ -79,8 +79,8 @@ def sac(C):
     o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
     if not C.use_done:
       d = 0
-    if C.net == 'vae':
-      r = ac.comp_rew(o)
+    if C.net == 'vae' and C.vae_rew:
+      r = ac.comp_rew(o).detach() / C.rew_scale
     q1 = ac.q1(o, a)
     q2 = ac.q2(o, a)
 
@@ -102,6 +102,7 @@ def sac(C):
 
     # Useful info for logging
     q_info = dict(Q1Vals=q1.mean().detach().cpu(), Q2Vals=q2.mean().detach().cpu())
+    q_info['batchR'] = r.mean().detach().cpu()
     return loss_q, q_info
 
   # Set up function for computing SAC pi loss
@@ -153,6 +154,10 @@ def sac(C):
     # computing gradients for them during the policy learning step.
     for p in q_params:
       p.requires_grad = False
+      if C.net == 'vae':
+        for p in ac.preproc.parameters():
+          p.requires_grad = False
+
 
     # Next run one gradient descent step for pi.
     pi_optimizer.zero_grad()
@@ -204,6 +209,10 @@ def sac(C):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
       o, r, d, info = tvenv.step(a)
+      if C.net == 'vae':
+        R = ac.comp_rew({key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}) / C.rew_scale
+      else:
+        R = np.zeros_like(r)
       ep_ret += r
       ep_len += 1
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
@@ -219,7 +228,7 @@ def sac(C):
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
         color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
-        draw.text((C.lcd_w*REP*j + 10, 10), f'R: {r[j]:.2f} Q: {q[j]:.2f}', fill=color, fnt=fnt)
+        draw.text((C.lcd_w*REP*j + 10, 10), f'r: {r[j]:.2f} R: {R[j]:.2f}', fill=color, fnt=fnt)
       frames += [np.array(pframe)]
     
     if len(frames) != 0:
@@ -355,8 +364,10 @@ _C.start_steps = 1000
 _C.update_after = 1000
 _C.use_done = 0
 _C.state_rew = 1
+_C.vae_rew = 0
 _C.net = 'mlp'
 _C.zdelta = 1
+_C.rew_scale = 5.0
 
 if __name__ == '__main__':
   import argparse
