@@ -80,7 +80,7 @@ def sac(C):
     if not C.use_done:
       d = 0
     if C.net == 'vae' and C.vae_rew:
-      r = ac.comp_rew(o).detach() / C.rew_scale
+      r = ac.comp_rew(o).detach()
     q1 = ac.q1(o, a)
     q2 = ac.q2(o, a)
 
@@ -210,7 +210,7 @@ def sac(C):
       a, q = get_action_val(o)
       o, r, d, info = tvenv.step(a)
       if C.net == 'vae':
-        R = ac.comp_rew({key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}) / C.rew_scale
+        R = ac.comp_rew({key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}) 
       else:
         R = np.zeros_like(r)
       ep_ret += r
@@ -313,6 +313,10 @@ def sac(C):
       # Test the performance of the deterministic version of the agent.
       if epoch % 1 == 0:
         test_agent()
+
+        if C.net == 'vae':
+          test_batch = replay_buffer.sample_batch(8)
+          ac.preproc.evaluate(writer, test_batch['obs'], epoch)
         #test_agent(video=epoch % 1 == 0)
         # if replay_buffer.ptr > C.ep_len*4:
         #  eps = replay_buffer.get_last(4)
@@ -367,7 +371,7 @@ _C.state_rew = 1
 _C.vae_rew = 0
 _C.net = 'mlp'
 _C.zdelta = 1
-_C.rew_scale = 5.0
+_C.rew_scale = 1.0
 
 if __name__ == '__main__':
   import argparse

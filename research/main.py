@@ -23,6 +23,7 @@ import runners
 from nets.combined import Combined
 from nets.flatimage import FlatImageTransformer
 from nets.vae import VAE
+from nets.ternary import TVQVAE
 import data
 
 if __name__ == '__main__':
@@ -70,7 +71,9 @@ if __name__ == '__main__':
       assert C.vidstack < C.ep_len
       model = Multistep(env, C)
     elif C.model == 'vae':
-      model = VAE(env, C)
+      model = VAE(C)
+    elif C.model == 'ternary':
+      model = TVQVAE(env, C)
     model.to(C.device)
     C.num_vars = utils.count_vars(model)
 

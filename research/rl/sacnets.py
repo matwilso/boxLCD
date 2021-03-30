@@ -123,9 +123,13 @@ class QFunction(nn.Module):
     self.actin = nn.Linear(act_dim, H)
 
     if self.C.net == 'vae':
-      self.prepoc = preproc
+      self.preproc = preproc
       self.act_head = nn.Sequential(
-          nn.Linear(self.prepoc.z_size + H, H),
+          nn.Linear(self.preproc.z_size + H, H),
+          nn.ReLU(),
+          nn.Linear(H, H),
+          nn.ReLU(),
+          nn.Linear(H, H),
           nn.ReLU(),
           nn.Linear(H, 1),
       )
@@ -141,7 +145,7 @@ class QFunction(nn.Module):
       x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
       return self.base(x).squeeze(-1)
     elif self.C.net == 'vae':
-      x = self.prepoc.encoder(obs['lcd'][:,None]).mean
+      x = self.preproc.encoder(obs['lcd'][:,None]).mean
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
       x = self.act_head(x)
@@ -168,6 +172,8 @@ class SquashedGaussianActor(nn.Module):
       self.preproc = preproc
       self.net = nn.Sequential(
           nn.Linear(self.preproc.z_size, C.hidden_size),
+          nn.ReLU(),
+          nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
           nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
@@ -228,11 +234,18 @@ class ActorCritic(nn.Module):
     if C.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
       self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))
+    self.C = C
 
   def comp_rew(self, batch):
     zo = self.preproc.encoder(batch['lcd'][:,None]).mean
     zg = self.preproc.encoder(batch['goal:lcd'][:,None]).mean
-    return -th.linalg.norm(zo-zg, dim=1)
+    cosine_dist = (zo*zg).sum(dim=1) / (th.linalg.norm(zo, dim=1)*th.linalg.norm(zg, dim=1))
+    ang_dist = th.zeros_like(cosine_dist)
+    ang_dist = th.where(cosine_dist != 1.0, th.acos(cosine_dist)/np.pi, cosine_dist)
+    if th.isnan(ang_dist).any():
+      import ipdb; ipdb.set_trace()
+    return -ang_dist**2 * self.C.rew_scale
+    #return -th.linalg.norm(zo-zg, dim=1) / self.C.rew_scale
 
   def act(self, obs, deterministic=False):
     with th.no_grad():

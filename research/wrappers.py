@@ -78,13 +78,14 @@ class RewardGoalEnv:
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
       rew = -1 + similarity
       info['simi'] = similarity
-      if similarity > 0.75:
+      if similarity > 0.70:
         rew = 0
         #done = False
         done = True
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
     obs['history'] = np.array(self.history)
+    rew = rew * self.C.rew_scale
     return obs, rew, done, info
 
   def close(self):
@@ -97,6 +98,7 @@ if __name__ == '__main__':
   from rl.sacnets import ActorCritic
   import torch as th
   import pathlib
+  import time
   C = utils.AttrDict()
   C.state_rew = 1
   C.net = 'vae'
@@ -109,8 +111,11 @@ if __name__ == '__main__':
   C.lcd_w = 32
   C.wh_ratio = 2.0
   C.lr = 1e-3
-  C.weightdir = pathlib.Path('logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/')
+  #C.weightdir = pathlib.Path('logs/vaes/x2_beta0.5_1e-3_bigger128_bs32/')
+  #C.weightdir = pathlib.Path('logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/')
+  C.weightdir = pathlib.Path('logs/vaes/x2_beta1.0_1e-3_bigger128_bs32/')
   #C.lcd_base = 32
+  C.rew_scale = 1.0
   env = Luxo(C)
   env = RewardGoalEnv(env, C)
   print(env.observation_space, env.action_space)
@@ -123,6 +128,7 @@ if __name__ == '__main__':
     o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
     r = ac.comp_rew(o)
     print(rew, info['simi'], r)
+    time.sleep(0.1)
     #plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:
