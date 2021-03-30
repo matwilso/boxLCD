@@ -1,3 +1,4 @@
+import yaml
 import sys
 from collections import defaultdict
 import numpy as np
@@ -24,11 +25,16 @@ class FlatEverything(nn.Module):
     self.pstate_n = env.observation_space.spaces['pstate'].shape[0]
     self.block_size = self.C.window
 
-    self.svae = SVAE(env, C)
+    # LOAD SVAE
+    weight_yaml = C.weightdir / 'hps.yaml'
+    with weight_yaml.open('r') as f:
+      weight_cfg = yaml.load(f, Loader=yaml.Loader)
+    self.svae = SVAE(env, weight_cfg)
     self.svae.load(C.weightdir)
     for p in self.svae.parameters():
       p.requires_grad = False
     self.svae.eval()
+    # </LOAD SVAE>
 
     self.size = self.C.imsize + C.vqK
     self.gpt_size = self.C.imsize + C.vqK
@@ -99,7 +105,8 @@ class FlatEverything(nn.Module):
     loss = -dist.log_prob(target).mean([0, 1])
     metrics['loss/lcd'] = loss[:self.C.imsize].mean()
     metrics['loss/state'] = loss[self.C.imsize:].mean()
-    return loss.mean(), metrics
+    metrics['loss/total'] = total_loss = loss.mean()
+    return total_loss, metrics
 
   def onestep(self, batch, i, temp=1.0):
     logits = self.forward(batch)
@@ -168,12 +175,15 @@ class FlatEverything(nn.Module):
         acts[ii] += [act]
       acts[ii] += [np.zeros_like(act)]
     obses = {key: np.array(val) for key, val in obses.items()}
+    # dupe
+    for key in obses:
+      obses[key][4:] = obses[key][4:5]
     acts = np.array(acts)
     acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
     prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
-    # dupe
-    for key in prompts:
-      prompts[key][4:] = prompts[key][4:5]
+    ## dupe
+    #for key in prompts:
+    #  prompts[key][4:] = prompts[key][4:5]
     acts[4:] = acts[4:5]
     prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
     real_lcd = obses['lcd'][:, :, None]
