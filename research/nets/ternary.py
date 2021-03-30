@@ -12,10 +12,10 @@ class TVQVAE(nn.Module):
     H = C.hidden_size
     # encoder -> VQ -> decoder
     self.encoder = Encoder(env, C)
-    self.vq = GumbelQuantize(128, C.vqK, C.vqD, straight_through=False)
     self.decoder = Decoder(env, C)
     self.optimizer = Adam(self.parameters(), C.lr)
 
+    self.vq = GumbelQuantize(128, C.vqK, C.vqD, straight_through=False)
     _ = th.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 10e3, eta_min=1/16, last_epoch=-1, verbose=False)
     Tmax = 10e3
     nMax = 1.0
@@ -47,10 +47,9 @@ class TVQVAE(nn.Module):
 
   def loss(self, batch, eval=False, return_idxs=False):
     z_q, diff, idxs, decoded = self.forward(batch)
-    image_loss = -decoded['lcd'].log_prob(batch['lcd']).mean()
-    pstate_loss = -decoded['pstate'].log_prob(batch['pstate']).mean()
-    loss = image_loss + pstate_loss + diff
-    metrics = {'total_loss': loss, 'image_loss': image_loss, 'pstate_loss': pstate_loss, 'entropy_loss': diff}
+    pstate_loss = -decoded.log_prob(batch['pstate']).mean()
+    loss = pstate_loss + diff
+    metrics = {'total_loss': loss, 'pstate_loss': pstate_loss, 'entropy_loss': diff, 'pstate_delta': ((decoded.mean-batch['pstate'])**2).mean()}
     metrics['zqdelta'] = (z_q-idxs).abs().mean()
     if eval:
       metrics['decoded'] = decoded
@@ -68,12 +67,7 @@ class TVQVAE(nn.Module):
     self.vq.eval()
     flatter_batch = {key: val[:8,0] for key, val in batch.items()}
     z_q, diff, idxs, decoded = self.forward(flatter_batch)
-    image = decoded['lcd'].sample()
-    true_image = flatter_batch['lcd'][:,None].cpu()
-    image = th.cat([true_image, image.cpu()], 0)
-    writer.add_image('recon_image', utils.combine_imgs(image, 2, 8)[None], epoch)
-
-    pred_pstate = decoded['pstate'].mean.cpu().numpy()
+    pred_pstate = decoded.mean.cpu().numpy()
     true_pstate = flatter_batch['pstate'].cpu().numpy()
     true_pstate_imgs = []
     pred_pstate_imgs = []
@@ -104,38 +98,10 @@ class Encoder(nn.Module):
         nn.ReLU(),
         nn.Linear(H, H),
     )
-    self.seq = nn.ModuleList([
-        nn.Conv2d(1, H, 3, 2, padding=1),
-        #ResBlock(H, emb_channels=H),
-        nn.Conv2d(H, H, 3, 2, padding=1),
-        ResBlock(H, emb_channels=H),
-        nn.Conv2d(H, H, 3, 2, padding=1),
-        ResBlock(H, emb_channels=H),
-        nn.Conv2d(H, H // 8, 1),
-        nn.Flatten(-3),
-        nn.Linear(H, H)
-    ])
 
   def forward(self, batch):
     state = batch['pstate']
-    lcd = batch['lcd']
-    emb = self.state_embed(state)
-    x = lcd[:, None]
-    for layer in self.seq:
-      if isinstance(layer, ResBlock):
-        x = layer(x, emb)
-      else:
-        x = layer(x)
-    return x
-
-class Upsample(nn.Module):
-  """double the size of the input"""
-  def __init__(self, in_ch, out_ch):
-    super().__init__()
-    self.conv = nn.Conv2d(in_ch, out_ch, 3, padding=1)
-  def forward(self, x, emb=None):
-    x = F.interpolate(x, scale_factor=2, mode="nearest")
-    x = self.conv(x)
+    x = self.state_embed(state)
     return x
 
 class Decoder(nn.Module):
@@ -150,58 +116,8 @@ class Decoder(nn.Module):
         nn.ReLU(),
         nn.Linear(H, state_n),
     )
-
-    H = C.hidden_size
-    assert C.lcd_h == 16, C.lcd_w == 32
-    self.net = nn.Sequential(
-        nn.ConvTranspose2d(C.vqK, H, (2,4), 2),
-        nn.ReLU(),
-        nn.ConvTranspose2d(H, H, 4, 4, padding=0),
-        nn.ReLU(),
-        nn.Conv2d(H, H, 3, 1, padding=1),
-        nn.ReLU(),
-        nn.ConvTranspose2d(H, 1, 4, 2, padding=1),
-    )
-    self.C = C
-
   def forward(self, x):
-    #import ipdb; ipdb.set_trace()
-    lcd_dist = thd.Bernoulli(logits=self.net(x[...,None,None]))
-    state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'pstate': state_dist}
-
-class ResBlock(nn.Module):
-  def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0):
-    super().__init__()
-    self.out_channels = out_channels or channels
-
-    self.in_layers = nn.Sequential(
-        nn.GroupNorm(32, channels),
-        nn.SiLU(),
-        nn.Conv2d(channels, self.out_channels, 3, padding=1)
-    )
-    self.emb_layers = nn.Sequential(
-        nn.SiLU(),
-        nn.Linear(emb_channels, self.out_channels)
-    )
-    self.out_layers = nn.Sequential(
-        nn.GroupNorm(32, self.out_channels),
-        nn.SiLU(),
-        nn.Dropout(p=dropout),
-        utils.zero_module(nn.Conv2d(self.out_channels, self.out_channels, 3, padding=1))
-    )
-    if self.out_channels == channels:
-      self.skip_connection = nn.Identity()
-    else:
-      self.skip_connection = nn.Conv2d(channels, self.out_channels, 1)  # step down size
-
-  def forward(self, x, emb):
-    h = self.in_layers(x)
-    emb_out = self.emb_layers(emb)[..., None, None]
-    h = h + emb_out
-    h = self.out_layers(h)
-    return self.skip_connection(x) + h
-
+    return thd.Normal(self.state_net(x), 1)
 
 class GumbelQuantize(nn.Module):
   """
