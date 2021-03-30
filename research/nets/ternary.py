@@ -1,3 +1,4 @@
+import numpy as np
 import torch as th
 from torch import nn, einsum
 import torch.nn.functional as F
@@ -11,28 +12,46 @@ class TVQVAE(nn.Module):
     H = C.hidden_size
     # encoder -> VQ -> decoder
     self.encoder = Encoder(env, C)
-    self.vq = GumbelQuantize(128, C.vqK, C.vqD)
+    self.vq = GumbelQuantize(128, C.vqK, C.vqD, straight_through=False)
     self.decoder = Decoder(env, C)
     self.optimizer = Adam(self.parameters(), C.lr)
+
+    _ = th.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 10e3, eta_min=1/16, last_epoch=-1, verbose=False)
+    Tmax = 10e3
+    nMax = 1.0
+    nMin = 1/16
+    def cos_schedule(t):
+      x = np.clip(t/Tmax, 0.0, 1.0)
+      return nMin + 0.5*(nMax-nMin) * (1 + np.cos(x * np.pi))
+    #self.cos_schedule = cos_schedule
+    self.env = env
     self.C = C
+  
+  def save(self, *args, **kwargs):
+    pass
 
   def train_step(self, batch, dry=False):
+    if dry:
+      return {}
+    #temp = self.cos_schedule(self.optimizer._step_count)
+    temp = 1.0
+    self.vq.temperature = temp
     self.optimizer.zero_grad()
     flatter_batch = {key: val.flatten(0, 1) for key, val in batch.items()}
     loss, metrics = self.loss(flatter_batch)
+    metrics['temp'] = th.as_tensor(temp)
     if not dry:
       loss.backward()
       self.optimizer.step()
     return metrics
 
   def loss(self, batch, eval=False, return_idxs=False):
-    embed_loss, decoded, perplexity, idxs = self.forward(batch)
-    import ipdb; ipdb.set_trace()
-
-    recon_loss = -thd.Bernoulli(logits=decoded).log_prob(x).mean()
-    loss = recon_loss + embed_loss
-    prior_loss = th.zeros(1)
-    metrics = {'vq_vae_loss': loss, 'recon_loss': recon_loss, 'embed_loss': embed_loss, 'perplexity': perplexity, 'prior_loss': prior_loss}
+    z_q, diff, idxs, decoded = self.forward(batch)
+    image_loss = -decoded['lcd'].log_prob(batch['lcd']).mean()
+    pstate_loss = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    loss = image_loss + pstate_loss + diff
+    metrics = {'total_loss': loss, 'image_loss': image_loss, 'pstate_loss': pstate_loss, 'entropy_loss': diff}
+    metrics['zqdelta'] = (z_q-idxs).abs().mean()
     if eval:
       metrics['decoded'] = decoded
     if return_idxs:
@@ -42,9 +61,28 @@ class TVQVAE(nn.Module):
   def forward(self, x):
     z_e = self.encoder(x)
     z_q, diff, idxs = self.vq(z_e)
-    import ipdb; ipdb.set_trace()
     decoded = self.decoder(z_q)
-    return z_q, diff, idxs
+    return z_q, diff, idxs, decoded
+
+  def evaluate(self, writer, batch, epoch):
+    self.vq.eval()
+    flatter_batch = {key: val[:8,0] for key, val in batch.items()}
+    z_q, diff, idxs, decoded = self.forward(flatter_batch)
+    image = decoded['lcd'].sample()
+    true_image = flatter_batch['lcd'][:,None].cpu()
+    image = th.cat([true_image, image.cpu()], 0)
+    writer.add_image('recon_image', utils.combine_imgs(image, 2, 8)[None], epoch)
+
+    pred_pstate = decoded['pstate'].mean.cpu().numpy()
+    true_pstate = flatter_batch['pstate'].cpu().numpy()
+    true_pstate_imgs = []
+    pred_pstate_imgs = []
+    for i in range(8):
+      true_pstate_imgs += [self.env.reset(pstate=true_pstate[i])['lcd']]
+      pred_pstate_imgs += [self.env.reset(pstate=pred_pstate[i])['lcd']]
+    out = np.concatenate([np.stack(true_pstate_imgs), np.stack(pred_pstate_imgs)], 0)[:,None]
+    writer.add_image('recon_pstate', utils.combine_imgs(out, 2, 8)[None], epoch)
+    self.vq.train()
 
   def sample(self, n):
     import ipdb; ipdb.set_trace()
@@ -68,12 +106,12 @@ class Encoder(nn.Module):
     )
     self.seq = nn.ModuleList([
         nn.Conv2d(1, H, 3, 2, padding=1),
-        ResBlock(H, emb_channels=H),
+        #ResBlock(H, emb_channels=H),
         nn.Conv2d(H, H, 3, 2, padding=1),
         ResBlock(H, emb_channels=H),
         nn.Conv2d(H, H, 3, 2, padding=1),
         ResBlock(H, emb_channels=H),
-        nn.Conv2d(H, H//8, 1),
+        nn.Conv2d(H, H // 8, 1),
         nn.Flatten(-3),
         nn.Linear(H, H)
     ])
@@ -82,7 +120,7 @@ class Encoder(nn.Module):
     state = batch['pstate']
     lcd = batch['lcd']
     emb = self.state_embed(state)
-    x = lcd[:,None]
+    x = lcd[:, None]
     for layer in self.seq:
       if isinstance(layer, ResBlock):
         x = layer(x, emb)
@@ -106,26 +144,29 @@ class Decoder(nn.Module):
     H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_net = nn.Sequential(
-        nn.Flatten(-3),
-        nn.Linear(C.vqD * 4 * 6, H * C.vidstack),
-        nn.Unflatten(-1, (C.vidstack, H)),
+        nn.Linear(C.vqK, H),
         nn.ReLU(),
         nn.Linear(H, H),
         nn.ReLU(),
         nn.Linear(H, state_n),
     )
 
+    H = C.hidden_size
+    assert C.lcd_h == 16, C.lcd_w == 32
     self.net = nn.Sequential(
-        Upsample(C.vqD, H),
+        nn.ConvTranspose2d(C.vqK, H, (2,4), 2),
         nn.ReLU(),
-        Upsample(H, H),
+        nn.ConvTranspose2d(H, H, 4, 4, padding=0),
         nn.ReLU(),
-        nn.Conv2d(H, H, 3, padding=1),
+        nn.Conv2d(H, H, 3, 1, padding=1),
         nn.ReLU(),
-        nn.Conv2d(H, C.vidstack, 3, padding=1),
+        nn.ConvTranspose2d(H, 1, 4, 2, padding=1),
     )
+    self.C = C
+
   def forward(self, x):
-    lcd_dist = thd.Bernoulli(logits=self.net(x))
+    #import ipdb; ipdb.set_trace()
+    lcd_dist = thd.Bernoulli(logits=self.net(x[...,None,None]))
     state_dist = thd.Normal(self.state_net(x), 1)
     return {'lcd': lcd_dist, 'pstate': state_dist}
 
@@ -179,18 +220,30 @@ class GumbelQuantize(nn.Module):
     self.kld_scale = 5e-4
 
     self.proj = nn.Linear(num_hiddens, n_embed)
-    self.embed = nn.Embedding(1, embedding_dim)
+    self.embed = nn.Embedding(2, embedding_dim)
 
   def forward(self, z):
-    # force hard = True when we are in eval mode, as we must quantize
-    hard = self.straight_through if self.training else True
-
     logits = self.proj(z)
-    soft_bin = thd.RelaxedBernoulli(self.temperature, logits=logits)
-    z_q = soft_bin.rsample()
+    dist = thd.Bernoulli(logits=logits)
+    z_q = dist.sample()
+    z_q += dist.probs - dist.probs.detach()
+    # + kl divergence to the prior loss (entropy bonus)
+    diff = self.kld_scale * dist.entropy().mean()
+    diff = th.zeros_like(diff)
+    return z_q, diff, z_q
 
-    # + kl divergence to the prior loss
-    # entropy bonus
-    diff = self.kld_scale * thd.Bernoulli(logits=logits).entropy().mean()
-    idxs = z_q > 0.5
-    return z_q, diff, idxs
+  #def forward(self, z):
+  #  # force hard = True when we are in eval mode, as we must quantize
+  #  hard = self.straight_through if self.training else True
+
+  #  logits = self.proj(z)
+  #  soft_bin = thd.RelaxedBernoulli(self.temperature, logits=logits)
+  #  z_q = soft_bin.rsample()
+
+  #  hard_z_q = z_q.round()
+  #  if hard:
+  #    z_q = hard_z_q - z_q.detach() + z_q
+
+  #  # + kl divergence to the prior loss (entropy bonus)
+  #  diff = self.kld_scale * thd.Bernoulli(logits=logits).entropy().mean()
+  #  return z_q, diff, hard_z_q
