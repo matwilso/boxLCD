@@ -51,7 +51,7 @@ def config():
   C.stacks_per_block = 32
 
   C.vqD = 128
-  C.vqK = 256
+  C.vqK = 128
   C.beta = 0.25
 
 

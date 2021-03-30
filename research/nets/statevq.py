@@ -6,7 +6,7 @@ import torch.distributions as thd
 from torch.optim import Adam
 import utils
 
-class TVQVAE(nn.Module):
+class SVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.hidden_size
@@ -15,7 +15,7 @@ class TVQVAE(nn.Module):
     self.decoder = Decoder(env, C)
     self.optimizer = Adam(self.parameters(), C.lr)
 
-    self.vq = GumbelQuantize(128, C.vqK, C.vqD, straight_through=False)
+    self.vq = Quantize(C.hidden_size, C.vqK)
     _ = th.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 10e3, eta_min=1/16, last_epoch=-1, verbose=False)
     Tmax = 10e3
     nMax = 1.0
@@ -27,8 +27,17 @@ class TVQVAE(nn.Module):
     self.env = env
     self.C = C
   
-  def save(self, *args, **kwargs):
-    pass
+  def save(self, dir):
+    print("SAVED MODEL", dir)
+    path = dir / 'sqvae.pt'
+    th.save(self.state_dict(), path)
+    print(path)
+
+  def load(self, path):
+    path = path / 'sqvae.pt'
+    self.load_state_dict(th.load(path))
+    print(f'LOADED {path}')
+
 
   def train_step(self, batch, dry=False):
     if dry:
@@ -119,24 +128,14 @@ class Decoder(nn.Module):
   def forward(self, x):
     return thd.Normal(self.state_net(x), 1)
 
-class GumbelQuantize(nn.Module):
-  """
-  Gumbel Softmax trick quantizer
-  Categorical Reparameterization with Gumbel-Softmax, Jang et al. 2016
-  https://arxiv.org/abs/1611.01144
-  """
-  def __init__(self, num_hiddens, n_embed, embedding_dim, straight_through=False):
+class Quantize(nn.Module):
+  """there is no god"""
+  def __init__(self, num_hiddens, n_embed):
     super().__init__()
-
-    self.embedding_dim = embedding_dim
     self.n_embed = n_embed
-
-    self.straight_through = straight_through
     self.temperature = 1.0
     self.kld_scale = 5e-4
-
     self.proj = nn.Linear(num_hiddens, n_embed)
-    self.embed = nn.Embedding(2, embedding_dim)
 
   def forward(self, z):
     logits = self.proj(z)
@@ -145,7 +144,6 @@ class GumbelQuantize(nn.Module):
     z_q += dist.probs - dist.probs.detach()
     # + kl divergence to the prior loss (entropy bonus)
     diff = self.kld_scale * dist.entropy().mean()
-    diff = th.zeros_like(diff)
     return z_q, diff, z_q
 
   #def forward(self, z):

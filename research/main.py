@@ -1,8 +1,9 @@
+from research.nets.flat_everything import FlatEverything
+from research.nets.statevq import SVAE
 from research.nets.multistep import Multistep
 from tqdm import tqdm
 import yaml
 import time
-from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -23,7 +24,6 @@ import runners
 from nets.combined import Combined
 from nets.flatimage import FlatImageTransformer
 from nets.vae import VAE
-from nets.ternary import TVQVAE
 import data
 
 if __name__ == '__main__':
@@ -64,6 +64,8 @@ if __name__ == '__main__':
   if C.mode not in ['collect']:
     if C.model == 'frame_token':
       model = FlatImageTransformer(env, C)
+    if C.model == 'flatev':
+      model = FlatEverything(env, C)
     elif C.model == 'single':
       assert C.datamode == 'image'
       model = Combined(env, C)
@@ -72,8 +74,8 @@ if __name__ == '__main__':
       model = Multistep(env, C)
     elif C.model == 'vae':
       model = VAE(C)
-    elif C.model == 'ternary':
-      model = TVQVAE(env, C)
+    elif C.model == 'statevq':
+      model = SVAE(env, C)
     model.to(C.device)
     C.num_vars = utils.count_vars(model)
 
