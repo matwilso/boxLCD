@@ -192,29 +192,35 @@ def sac(C):
 
   def get_action(o, deterministic=False):
     o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
-    return ac.act(o, deterministic)
+    act = ac.act(o, deterministic)
+    if not C.lenv:
+      act = act.cpu().numpy()
+    return act
 
   def get_action_val(o, deterministic=False):
     with th.no_grad():
       o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
       a, _, ainfo = ac.pi(o, deterministic, False)
       q = ac.value(o, a)
-    return a.cpu().numpy(), q
+    if not C.lenv:
+      a = a.cpu().numpy()
+    return a, q
 
   def test_agent():
     frames = []
     REP = 4
-    o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
-    #o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+    if C.lenv:
+      o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
+    else:
+      o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+    dones = []
+    rs = []
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
       o, r, d, info = tvenv.step(a)
-      if C.net == 'vae':
-        R = ac.comp_rew({key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}) 
-      else:
-        R = th.zeros_like(r)
-        #R = np.zeros_like(r)
+      rs += [r]
+      dones += [d]
       ep_ret += r
       ep_len += 1
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
@@ -222,21 +228,27 @@ def sac(C):
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
       frames += [frame]
 
-    frames = th.stack(frames)
-    frames = frames.cpu().numpy()
+    if C.lenv:
+      frames = th.stack(frames)
+      frames = frames.cpu().numpy()
+    else:
+      frames = np.stack(frames)
     frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
     frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
     for k in range(TN):
       frames[:,:,k*REP*C.lcd_w] = 0.0
-    # TODO: add drawing back
-    #pframe = Image.fromarray((frame * 255).astype(np.uint8))
-    ## get a drawing context
-    #draw = ImageDraw.Draw(pframe)
-    #fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
-    #for j in range(TN):
-    #  color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
-    #  draw.text((C.lcd_w*REP*j + 10, 10), f'r: {r[j]:.2f} R: {R[j]:.2f}', fill=color, fnt=fnt)
-    #frames += [np.array(pframe)]
+
+    dframes = []
+    for i in range(len(frames)):
+      frame = frames[i]
+      pframe = Image.fromarray((frame * 255).astype(np.uint8))
+      # get a drawing context
+      draw = ImageDraw.Draw(pframe)
+      fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
+      for j in range(TN):
+        color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
+        draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
+      dframes += [np.array(pframe)]
     vid = frames.transpose(0, -1, 1, 2)[None]
     utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
     print('wrote video')
@@ -245,8 +257,10 @@ def sac(C):
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
-  o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), th.zeros(C.num_envs).to(C.device), th.zeros(C.num_envs).to(C.device)
-  #o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
+  if C.lenv:
+    o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), th.zeros(C.num_envs).to(C.device), th.zeros(C.num_envs).to(C.device)
+  else:
+    o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
   # Main loop: collect experience in venv and update/log each epoch
   for t in range(total_steps):
     # Until start_steps have elapsed, randomly sample actions
@@ -282,16 +296,20 @@ def sac(C):
     o = o2
 
     # End of trajectory handling
-    done = th.logical_or(d, ep_len == C.ep_len)
-    dixs = th.nonzero(done)
-    #done = np.logical_or(d, ep_len == C.ep_len)
-    #dixs = np.nonzero(done)[0]
+    if C.lenv:
+      done = th.logical_or(d, ep_len == C.ep_len)
+      dixs = th.nonzero(done)
+      proc = lambda x: x.cpu()
+    else:
+      done = np.logical_or(d, ep_len == C.ep_len)
+      dixs = np.nonzero(done)[0]
+      proc = lambda x: x
     for idx in dixs:
-      logger['EpRet'] += [ep_ret[idx].cpu()]
-      logger['EpLen'] += [ep_len[idx].cpu()]
+      logger['EpRet'] += [proc(ep_ret[idx])]
+      logger['EpLen'] += [proc(ep_len[idx])]
       ep_ret[idx] = 0
       ep_len[idx] = 0
-      logger['success_rate'] += [d[idx].cpu()]
+      logger['success_rate'] += [proc(d[idx])]
     if len(dixs) != 0:
       o = env.reset(dixs)
       #assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"

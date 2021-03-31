@@ -1,5 +1,5 @@
 import os
-from re import I
+from jax.tree_util import tree_multimap
 import time
 from collections import defaultdict
 import copy
@@ -29,7 +29,7 @@ class LearnedEnv:
     self.model.load(C.weightdir)
     self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
     self.model.eval()
-    for p in self.parameters():
+    for p in self.model.parameters():
       p.requires_grad = False
 
     def act_sample():
@@ -66,7 +66,7 @@ class LearnedEnv:
       if self.ptr == self.C.window - 2:
         self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
       self.ptr = min(1 + self.ptr, self.C.window - 2)
-      jreturn obs, 0, False, {}
+      return obs, 0, False, {}
 
   def make_prompt(self):
     pass
@@ -76,7 +76,8 @@ class RewardLenv:
     self._env = env
     self.SCALE = 2
     self.C = C
-    self.obs_keys = env_map[C.env]().obs_keys
+    self.real_env = env_fn(C)()._env
+    self.obs_keys = self.real_env.obs_keys
 
   @property
   def action_space(self):
@@ -90,10 +91,12 @@ class RewardLenv:
    return base_space
 
   def reset(self, *args, **kwargs):
-    self.goal = self._env.reset()
+    goals = [self.real_env.reset() for _ in range(self.C.num_envs)]
+    goals = tree_multimap(lambda x,*y: th.as_tensor(np.stack([x, *y])).to(self.C.device), goals[0], *goals[1:])
+    self.goal = goals
     obs = self._env.reset(*args, **kwargs)
-    obs['goal:lcd'] = self.goal['lcd'].detach().clone()
-    obs['goal:pstate'] = self.goal['pstate'].detach().clone()
+    obs['goal:lcd'] = self.goal['lcd']
+    obs['goal:pstate'] = self.goal['pstate']
     return obs
 
   def render(self, *args, **kwargs):
