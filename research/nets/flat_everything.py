@@ -70,11 +70,12 @@ class FlatEverything(nn.Module):
     acts = batch['acts']
     z_q = self.svae(utils.filtdict(batch, 'pstate'))[0]
     x = th.cat([lcd, z_q], -1)
+    # forward the GPT model
+    x = self.embed(x)
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
     x = th.cat([th.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
-    # forward the GPT model
-    x = self.embed(x)
+
     cin = self.cond_in(acts)
     if acts.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
