@@ -52,7 +52,7 @@ class LearnedEnv:
       window_batch['acts'] = 2.0 * th.rand([self.C.window, *self.action_space.shape]).to(self.C.device) - 1.0
       window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
       for self.ptr in range(20):
-        window_batch = self.model.onestep(window_batch, self.ptr, temp=1.0)
+        window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
       window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
       self.ptr = 9
       self.window_batch = window_batch
@@ -61,7 +61,7 @@ class LearnedEnv:
   def step(self, act):
     with th.no_grad():
       self.window_batch['acts'][:,self.ptr] = th.as_tensor(act).to(self.C.device)
-      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=1.0)
+      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.C.lenv_temp)
       obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
       if self.ptr == self.C.window - 2:
         self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}

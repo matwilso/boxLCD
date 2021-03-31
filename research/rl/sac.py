@@ -397,6 +397,7 @@ _C.net = 'mlp'
 _C.zdelta = 1
 _C.lenv = 0
 _C.lenv_mode = 'swap'
+_C.lenv_temp = 1.0
 
 if __name__ == '__main__':
   import argparse
