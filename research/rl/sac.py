@@ -249,7 +249,8 @@ def sac(C):
         color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
         draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
-    vid = frames.transpose(0, -1, 1, 2)[None]
+    dframes = np.stack(dframes)
+    vid = dframes.transpose(0, -1, 1, 2)[None]
     utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
     print('wrote video')
   test_agent()
