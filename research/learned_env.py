@@ -28,6 +28,9 @@ class LearnedEnv:
     self.model = model
     self.model.load(C.weightdir)
     self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
+    self.model.eval()
+    for p in self.parameters():
+      p.requires_grad = False
 
     def act_sample():
       return 2.0 * th.rand(self.action_space.shape).to(C.device) - 1.0
@@ -41,27 +44,29 @@ class LearnedEnv:
     self.observation_space = gym.spaces.Dict(spaces)
 
   def reset(self, *args, **kwargs):
-    # TODO: add support for resetting to a specific state. like a prompt
-    # initialize and burn in
-    self.ptr = 0
-    window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
-    window_batch['acts'] = 2.0 * th.rand([self.C.window, *self.action_space.shape]).to(self.C.device) - 1.0
-    window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
-    for self.ptr in range(20):
-      window_batch = self.model.onestep(window_batch, self.ptr, temp=1.0)
-    window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
-    self.ptr = 9
-    self.window_batch = window_batch
-    return {key: val[:, self.ptr] for key, val in window_batch.items() if key in self.keys}
+    with th.no_grad():
+      # TODO: add support for resetting to a specific state. like a prompt
+      # initialize and burn in
+      self.ptr = 0
+      window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
+      window_batch['acts'] = 2.0 * th.rand([self.C.window, *self.action_space.shape]).to(self.C.device) - 1.0
+      window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
+      for self.ptr in range(20):
+        window_batch = self.model.onestep(window_batch, self.ptr, temp=1.0)
+      window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
+      self.ptr = 9
+      self.window_batch = window_batch
+      return {key: val[:, self.ptr] for key, val in window_batch.items() if key in self.keys}
 
   def step(self, act):
-    self.window_batch['acts'][:,self.ptr] = th.as_tensor(act).to(self.C.device)
-    self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=1.0)
-    obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
-    if self.ptr == self.C.window - 2:
-      self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
-    self.ptr = min(1 + self.ptr, self.C.window - 2)
-    return obs, 0, False, {}
+    with th.no_grad():
+      self.window_batch['acts'][:,self.ptr] = th.as_tensor(act).to(self.C.device)
+      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=1.0)
+      obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
+      if self.ptr == self.C.window - 2:
+        self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
+      self.ptr = min(1 + self.ptr, self.C.window - 2)
+      jreturn obs, 0, False, {}
 
   def make_prompt(self):
     pass

@@ -250,10 +250,10 @@ class ActorCritic(nn.Module):
   def act(self, obs, deterministic=False):
     with th.no_grad():
       a, _, ainfo = self.pi(obs, deterministic, False)
-      return a.cpu().numpy()
+      return a#.cpu().numpy()
 
   def value(self, obs, act):
     with th.no_grad():
       q1 = self.q1(obs, act)
       q2 = self.q1(obs, act)
-      return ((q1 + q2) / 2).cpu().numpy()
+      return ((q1 + q2) / 2)#.cpu().numpy()

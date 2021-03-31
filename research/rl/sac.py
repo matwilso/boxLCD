@@ -191,7 +191,7 @@ def sac(C):
         p_targ.data.add_((1 - C.polyak) * p.data)
 
   def get_action(o, deterministic=False):
-    o = {key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}
+    o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
     return ac.act(o, deterministic)
 
   def get_action_val(o, deterministic=False):
