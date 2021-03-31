@@ -1,6 +1,5 @@
 import uuid
 from sys import maxsize
-from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter

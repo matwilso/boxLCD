@@ -2,17 +2,13 @@ import yaml
 import sys
 from collections import defaultdict
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
-
 import matplotlib.pyplot as plt
-import torch as torchvision
 from torch.optim import Adam
-from itertools import chain, count
 import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
+from nets.common import Block, BinaryHead
 import utils
 from nets.statevq import SVAE
 
@@ -182,8 +178,8 @@ class FlatEverything(nn.Module):
     acts = np.array(acts)
     acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
     prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
-    ## dupe
-    #for key in prompts:
+    # dupe
+    # for key in prompts:
     #  prompts[key][4:] = prompts[key][4:5]
     acts[4:] = acts[4:5]
     prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
@@ -205,7 +201,7 @@ class FlatEverything(nn.Module):
       for jj in range(shape[1]):
         col += [self.env.reset(pstate=pstate_samp[ii, jj])['lcd']]
       imgs += [col]
-    pstate_img = 1.0*np.array(imgs)[:, :, None]
+    pstate_img = 1.0 * np.array(imgs)[:, :, None]
     error = (pstate_img - real_lcd + 1.0) / 2.0
     blank = np.zeros_like(real_lcd)[..., :1, :]
     out = np.concatenate([real_lcd, blank, pstate_img, blank, error], 3)

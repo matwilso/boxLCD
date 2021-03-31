@@ -1,6 +1,5 @@
 import time
 import copy
-from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -32,7 +31,6 @@ class Trainer:
     #    'bs': C.bs,
     #})
     self.logger = utils.dump_logger({}, self.writer, 0, C)
-    self.tvenv = SyncVectorEnv([env_fn(C, 0 + i) for i in range(C.num_envs)], C=C)  # test vector env
     self.env = env
     self.model = model
     self.num_vars = utils.count_vars(self.model)

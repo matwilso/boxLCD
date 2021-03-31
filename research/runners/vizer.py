@@ -2,7 +2,6 @@ import time
 from collections import defaultdict
 import pyglet
 import copy
-from sync_vector_env import SyncVectorEnv
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter

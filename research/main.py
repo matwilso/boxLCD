@@ -1,6 +1,3 @@
-from research.nets.flat_everything import FlatEverything
-from research.nets.statevq import SVAE
-from research.nets.multistep import Multistep
 from tqdm import tqdm
 import yaml
 import time
@@ -21,9 +18,13 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 from boxLCD import env_map
 import utils
 import runners
-from nets.combined import Combined
-from nets.flatimage import FlatImageTransformer
-from nets.vae import VAE
+from research.nets.flat_everything import FlatEverything
+from research.nets.flatimage import FlatImageTransformer
+from research.nets.statevq import SVAE
+from research.nets.multistep import Multistep
+from research.nets.vae import VAE
+from research.nets.combined import Combined
+
 import data
 
 if __name__ == '__main__':
