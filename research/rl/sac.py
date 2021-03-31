@@ -20,38 +20,38 @@ from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 from buffers import OGRB, ReplayBuffer
 from sacnets import ActorCritic
-from research.define_config import config, args_type
+from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
 import boxLCD
 from research import utils
 from async_vector_env import AsyncVectorEnv
 from research.wrappers import RewardGoalEnv
+from research.learned_env import LearnedEnv, RewardLenv
+from research.nets.flat_everything import FlatEverything
 
 def sac(C):
   print(C.full_cmd)
   # th.manual_seed(C.seed)
   # np.random.seed(C.seed)
 
-  def env_fn(C, seed=None):
-    def _thunk():
-      env = env_map[C.env](C)
-      if seed is not None:
-        env.seed(seed)
-      env = RewardGoalEnv(env, C)
-      return env
-    return _thunk
-
   # Set up logger and save configuration
   logger = defaultdict(lambda: [])
   writer = SummaryWriter(C.logdir)
-  env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
-  TN = 4
-  tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
-  #env = env_fn(C, C.seed)()
   tenv = env_fn(C, C.seed)()  # test env
-  #tenv.reset()
   obs_space = tenv.observation_space
   act_space = tenv.action_space
+  TN = 4
+  if C.lenv:
+    MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
+    model = FlatEverything(tenv, MC)
+    env = RewardLenv(LearnedEnv(C.num_envs, model, C), C)
+    tvenv = RewardLenv(LearnedEnv(TN, model, C), C)
+    obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
+  else:
+    env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+    tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
+
+  #tenv.reset()
   epoch = -1
 
   # Create actor-critic module and target networks
@@ -196,7 +196,7 @@ def sac(C):
 
   def get_action_val(o, deterministic=False):
     with th.no_grad():
-      o = {key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}
+      o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
       a, _, ainfo = ac.pi(o, deterministic, False)
       q = ac.value(o, a)
     return a.cpu().numpy(), q
@@ -204,7 +204,8 @@ def sac(C):
   def test_agent():
     frames = []
     REP = 4
-    o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+    o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
+    #o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
@@ -212,37 +213,40 @@ def sac(C):
       if C.net == 'vae':
         R = ac.comp_rew({key: th.as_tensor(val.astype(np.float32), dtype=th.float32).to(C.device) for key, val in o.items()}) 
       else:
-        R = np.zeros_like(r)
+        R = th.zeros_like(r)
+        #R = np.zeros_like(r)
       ep_ret += r
       ep_len += 1
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
       frame = delta
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
-      frame = frame.repeat(REP, 1).repeat(REP, 2)[..., None].repeat(3, -1)
-      frame = frame.transpose(1, 0, 2, 3).reshape([C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
-      for k in range(TN):
-        frame[:,k*REP*C.lcd_w] = 0.0
-      pframe = Image.fromarray((frame * 255).astype(np.uint8))
-      # get a drawing context
-      draw = ImageDraw.Draw(pframe)
-      fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
-      for j in range(TN):
-        color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
-        draw.text((C.lcd_w*REP*j + 10, 10), f'r: {r[j]:.2f} R: {R[j]:.2f}', fill=color, fnt=fnt)
-      frames += [np.array(pframe)]
-    
-    if len(frames) != 0:
-      vid = np.stack(frames)
-      vid_tensor = vid.transpose(0, 3, 1, 2)[None]
-      utils.add_video(writer, f'rollout', vid_tensor, epoch, fps=C.fps)
-      frames = []
-      print('wrote video')
+      frames += [frame]
+
+    frames = th.stack(frames)
+    frames = frames.cpu().numpy()
+    frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
+    frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
+    for k in range(TN):
+      frames[:,:,k*REP*C.lcd_w] = 0.0
+    # TODO: add drawing back
+    #pframe = Image.fromarray((frame * 255).astype(np.uint8))
+    ## get a drawing context
+    #draw = ImageDraw.Draw(pframe)
+    #fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
+    #for j in range(TN):
+    #  color = (255, 255, 50) if d[j] and i != C.ep_len-1 else (255, 255, 255)
+    #  draw.text((C.lcd_w*REP*j + 10, 10), f'r: {r[j]:.2f} R: {R[j]:.2f}', fill=color, fnt=fnt)
+    #frames += [np.array(pframe)]
+    vid = frames.transpose(0, -1, 1, 2)[None]
+    utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
+    print('wrote video')
   test_agent()
 
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
-  o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
+  o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), th.zeros(C.num_envs).to(C.device), th.zeros(C.num_envs).to(C.device)
+  #o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
   # Main loop: collect experience in venv and update/log each epoch
   for t in range(total_steps):
     # Until start_steps have elapsed, randomly sample actions
@@ -278,17 +282,19 @@ def sac(C):
     o = o2
 
     # End of trajectory handling
-    done = np.logical_or(d, ep_len == C.ep_len)
-    dixs = np.nonzero(done)[0]
+    done = th.logical_or(d, ep_len == C.ep_len)
+    dixs = th.nonzero(done)
+    #done = np.logical_or(d, ep_len == C.ep_len)
+    #dixs = np.nonzero(done)[0]
     for idx in dixs:
-      logger['EpRet'] += [ep_ret[idx]]
-      logger['EpLen'] += [ep_len[idx]]
+      logger['EpRet'] += [ep_ret[idx].cpu()]
+      logger['EpLen'] += [ep_len[idx].cpu()]
       ep_ret[idx] = 0
       ep_len[idx] = 0
-      logger['success_rate'] += [d[idx]]
+      logger['success_rate'] += [d[idx].cpu()]
     if len(dixs) != 0:
       o = env.reset(dixs)
-      assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
+      #assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
       #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
     # Update handling
@@ -367,11 +373,11 @@ _C.update_every = 40
 _C.start_steps = 1000
 _C.update_after = 1000
 _C.use_done = 0
-_C.state_rew = 1
 _C.vae_rew = 0
 _C.net = 'mlp'
 _C.zdelta = 1
-_C.rew_scale = 1.0
+_C.lenv = 0
+_C.lenv_mode = 'swap'
 
 if __name__ == '__main__':
   import argparse
@@ -384,6 +390,7 @@ if __name__ == '__main__':
   # grab defaults from the env
   Env = env_map[tempC.env]
   parser.set_defaults(**Env.ENV_DC)
+  parser.set_defaults(**{'goals': 1})
   C = parser.parse_args()
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base

@@ -25,22 +25,16 @@ class RewardGoalEnv:
   @property
   def observation_space(self):
    base_space = self._env.observation_space
-   base_space.spaces['history'] = copy.deepcopy(base_space.spaces['lcd'])
-   base_space.spaces['history'].shape = (4,)+base_space.spaces['history'].shape
    base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
    base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
    return base_space
 
   def reset(self, *args, **kwargs):
-    self._env.seed(0)
     self.goal = self._env.reset()
-    self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
-    self.history = obs['lcd'][None].repeat(4, 0)
-    obs['history'] = np.array(self.history)
     return obs
 
   def simi2rew(self, similarity):
@@ -57,12 +51,8 @@ class RewardGoalEnv:
   def render(self, *args, **kwargs):
     self._env.render(*args, **kwargs)
 
-  def step(self, action):
-    obs, rew, done, info = self._env.step(action)
-    obs['goal:lcd'] = np.array(self.goal['lcd'])
-    obs['goal:pstate'] = np.array(self.goal['pstate'])
-    self.history = np.concatenate([self.history[1:], obs['lcd'][None]])
-
+  def comp_rew_done(self, obs, info={}):
+    done = False
     if self.C.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
       keys = utils.filtlist(self._env.obs_keys, '.*(x|y):p')
@@ -82,9 +72,17 @@ class RewardGoalEnv:
         rew = 0
         #done = False
         done = True
+    return rew, done
+
+  def step(self, action):
+    obs, rew, done, info = self._env.step(action)
+    obs['goal:lcd'] = np.array(self.goal['lcd'])
+    obs['goal:pstate'] = np.array(self.goal['pstate'])
+
+    rew, done = self.comp_rew_done(obs, info)
+
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
-    obs['history'] = np.array(self.history)
     rew = rew * self.C.rew_scale
     return obs, rew, done, info
 

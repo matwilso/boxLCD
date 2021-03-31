@@ -1,4 +1,5 @@
 import argparse
+from research.wrappers import RewardGoalEnv
 import subprocess
 import sys
 import pathlib
@@ -11,6 +12,8 @@ def env_fn(C, seed=None):
   def _make():
     env = env_map[C.env](C)
     env.seed(seed)
+    if C.goals:
+      env = RewardGoalEnv(env, C)
     return env
   return _make
 
@@ -70,6 +73,9 @@ def config():
   C.seed = 0
 
   C.env = 'Dropbox'
+  C.goals = 0
+  C.state_rew = 1
+  C.rew_scale = 1.0
 
   # extra info that we set here for convenience and don't modify 
   C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

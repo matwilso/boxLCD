@@ -32,6 +32,8 @@ class AutoEnv:
     self.tot_count = 0
     obses = {key: [] for key in self.env.observation_space.spaces}
     obs = self.env.reset()
+    self.goal_lcd = obs['goal:lcd']
+    self.goal_pstate = obs['goal:pstate']
     for key, val in obs.items():
       obses[key] += [val]
     acts = []
@@ -51,7 +53,7 @@ class AutoEnv:
       bs, lenk, *extra = val.shape
       pad = np.zeros([bs, self.C.window - lenk, *extra])
       self.window_batch[key] = np.concatenate([val, pad], 1)
-    return img, img
+    return img, img, outproc(self.goal_lcd)
 
   def step(self, act):
     self.tot_count += 1
@@ -70,7 +72,9 @@ class AutoEnv:
       #val = self.window_batch['lcd']
       #self.window_batch['lcd'] = np.concatenate([val[:,1:], val[:,:1]], axis=1)
     self.count = min(1 + self.count, self.C.window - 2)
-    return outproc(truth), outproc(pred)
+    pstate = out['pstate'][:,self.count-1][0]
+    lrew, done= self.env.comp_rew_done({'pstate': pstate.cpu().numpy(), 'goal:pstate': self.goal_pstate})
+    return outproc(truth), outproc(pred), rew, lrew, outproc(self.goal_lcd)
 
   def make_prompt(self):
     pass
@@ -155,15 +159,15 @@ class Vizer:
     a.requires_grad = True
     for i in range(10):
       o = self.look_ahead(prompto, a)
-      out = self.model.forward({'lcd': o, 'acts':a})
+      out = self.model.forward({'lcd': o, 'acts': a})
       loss = -self.model.dist_head(out).log_prob(g.flatten(-2)).mean()
       loss.backward()
-      a.grad[:,:10] = 0.0
+      a.grad[:, :10] = 0.0
       a.data.add_(-a.grad)
-      a.data.clamp_(-1,1)
+      a.data.clamp_(-1, 1)
       a.grad[:] = 0.05
-      #print(a)
-    print('delta', ((a-oa)**2).mean())
+      # print(a)
+    print('delta', ((a - oa)**2).mean())
     return o.detach().cpu().numpy()
 
   def do_goal(self):
@@ -194,13 +198,11 @@ class Vizer:
       self.render(**kwargs)
 
       if self.held_down[KEY.SPACE]:
-        traj = self.sample_traj(obses, acts, goal_lcd)[0,:,0]
+        traj = self.sample_traj(obses, acts, goal_lcd)[0, :, 0]
         for i in range(len(traj)):
           kwargs['imgs'] = [((1, 1), outproc(traj[i]))]
           #kwargs['imgs'] = [((1, 1), self.env.lcd_render(height=128, width=int(self.C.wh_ratio * 128), pretty=True))]
           self.render(**kwargs)
-
-
 
   def run(self, commands=[]):
     if isinstance(commands, str):
@@ -209,7 +211,8 @@ class Vizer:
       for key in commands:
         self.messages[key] = True  # TODO: some way to clear the buffer of past key presses
 
-    atruth, apred = self.autoenv.reset()
+    atruth, apred, goal_lcd = self.autoenv.reset()
+    rew, lrew = 0, 0
     i = 0
     lcds = []
     while True:
@@ -221,17 +224,20 @@ class Vizer:
       for j in range(len(lcds)):
         imgs += [((2 * j, 0), lcds[j][k])]
       imgs += [
-          ((0, 3), atruth),
-          ((2.1, 3), apred),
+          ((0, 2), atruth),
+          ((0, 1), apred),
+          ((0, 3), goal_lcd)
       ]
       kwargs['imgs'] = imgs
       if not self.paused:
-        atruth, apred = self.autoenv.step(self.env.action_space.sample())
-      kwargs['texts'] = [((0.5, 3.5), f'truth. {self.autoenv.tot_count}')]
+        atruth, apred, rew, lrew, goal_lcd = self.autoenv.step(self.env.action_space.sample())
+      #kwargs['texts'] = [((0.5, 3.5), f'truth. {self.autoenv.tot_count}')]
+      kwargs['texts'] = [((0.5, 1.8), f'rew. {lrew:.3f}')]
+      kwargs['texts'] += [((0.5, 2.8), f'rew. {rew:.3f}')]
 
       if self.check_message('reset'):
         print('reset')
-        atruth, apred = self.autoenv.reset()
+        atruth, apred, goal_lcd = self.autoenv.reset()
 
       if self.check_message('goal'):
         self.do_goal()
@@ -278,7 +284,7 @@ class Vizer:
     xys = []
     for xy_img in imgs:
       xy, img = xy_img
-      xy = np.array(xy) * self.C.lcd_base * self.C.wh_ratio * 8
+      xy = np.array(xy) * A[self.C.lcd_base * self.C.wh_ratio, self.C.lcd_base] * 8
       xys += [xy]
       images += [pyglet.image.ImageData(img.shape[1], img.shape[0], 'RGB', img.tobytes(), pitch=img.shape[1] * -3)]
 
@@ -289,7 +295,7 @@ class Vizer:
       images[i].blit(*xys[i])
     for xy_text in texts:
       xy, text = xy_text
-      xy = np.array(xy) * self.C.lcd_base * self.C.wh_ratio * 8
+      xy = np.array(xy) * A[self.C.lcd_base * self.C.wh_ratio, self.C.lcd_base] * 8
       label = pyglet.text.HTMLLabel(f'<font face="Times New Roman" size="{size}">{text}</font>', x=xy[0], y=xy[1], anchor_x='center', anchor_y='center')
       label.draw()
     arr = None

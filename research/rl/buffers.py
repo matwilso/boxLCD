@@ -79,14 +79,14 @@ class ReplayBuffer:
     end_idx = self.ptr + shape
     if end_idx <= self.max_size:  # normal operation
       for key in self.bufs:
-        self.bufs[key][self.ptr:end_idx] = ntrans[key]
+        self.bufs[key][self.ptr:end_idx] = ntrans[key].cpu().numpy()
       self.ptr = (self.ptr + shape) % self.max_size
     else:  # handle wrap around
       overflow = (end_idx - self.max_size)
       top_off = shape - overflow
       for key in self.bufs:
-        self.bufs[key][self.ptr:self.ptr + top_off] = ntrans[key][:top_off]  # top off the last end of the array
-        self.bufs[key][:overflow] = ntrans[key][top_off:]  # start over at beginning
+        self.bufs[key][self.ptr:self.ptr + top_off] = ntrans[key][:top_off].cpu().numpy()  # top off the last end of the array
+        self.bufs[key][:overflow] = ntrans[key][top_off:].cpu().numpy()  # start over at beginning
       self.ptr = overflow
     self.size = min(self.size + shape, self.max_size)
 

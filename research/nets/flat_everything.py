@@ -1,3 +1,4 @@
+from re import I
 import yaml
 import sys
 from collections import defaultdict
@@ -18,14 +19,15 @@ class FlatEverything(nn.Module):
     self.C = C
     self.env = env
     self.act_n = env.action_space.shape[0]
+    self.observation_space = env.observation_space
+    self.action_space = env.action_space
     self.pstate_n = env.observation_space.spaces['pstate'].shape[0]
     self.block_size = self.C.window
 
     # LOAD SVAE
-    weight_yaml = C.weightdir / 'hps.yaml'
-    with weight_yaml.open('r') as f:
-      weight_cfg = yaml.load(f, Loader=yaml.Loader)
-    self.svae = SVAE(env, weight_cfg)
+    sd = th.load(C.weightdir/'svae.pt')
+    svaeC = sd.pop('C')
+    self.svae = SVAE(env, svaeC)
     self.svae.load(C.weightdir)
     for p in self.svae.parameters():
       p.requires_grad = False
@@ -51,13 +53,19 @@ class FlatEverything(nn.Module):
 
   def save(self, dir):
     print("SAVED MODEL", dir)
-    path = dir / 'flatev.pt'
-    th.save(self.state_dict(), path)
+    path = dir / 'flatev2.pt'
+    sd = self.state_dict()
+    sd['C'] = self.C
+    th.save(sd, path)
     print(path)
+    self.svae.save(dir)
 
-  def load(self, path):
-    path = path / 'flatev.pt'
-    self.load_state_dict(th.load(path))
+  def load(self, dir):
+    path = dir / 'flatev2.pt'
+    sd = th.load(path)
+    C = sd.pop('C')
+    self.load_state_dict(sd)
+    self.svae.load(dir)
     print(f'LOADED {path}')
 
   def forward(self, batch):
@@ -108,7 +116,11 @@ class FlatEverything(nn.Module):
   def onestep(self, batch, i, temp=1.0):
     logits = self.forward(batch)
     dist = self.dist_head(logits / temp)
-    batch['lcd'][:, i] = dist.sample()[:, i]
+    sample = dist.sample()
+    batch['lcd'][:, i] = sample[:, i, :self.C.imsize].reshape(batch['lcd'][:,i].shape)
+    pstate_code = sample[:, i, self.C.imsize:]
+    pstate = self.svae.decoder(pstate_code).mean
+    batch['pstate'][:, i] = pstate
     return batch
 
   def sample(self, n, acts=None, prompts=None):

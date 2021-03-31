@@ -29,15 +29,18 @@ class SVAE(nn.Module):
   
   def save(self, dir):
     print("SAVED MODEL", dir)
-    path = dir / 'sqvae.pt'
-    th.save(self.state_dict(), path)
+    path = dir / 'svae.pt'
+    sd = self.state_dict()
+    sd['C'] = self.C
+    th.save(sd, path)
     print(path)
 
-  def load(self, path):
-    path = path / 'sqvae.pt'
-    self.load_state_dict(th.load(path))
+  def load(self, dir):
+    path = dir / 'svae.pt'
+    sd = th.load(path)
+    C = sd.pop('C')
+    self.load_state_dict(sd)
     print(f'LOADED {path}')
-
 
   def train_step(self, batch, dry=False):
     if dry:
