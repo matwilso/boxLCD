@@ -23,6 +23,7 @@ def outproc(img):
 
 class LearnedEnv:
   def __init__(self, num_envs, model, C):
+    self.num_envs = num_envs
     self.window_batch = None
     self.C = C
     self.model = model
@@ -91,7 +92,7 @@ class RewardLenv:
    return base_space
 
   def reset(self, *args, **kwargs):
-    goals = [self.real_env.reset() for _ in range(self.C.num_envs)]
+    goals = [self.real_env.reset() for _ in range(self._env.num_envs)]
     goals = tree_multimap(lambda x,*y: th.as_tensor(np.stack([x, *y])).to(self.C.device), goals[0], *goals[1:])
     self.goal = goals
     obs = self._env.reset(*args, **kwargs)

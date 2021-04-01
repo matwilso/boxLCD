@@ -246,8 +246,12 @@ def sac(C):
       draw = ImageDraw.Draw(pframe)
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
-        color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-        draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
+        if C.lenv:
+          color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
+          draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
+        else:
+          color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
+          draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j]:.2f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
