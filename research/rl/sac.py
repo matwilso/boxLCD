@@ -208,6 +208,10 @@ def sac(C):
 
   def test_agent():
     frames = []
+    if C.lenv:
+      pf = th
+    else:
+      pf = np
     REP = 4
     if C.lenv:
       o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
@@ -215,14 +219,16 @@ def sac(C):
       o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
     dones = []
     rs = []
+    all_done = pf.zeros_like(ep_ret)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
       o, r, d, info = tvenv.step(a)
+      all_done = pf.logical_or(all_done, d)
       rs += [r]
       dones += [d]
-      ep_ret += r
-      ep_len += 1
+      ep_ret += r * all_done
+      ep_len += 1 * all_done
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
       frame = delta
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
@@ -248,14 +254,20 @@ def sac(C):
       for j in range(TN):
         if C.lenv:
           color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
         else:
           color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f'r: {rs[i][j]:.2f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j]:.2f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
     utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
+    if C.lenv:
+      proc = lambda x: x.cpu()
+    else:
+      proc = lambda x: x
+    logger['test/EpRet'] += [proc(ep_ret).mean()]
+    logger['test/EpLen'] += [proc(ep_len).mean()]
     print('wrote video')
   test_agent()
 
@@ -309,16 +321,20 @@ def sac(C):
       done = np.logical_or(d, ep_len == C.ep_len)
       dixs = np.nonzero(done)[0]
       proc = lambda x: x
-    for idx in dixs:
-      logger['EpRet'] += [proc(ep_ret[idx])]
-      logger['EpLen'] += [proc(ep_len[idx])]
-      ep_ret[idx] = 0
-      ep_len[idx] = 0
-      logger['success_rate'] += [proc(d[idx])]
-    if len(dixs) != 0:
-      o = env.reset(dixs)
-      #assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
-      #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
+    if not C.lenv or len(dixs) == C.num_envs:
+      for idx in dixs:
+        logger['EpRet'] += [proc(ep_ret[idx])]
+        logger['EpLen'] += [proc(ep_len[idx])]
+        ep_ret[idx] = 0
+        ep_len[idx] = 0
+        logger['success_rate'] += [proc(d[idx])]
+      if len(dixs) != 0:
+        o = env.reset(dixs)
+        if C.lenv:
+          assert len(dixs) == C.num_envs, "the learned env needs the envs to be in sync in terms of history.  you can't easily reset one without resetting the others. it's hard"
+        else:
+          assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
+        #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
     # Update handling
     if t >= C.update_after and t % C.update_every == 0:
@@ -402,7 +418,7 @@ _C.zdelta = 1
 _C.lenv = 0
 _C.lenv_mode = 'swap'
 _C.lenv_temp = 1.0
-_C.reset_prompt = 1
+_C.reset_prompt = 0 
 
 if __name__ == '__main__':
   import argparse

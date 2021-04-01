@@ -26,8 +26,8 @@ class RewardLenv:
     self.lenv = env
     self.SCALE = 2
     self.C = env.C
-    self.real_env = env_fn(self.C)()._env
-    #self.real_env = self.lenv.real_env
+    #self.real_env = env_fn(self.C)()._env
+    self.real_env = self.lenv.real_env
     self.obs_keys = self.lenv.obs_keys
 
   @property
