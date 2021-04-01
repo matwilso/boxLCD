@@ -227,7 +227,7 @@ def sac(C):
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
-      if not use_lenv:
+      if not use_lenv and C.lenv:
         a = a.cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
