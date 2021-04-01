@@ -227,8 +227,8 @@ def sac(C):
       all_done = pf.logical_or(all_done, d)
       rs += [r]
       dones += [d]
-      ep_ret += r * all_done
-      ep_len += 1 * all_done
+      ep_ret += r * ~all_done
+      ep_len += 1 * ~all_done
       delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
       frame = delta
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
