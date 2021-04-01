@@ -260,19 +260,19 @@ def sac(C):
       for j in range(TN):
         if use_lenv:
           color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
         else:
           color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j]:.2f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j]:.3f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
-    utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
+    prefix = 'learned' if use_lenv else 'real'
+    utils.add_video(writer, f'{prefix}_rollout', vid, epoch, fps=C.fps)
     if use_lenv:
       proc = lambda x: x.detach().cpu()
     else:
       proc = lambda x: x
-    prefix = 'learned' if use_lenv else 'real'
     logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
     logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
     print('wrote video', prefix)

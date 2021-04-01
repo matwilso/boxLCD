@@ -67,6 +67,11 @@ elif [ $1 == 9 ]; then
 
     $args --logdir=logs/rl/image_based/vae_b0.1_bs512 --learned_alpha=0 --lr=3e-4 --alpha=0.2 --bs=512 --weightdir=logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/ --vae_rew=0
 
+
+elif [ $1 == 10 ]; then
+ python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatev --state_rew=1 --net=mlp --weightdir=logs/flatev/100window/smallnet_bs32_8e-4_fix/ --window=100 --goals=1 --num_envs=8 --lenv=1 --logdir=logs/rl/lenv/temp0.1 --lenv_temp=0.1 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=5e-4 --reset_prompt=0
 else
     echo "null"
 fi
+
+
