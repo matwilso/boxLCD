@@ -26,7 +26,7 @@ import boxLCD
 from research import utils
 from async_vector_env import AsyncVectorEnv
 from research.wrappers import RewardGoalEnv
-from research.learned_env import LearnedEnv
+from research.learned_env import LearnedEnv, RewardLenv
 from research.nets.flat_everything import FlatEverything
 
 def sac(C):
@@ -44,8 +44,8 @@ def sac(C):
   if C.lenv:
     MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
     model = FlatEverything(tenv, MC)
-    env = LearnedEnv(C.num_envs, model, C)
-    tvenv = LearnedEnv(TN, model, C)
+    env = RewardLenv(LearnedEnv(C.num_envs, model, C))
+    tvenv = RewardLenv(LearnedEnv(TN, model, C))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
   else:
     env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
@@ -402,6 +402,7 @@ _C.zdelta = 1
 _C.lenv = 0
 _C.lenv_mode = 'swap'
 _C.lenv_temp = 1.0
+_C.reset_prompt = 1
 
 if __name__ == '__main__':
   import argparse
