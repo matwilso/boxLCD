@@ -21,12 +21,16 @@ from boxLCD import env_map
 def outproc(img):
   return (255 * img[..., None].repeat(3, -1)).astype(np.uint8)
 
+# TODO: add back this wrapper probably, since it makes things a bit cleaner.
+# i was wrong about something when i removed it.
 class LearnedEnv:
   def __init__(self, num_envs, model, C):
     self.num_envs = num_envs
     self.window_batch = None
     self.C = C
     self.model = model
+    self.real_env = env_fn(C)()
+    self.obs_keys = self.real_env._env.obs_keys
     self.model.load(C.weightdir)
     self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
     self.model.eval()
@@ -39,69 +43,66 @@ class LearnedEnv:
 
     spaces = {}
     self.keys = ['lcd', 'pstate']
-    for key, val in model.observation_space.spaces.items():
-      if key in self.keys:
-        spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
+    if C.goals:
+      self.goal_keys = ['goal:lcd', 'goal:pstate']
+      self.goal = {}
+    for key in self.keys:
+      val = self.real_env.observation_space.spaces[key]
+      spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
     self.observation_space = gym.spaces.Dict(spaces)
 
   def reset(self, *args, **kwargs):
-    with th.no_grad():
-      # TODO: add support for resetting to a specific state. like a prompt
-      # initialize and burn in
-      self.ptr = 0
-      window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
-      window_batch['acts'] = 2.0 * th.rand([self.C.window, *self.action_space.shape]).to(self.C.device) - 1.0
-      window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
-      for self.ptr in range(20):
-        window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
-      window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
-      self.ptr = 9
-      self.window_batch = window_batch
-      return {key: val[:, self.ptr] for key, val in window_batch.items() if key in self.keys}
+    if self.C.goals:
+      goals = [self.real_env.reset() for _ in range(self.num_envs)]
+      goals = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device), goals[0], *goals[1:])
+    prompts = [self.real_env.reset() for _ in range(self.num_envs)]
+    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device), prompts[0], *prompts[1:])
+    window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
+    window_batch['acts'] = th.zeros([self.C.window, *self.action_space.shape]).to(self.C.device)
+    #window_batch['acts'] = 2.0 * th.rand([self.C.window, *self.action_space.shape]).to(self.C.device) - 1.0
+    window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
+    for key in self.keys:
+      window_batch[key][:, 0] = prompts[key]
+    for key in self.goal_keys:
+      self.goal[key] = 1.0*goals[key]
+
+    self.ptr = 0
+    self.window_batch = window_batch
+    #with th.no_grad():
+    #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
+    #self.ptr += 1
+    # with th.no_grad():
+    #  # TODO: add support for resetting to a specific state. like a prompt
+    #  # initialize and burn in
+    #  for self.ptr in range(1,20):
+    #    window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
+    #  window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
+    #  self.ptr = 9
+    #  self.window_batch = window_batch
+    obs = {key: val[:, self.ptr] for key, val in window_batch.items() if key in self.keys}
+    for key in self.goal_keys:
+      obs[key] = self.goal[key].detach().clone()
+    self.ptr = 1
+    return obs
 
   def step(self, act):
     with th.no_grad():
-      self.window_batch['acts'][:,self.ptr] = th.as_tensor(act).to(self.C.device)
+      self.window_batch['acts'][:, self.ptr-1] = th.as_tensor(act).to(self.C.device)
       self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.C.lenv_temp)
       obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
-      if self.ptr == self.C.window - 2:
+      self.ptr = min(1 + self.ptr, self.C.window - 1)
+      if self.ptr == self.C.window - 1:
         self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
-      self.ptr = min(1 + self.ptr, self.C.window - 2)
-      return obs, 0, False, {}
+        self.ptr -= 1
 
-  def make_prompt(self):
-    pass
-
-class RewardLenv:
-  def __init__(self, env, C):
-    self._env = env
-    self.SCALE = 2
-    self.C = C
-    self.real_env = env_fn(C)()._env
-    self.obs_keys = self.real_env.obs_keys
-
-  @property
-  def action_space(self):
-    return self._env.action_space
-
-  @property
-  def observation_space(self):
-   base_space = self._env.observation_space
-   base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
-   base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
-   return base_space
-
-  def reset(self, *args, **kwargs):
-    goals = [self.real_env.reset() for _ in range(self._env.num_envs)]
-    goals = tree_multimap(lambda x,*y: th.as_tensor(np.stack([x, *y])).to(self.C.device), goals[0], *goals[1:])
-    self.goal = goals
-    obs = self._env.reset(*args, **kwargs)
-    obs['goal:lcd'] = self.goal['lcd']
-    obs['goal:pstate'] = self.goal['pstate']
-    return obs
-
-  def render(self, *args, **kwargs):
-    self._env.render(*args, **kwargs)
+    if self.C.goals:
+      obs['goal:lcd'] = self.goal['goal:lcd'].clone()
+      obs['goal:pstate'] = self.goal['goal:pstate'].clone()
+      rew, done = self.comp_rew_done(obs)
+      rew = rew * self.C.rew_scale
+    else:
+      rew, done = th.zeros(self.num_envs).to(self.C.device), th.zeros(self.num_envs).to(self.C.device)
+    return obs, rew, done, {}
 
   def comp_rew_done(self, obs, info={}):
     done = th.zeros(obs['lcd'].shape[0]).to(self.C.device)
@@ -109,7 +110,7 @@ class RewardLenv:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
       keys = utils.filtlist(self.obs_keys, '.*(x|y):p')
       idxs = [self.obs_keys.index(x) for x in keys]
-      delta = delta[...,idxs].mean(-1)
+      delta = delta[..., idxs].mean(-1)
       rew = -delta**0.5
       info['simi'] = delta
       rew[delta < 0.010] = 0
@@ -124,17 +125,6 @@ class RewardLenv:
         #done = False
         done = True
     return rew, done
-
-  def step(self, action):
-    obs, rew, done, info = self._env.step(action)
-    obs['goal:lcd'] = self.goal['lcd'].clone()
-    obs['goal:pstate'] = self.goal['pstate'].clone()
-    rew, done = self.comp_rew_done(obs, info)
-    rew = rew * self.C.rew_scale
-    return obs, rew, done, info
-
-  def close(self):
-      self._env.close()
 
 if __name__ == '__main__':
   from research.define_config import config, args_type, env_fn
@@ -155,13 +145,13 @@ if __name__ == '__main__':
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base
   C.imsize = C.lcd_w * C.lcd_h
+  C.lenv_temp = 1.0
 
   env = env_fn(C)()
 
   MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
   model = FlatEverything(env, MC)
   lenv = LearnedEnv(C.num_envs, model, C)
-  lenv = RewardLenv(lenv, C)
   obs = lenv.reset()
   start = time.time()
   lcds = [obs['lcd']]
@@ -172,8 +162,8 @@ if __name__ == '__main__':
     lcds += [obs['lcd']]
     pslcds += [env.reset(pstate=obs['pstate'][0].cpu())['lcd']]
 
-  lcds = th.stack(lcds).flatten(1,2).cpu().numpy()
-  print('1', time.time()-start)
+  lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
+  print('1', time.time() - start)
   utils.write_gif('test.gif', outproc(lcds), fps=C.fps)
   utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=C.fps)
 

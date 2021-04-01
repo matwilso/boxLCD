@@ -79,7 +79,7 @@ class FlatEverything(nn.Module):
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
     x = th.cat([th.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
-
+    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.C.device), acts[:,:-1]], dim=1)
     cin = self.cond_in(acts)
     if acts.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)

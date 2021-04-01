@@ -28,6 +28,12 @@ def collect(make_env, C):
   fill_barrels(env, C.train_barrels, C.logdir/'train')
 
 def fill_barrels(env, num_barrels, logdir):
+  """Create files with:
+  BARREL_SIZE x EP_LEN x *STATE_DIMS
+  
+  o1,a1 --> o2
+  Meaning that the last action doesn't matter
+  """
   logdir.mkdir(parents=True, exist_ok=True)
   total_bar = tqdm(total=num_barrels)
   barrel_bar = tqdm(total=BARREL_SIZE)
