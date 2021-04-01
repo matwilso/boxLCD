@@ -69,7 +69,7 @@ class RewardLenv:
       delta = delta[..., idxs].mean(-1)
       rew = -delta**0.5
       info['simi'] = delta
-      rew[delta < 0.010] = 0
+      #rew[delta < 0.010] = 0
       done[delta < 0.010] = 1
     else:
       import ipdb; ipdb.set_trace()

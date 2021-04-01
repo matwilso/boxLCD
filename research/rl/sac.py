@@ -41,15 +41,16 @@ def sac(C):
   obs_space = tenv.observation_space
   act_space = tenv.action_space
   TN = 4
+  real_tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
   if C.lenv:
     MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
     model = FlatEverything(tenv, MC)
     env = RewardLenv(LearnedEnv(C.num_envs, model, C))
-    tvenv = RewardLenv(LearnedEnv(TN, model, C))
+    tvenv = learned_tvenv = RewardLenv(LearnedEnv(TN, model, C))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
   else:
     env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
-    tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
+    tvenv = real_tvenv
 
   #tenv.reset()
   epoch = -1
@@ -206,24 +207,29 @@ def sac(C):
       a = a.cpu().numpy()
     return a, q
 
-  def test_agent():
-    frames = []
-    if C.lenv:
+  def test_agent(use_lenv=False):
+    # init
+    REP = 4
+    if use_lenv:
       pf = th
+      _env = learned_tvenv
+      o, ep_ret, ep_len = _env.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
     else:
       pf = np
-    REP = 4
-    if C.lenv:
-      o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
-    else:
-      o, ep_ret, ep_len = tvenv.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+      _env = real_tvenv
+      o, ep_ret, ep_len = _env.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+
+    # run
+    frames = []
     dones = []
     rs = []
     all_done = pf.zeros_like(ep_ret)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
-      o, r, d, info = tvenv.step(a)
+      if not use_lenv:
+        a = a.cpu().numpy()
+      o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
       rs += [r]
       dones += [d]
@@ -234,7 +240,7 @@ def sac(C):
       #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
       frames += [frame]
 
-    if C.lenv:
+    if use_lenv:
       frames = th.stack(frames)
       frames = frames.cpu().numpy()
     else:
@@ -252,7 +258,7 @@ def sac(C):
       draw = ImageDraw.Draw(pframe)
       fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
       for j in range(TN):
-        if C.lenv:
+        if use_lenv:
           color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
           draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j].cpu().numpy():.2f}', fill=color, fnt=fnt)
         else:
@@ -262,14 +268,16 @@ def sac(C):
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
     utils.add_video(writer, f'rollout', vid, epoch, fps=C.fps)
-    if C.lenv:
-      proc = lambda x: x.cpu()
+    if use_lenv:
+      proc = lambda x: x.detach().cpu()
     else:
       proc = lambda x: x
-    logger['test/EpRet'] += [proc(ep_ret).mean()]
-    logger['test/EpLen'] += [proc(ep_len).mean()]
-    print('wrote video')
+    prefix = 'learned' if use_lenv else 'real'
+    logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
+    logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
+    print('wrote video', prefix)
   test_agent()
+  if C.lenv: test_agent(use_lenv=True)
 
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
@@ -358,6 +366,7 @@ def sac(C):
       # Test the performance of the deterministic version of the agent.
       if epoch % 1 == 0:
         test_agent()
+        if C.lenv: test_agent(use_lenv=True)
 
         if C.net == 'vae':
           test_batch = replay_buffer.sample_batch(8)
