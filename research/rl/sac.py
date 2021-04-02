@@ -25,7 +25,7 @@ from boxLCD import env_map
 import boxLCD
 from research import utils
 from async_vector_env import AsyncVectorEnv
-from research.wrappers import RewardGoalEnv
+from research.wrappers.state_goal_env import StateGoalEnv
 from research.learned_env import LearnedEnv, RewardLenv
 from research.nets.flat_everything import FlatEverything
 
@@ -329,7 +329,8 @@ def sac(C):
       done = np.logical_or(d, ep_len == C.ep_len)
       dixs = np.nonzero(done)[0]
       proc = lambda x: x
-    if not C.lenv or len(dixs) == C.num_envs:
+    if len(dixs) == C.num_envs:
+    #if not C.lenv or len(dixs) == C.num_envs:
       for idx in dixs:
         logger['EpRet'] += [proc(ep_ret[idx])]
         logger['EpLen'] += [proc(ep_len[idx])]

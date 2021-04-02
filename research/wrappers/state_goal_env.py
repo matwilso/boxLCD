@@ -12,7 +12,7 @@ from gym.utils import seeding, EzPickle
 from research import utils
 
 
-class RewardGoalEnv:
+class StateGoalEnv:
   def __init__(self, env, C):
     self._env = env
     self.SCALE = 2
@@ -55,8 +55,8 @@ class RewardGoalEnv:
     done = False
     if self.C.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
-      keys = utils.filtlist(self._env.obs_keys, '.*(x|y):p')
-      idxs = [self._env.obs_keys.index(x) for x in keys]
+      keys = utils.filtlist(self._env.pobs_keys, '.*(x|y):p')
+      idxs = [self._env.pobs_keys.index(x) for x in keys]
       delta = delta[idxs].mean()
       rew = -delta**0.5
       info['simi'] = delta
@@ -78,9 +78,8 @@ class RewardGoalEnv:
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
-
-    rew, done = self.comp_rew_done(obs, info)
-
+    rew, _done = self.comp_rew_done(obs, info)
+    done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
     rew = rew * self.C.rew_scale
@@ -91,44 +90,48 @@ class RewardGoalEnv:
 
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
-  from boxLCD.envs import Luxo
+  from boxLCD import envs
   import utils
   from rl.sacnets import ActorCritic
   import torch as th
   import pathlib
   import time
   C = utils.AttrDict()
-  C.state_rew = 1
-  C.net = 'vae'
-  C.nfilter = 128
-  C.hidden_size = 128
-  C.learned_alpha = 0
-  C.alpha = 0.2
+  C.env = 'UrchinCube'
+  C.state_rew = 0
   C.device = 'cpu'
   C.lcd_h = 16
   C.lcd_w = 32
   C.wh_ratio = 2.0
   C.lr = 1e-3
-  #C.weightdir = pathlib.Path('logs/vaes/x2_beta0.5_1e-3_bigger128_bs32/')
-  #C.weightdir = pathlib.Path('logs/vaes/carb/x2_beta0.1_1e-3_bigger128_bs32/')
-  C.weightdir = pathlib.Path('logs/vaes/x2_beta1.0_1e-3_bigger128_bs32/')
   #C.lcd_base = 32
   C.rew_scale = 1.0
-  env = Luxo(C)
-  env = RewardGoalEnv(env, C)
+  env = envs.UrchinCube(C)
+  C.fps = env.C.fps
+  env = StateGoalEnv(env, C)
   print(env.observation_space, env.action_space)
-  env.reset()
-  ac = ActorCritic(env.observation_space, env.action_space, C=C).to(C.device)
+  obs = env.reset()
+  lcds = [obs['lcd']]
+  glcds = [obs['goal:lcd']]
+  rews = []
   while True:
     env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
-    o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
-    r = ac.comp_rew(o)
-    print(rew, info['simi'], r)
-    time.sleep(0.1)
+    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
+    lcds += [obs['lcd']]
+    glcds += [obs['goal:lcd']]
+    rews += [rew]
     #plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:
       break
+
+  def outproc(img):
+    return (255 * img[..., None].repeat(3, -1)).astype(np.uint8)
+  lcds = np.stack(lcds)
+  glcds = np.stack(glcds)
+  lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
+  utils.write_gif('test.gif', outproc(lcds), fps=C.fps)
+
 

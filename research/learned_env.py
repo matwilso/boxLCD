@@ -28,7 +28,7 @@ class RewardLenv:
     self.C = env.C
     #self.real_env = env_fn(self.C)()._env
     self.real_env = self.lenv.real_env
-    self.obs_keys = self.lenv.obs_keys
+    self.pobs_keys = self.lenv.pobs_keys
 
   @property
   def action_space(self):
@@ -64,8 +64,8 @@ class RewardLenv:
     done = th.zeros(obs['lcd'].shape[0]).to(self.C.device)
     if self.C.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
-      keys = utils.filtlist(self.obs_keys, '.*(x|y):p')
-      idxs = [self.obs_keys.index(x) for x in keys]
+      keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
+      idxs = [self.pobs_keys.index(x) for x in keys]
       delta = delta[..., idxs].mean(-1)
       rew = -delta**0.5
       info['simi'] = delta

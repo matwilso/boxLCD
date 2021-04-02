@@ -1,5 +1,5 @@
 import argparse
-from research.wrappers import RewardGoalEnv
+from research.wrappers.state_goal_env import StateGoalEnv
 import subprocess
 import sys
 import pathlib
@@ -13,7 +13,7 @@ def env_fn(C, seed=None):
     env = env_map[C.env](C)
     env.seed(seed)
     if C.goals:
-      env = RewardGoalEnv(env, C)
+      env = StateGoalEnv(env, C)
     return env
   return _make
 

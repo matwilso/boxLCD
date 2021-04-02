@@ -77,5 +77,15 @@ class LuxoBall(WorldEnv):
     super().__init__(w, C)
 
 
+@cc(wh_ratio=2.0)
+class UrchinCube(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1, friction=1.0) for i in range(1)])
+    super().__init__(w, C)
 
+@cc(wh_ratio=2.0)
+class LuxoCube(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(1)])
+    super().__init__(w, C)
 
