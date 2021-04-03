@@ -29,6 +29,7 @@ class RewardLenv:
     #self.real_env = env_fn(self.C)()._env
     self.real_env = self.lenv.real_env
     self.pobs_keys = self.lenv.pobs_keys
+    self.obs_keys = self.lenv.obs_keys
 
   @property
   def action_space(self):
@@ -93,6 +94,7 @@ class LearnedEnv:
     self.model = model
     self.real_env = env_fn(C)()
     self.obs_keys = self.real_env._env.obs_keys
+    self.pobs_keys = self.real_env._env.pobs_keys
     self.model.load(C.weightdir)
     self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
     self.model.eval()

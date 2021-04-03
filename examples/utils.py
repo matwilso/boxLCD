@@ -82,7 +82,7 @@ def dump_logger(logger, writer, i, C):
   print(C.num_vars)
   pathlib.Path(C.logdir).mkdir(parents=True, exist_ok=True)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(dict(C), f)
+    yaml.dump(dict(C), f, width=1000)
   print('=' * 30)
   return defaultdict(lambda: [])
 

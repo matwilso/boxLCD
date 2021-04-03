@@ -1,5 +1,5 @@
 import argparse
-from research.wrappers.state_goal_env import StateGoalEnv
+from research import wrappers
 import subprocess
 import sys
 import pathlib
@@ -13,7 +13,10 @@ def env_fn(C, seed=None):
     env = env_map[C.env](C)
     env.seed(seed)
     if C.goals:
-      env = StateGoalEnv(env, C)
+      if C.env not in ['UrchinCube', 'LuxoCube']:
+        env = wrappers.StateGoalEnv(env, C)
+      else:
+        env = wrappers.CubeGoal(env, C)
     return env
   return _make
 

@@ -113,7 +113,7 @@ class QFunction(nn.Module):
     super().__init__()
     H = C.hidden_size
     self.C = C
-    size = obs_space['pstate'].shape[0] * 2 + act_dim
+    size = obs_space[self.C.state_key].shape[0] + obs_space['goal:' + self.C.state_key].shape[0] + act_dim
     if self.C.net == 'mlp':
       self.base = BaseMLP(size, 1, C)
     elif self.C.net == 'cmlp':
@@ -142,10 +142,10 @@ class QFunction(nn.Module):
 
   def forward(self, obs, act):
     if self.C.net == 'mlp':
-      x = th.cat([obs['pstate'], obs['goal:pstate'], act], -1)
+      x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key], act], -1)
       return self.base(x).squeeze(-1)
     elif self.C.net == 'vae':
-      x = self.preproc.encoder(obs['lcd'][:,None]).mean
+      x = self.preproc.encoder(obs['lcd'][:, None]).mean
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
       x = self.act_head(x)
@@ -161,7 +161,8 @@ class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, C, preproc=None):
     super().__init__()
     self.C = C
-    size = obs_space['pstate'].shape[0] * 2
+    size = obs_space[self.C.state_key].shape[0] + obs_space['goal:' + self.C.state_key].shape[0]
+    self.size = size
     if self.C.net == 'mlp':
       self.net = BaseMLP(size, 2 * act_dim, C)
     elif self.C.net == 'cmlp':
@@ -177,15 +178,15 @@ class SquashedGaussianActor(nn.Module):
           nn.ReLU(),
           nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
-          nn.Linear(C.hidden_size, 2*act_dim),
+          nn.Linear(C.hidden_size, 2 * act_dim),
       )
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
-      obs = th.cat([obs['pstate'], obs['goal:pstate']], -1)
+      obs = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
     if self.C.net == 'vae':
-      obs = self.preproc.encoder.forward(obs['lcd'][:,None]).mean
+      obs = self.preproc.encoder.forward(obs['lcd'][:, None]).mean
     net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
@@ -237,15 +238,15 @@ class ActorCritic(nn.Module):
     self.C = C
 
   def comp_rew(self, batch):
-    zo = self.preproc.encoder(batch['lcd'][:,None]).mean
-    zg = self.preproc.encoder(batch['goal:lcd'][:,None]).mean
-    cosine_dist = (zo*zg).sum(dim=1) / (th.linalg.norm(zo, dim=1)*th.linalg.norm(zg, dim=1))
+    zo = self.preproc.encoder(batch['lcd'][:, None]).mean
+    zg = self.preproc.encoder(batch['goal:lcd'][:, None]).mean
+    cosine_dist = (zo * zg).sum(dim=1) / (th.linalg.norm(zo, dim=1) * th.linalg.norm(zg, dim=1))
     ang_dist = th.zeros_like(cosine_dist)
-    ang_dist = th.where(cosine_dist != 1.0, th.acos(cosine_dist)/np.pi, cosine_dist)
+    ang_dist = th.where(cosine_dist != 1.0, th.acos(cosine_dist) / np.pi, cosine_dist)
     if th.isnan(ang_dist).any():
       import ipdb; ipdb.set_trace()
     return -ang_dist**2 * self.C.rew_scale
-    #return -th.linalg.norm(zo-zg, dim=1) / self.C.rew_scale
+    # return -th.linalg.norm(zo-zg, dim=1) / self.C.rew_scale
 
   def act(self, obs, deterministic=False):
     with th.no_grad():

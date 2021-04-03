@@ -41,7 +41,7 @@ def dump_logger(logger, writer, i, C):
   print(C.full_cmd)
   print(C.num_vars)
   with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(C, f)
+    yaml.dump(C, f, width=1000)
   print('=' * 30)
   return defaultdict(lambda: [])
 

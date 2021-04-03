@@ -25,7 +25,7 @@ from boxLCD import env_map
 import boxLCD
 from research import utils
 from async_vector_env import AsyncVectorEnv
-from research.wrappers.state_goal_env import StateGoalEnv
+from research import wrappers
 from research.learned_env import LearnedEnv, RewardLenv
 from research.nets.flat_everything import FlatEverything
 
@@ -130,7 +130,7 @@ def sac(C):
     return loss_pi, loss_alpha, pi_info
 
   # Set up optimizers for policy and q-function
-  q_optimizer = Adam(q_params, lr=C.lr)
+  q_optimizer = Adam(q_params, lr=C.lr, betas=(0.5, 0.999), eps=1e-5)
   pi_optimizer = Adam(ac.pi.parameters(), lr=C.lr)
   if C.learned_alpha:
     alpha_optimizer = Adam([ac.log_alpha], lr=C.alpha_lr)
@@ -329,7 +329,7 @@ def sac(C):
       done = np.logical_or(d, ep_len == C.ep_len)
       dixs = np.nonzero(done)[0]
       proc = lambda x: x
-    if len(dixs) == C.num_envs:
+    if len(dixs) == C.num_envs or (not C.lenv and C.succ_reset):
     #if not C.lenv or len(dixs) == C.num_envs:
       for idx in dixs:
         logger['EpRet'] += [proc(ep_ret[idx])]
@@ -404,7 +404,7 @@ def sac(C):
       logger = defaultdict(lambda: [])
       epoch_time = time.time()
       with open(C.logdir / 'hps.yaml', 'w') as f:
-        yaml.dump(C, f)
+        yaml.dump(C, f, width=1000)
 
 
 _C = boxLCD.utils.AttrDict()
@@ -429,6 +429,8 @@ _C.lenv = 0
 _C.lenv_mode = 'swap'
 _C.lenv_temp = 1.0
 _C.reset_prompt = 0 
+_C.succ_reset = 1 # between lenv and normal env 
+_C.state_key = 'pstate'
 
 if __name__ == '__main__':
   import argparse
