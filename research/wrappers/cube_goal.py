@@ -68,13 +68,15 @@ class CubeGoal:
   def comp_rew_done(self, obs, info={}):
     done = False
     if self.C.state_rew:
-      movement = (np.abs((obs['full_state'][self.idxs] - self.last_obs['full_state'][self.idxs])[...,0]) > 1e-4)
+      movement = (np.abs((obs['full_state'][self.idxs] - self.last_obs['full_state'][self.idxs])[..., 0]) > 1e-4)
       delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2).mean()
-      odelta = ((obs['full_state'][..., self.root_idxs] - obs['full_state'][..., self.idxs])**2)[...,0].mean()**0.5
+      odelta = ((obs['full_state'][..., self.root_idxs] - obs['full_state'][..., self.idxs])**2)[..., 0].mean()**0.5
 
       delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2)[0].mean()
       last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2)[0].mean()
-      rew = -0.1 + 100*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+      # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+      # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+      rew = 10 * (last_delta**0.5 - delta**0.5)
 
       #rew = movement
       #rew = -0.2 - delta**0.5 + 0.1*movement
@@ -86,7 +88,7 @@ class CubeGoal:
       done = False
       if delta < 0.01:
         done = True
-        rew = 0.5
+        rew += 1.0
       # if delta < 0.005:
       # done = False
     else:
@@ -157,7 +159,7 @@ if __name__ == '__main__':
     draw = ImageDraw.Draw(pframe)
     fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
     color = (255, 255, 255)
-    draw.text((10, 10), f't: {i} r: {rews[i]:.3f} d: {deltas[i]:.3f}', fill=color, fnt=fnt)
+    draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fill=color, fnt=fnt)
     dframes += [np.array(pframe)]
   dframes = np.stack(dframes)
   utils.write_video('mtest.mp4', dframes, fps=C.fps)

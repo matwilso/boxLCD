@@ -130,8 +130,8 @@ def sac(C):
     return loss_pi, loss_alpha, pi_info
 
   # Set up optimizers for policy and q-function
-  q_optimizer = Adam(q_params, lr=C.lr, betas=(0.5, 0.999), eps=1e-5)
-  pi_optimizer = Adam(ac.pi.parameters(), lr=C.lr)
+  q_optimizer = Adam(q_params, lr=C.lr, betas=(0.9, 0.999), eps=1e-8)
+  pi_optimizer = Adam(ac.pi.parameters(), lr=C.lr, betas=(0.9, 0.999), eps=1e-8)
   if C.learned_alpha:
     alpha_optimizer = Adam([ac.log_alpha], lr=C.alpha_lr)
 
@@ -260,10 +260,10 @@ def sac(C):
       for j in range(TN):
         if use_lenv:
           color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i}\nr: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
         else:
           color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r: {rs[i][j]:.3f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i}\nr: {rs[i][j]:.3f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
