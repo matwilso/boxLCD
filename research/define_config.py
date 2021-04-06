@@ -13,7 +13,7 @@ def env_fn(C, seed=None):
     env = env_map[C.env](C)
     env.seed(seed)
     if C.goals:
-      if C.env not in ['UrchinCube', 'LuxoCube']:
+      if 'Cube' not in C.env:
         env = wrappers.StateGoalEnv(env, C)
       else:
         env = wrappers.CubeGoal(env, C)

@@ -223,15 +223,18 @@ def sac(C):
     frames = []
     dones = []
     rs = []
+    qs = []
     all_done = pf.zeros_like(ep_ret)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
       if not use_lenv and C.lenv:
         a = a.cpu().numpy()
+        q = q.cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
       rs += [r]
+      qs += [q]
       dones += [d]
       ep_ret += r * ~all_done
       ep_len += 1 * ~all_done
@@ -260,10 +263,10 @@ def sac(C):
       for j in range(TN):
         if use_lenv:
           color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i}\nr: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} Q:{qs[i][j].cpu().numpy():.3f}\nr: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
         else:
           color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i}\nr: {rs[i][j]:.3f}', fill=color, fnt=fnt)
+          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} Q:{qs[i][j]:.3f}\nr: {rs[i][j]:.3f}', fill=color, fnt=fnt)
       dframes += [np.array(pframe)]
     dframes = np.stack(dframes)
     vid = dframes.transpose(0, -1, 1, 2)[None]
