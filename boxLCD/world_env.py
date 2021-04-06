@@ -301,7 +301,8 @@ class WorldEnv(gym.Env, EzPickle):
           position=pos,
           angle=angle,
           fixtures=fixture,
-          linearDamping=obj.damping,
+          linearDamping=obj.linearDamping,
+          angularDamping=obj.angularDamping,
       )
       body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       self.dynbodies[obj.name] = body
