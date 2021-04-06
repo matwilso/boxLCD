@@ -238,47 +238,52 @@ def sac(C):
       dones += [d]
       ep_ret += r * ~all_done
       ep_len += 1 * ~all_done
-      delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
-      frame = delta
-      #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
-      frames += [frame]
+      if 'lcd' in o:
+        delta = (1.0 * o['lcd'] - 1.0 * o['goal:lcd'] + 1) / 2
+        #frame = np.concatenate([1.0 * o['goal:lcd'], 1.0 * o['lcd'], delta], axis=-2)
+        frame = delta
+        frames += [frame]
+      else:
+        frames = []
 
-    if use_lenv:
-      frames = th.stack(frames)
-      frames = frames.cpu().numpy()
-    else:
-      frames = np.stack(frames)
-    frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
-    frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
-    for k in range(TN):
-      frames[:,:,k*REP*C.lcd_w] = 0.0
-
-    dframes = []
-    for i in range(len(frames)):
-      frame = frames[i]
-      pframe = Image.fromarray((frame * 255).astype(np.uint8))
-      # get a drawing context
-      draw = ImageDraw.Draw(pframe)
-      fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
-      for j in range(TN):
-        if use_lenv:
-          color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} Q:{qs[i][j].cpu().numpy():.3f}\nr: {rs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
-        else:
-          color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
-          draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} Q:{qs[i][j]:.3f}\nr: {rs[i][j]:.3f}', fill=color, fnt=fnt)
-      dframes += [np.array(pframe)]
-    dframes = np.stack(dframes)
-    vid = dframes.transpose(0, -1, 1, 2)[None]
-    prefix = 'learned' if use_lenv else 'real'
-    utils.add_video(writer, f'{prefix}_rollout', vid, epoch, fps=C.fps)
     if use_lenv:
       proc = lambda x: x.detach().cpu()
+      prefix = 'learned'
     else:
       proc = lambda x: x
+      prefix = 'real'
+    if len(frames) != 0:
+      if use_lenv:
+        frames = th.stack(frames)
+        frames = frames.cpu().numpy()
+      else:
+        frames = np.stack(frames)
+      frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
+      frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
+      for k in range(TN):
+        frames[:,:,k*REP*C.lcd_w] = 0.0
+
+      dframes = []
+      for i in range(len(frames)):
+        frame = frames[i]
+        pframe = Image.fromarray((frame * 255).astype(np.uint8))
+        # get a drawing context
+        draw = ImageDraw.Draw(pframe)
+        fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
+        for j in range(TN):
+          if use_lenv:
+            color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
+            draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+          else:
+            color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
+            draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
+        dframes += [np.array(pframe)]
+      dframes = np.stack(dframes)
+      vid = dframes.transpose(0, -1, 1, 2)[None]
+      utils.add_video(writer, f'{prefix}_rollout', vid, epoch, fps=C.fps)
+      print('wrote video', prefix)
     logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
     logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
-    print('wrote video', prefix)
   test_agent()
   if C.lenv: test_agent(use_lenv=True)
 
@@ -434,6 +439,7 @@ _C.lenv_temp = 1.0
 _C.reset_prompt = 0 
 _C.succ_reset = 1 # between lenv and normal env 
 _C.state_key = 'pstate'
+_C.diff_delt = 0
 
 if __name__ == '__main__':
   import argparse
@@ -444,9 +450,10 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   tempC = parser.parse_args()
   # grab defaults from the env
-  Env = env_map[tempC.env]
-  parser.set_defaults(**Env.ENV_DC)
-  parser.set_defaults(**{'goals': 1})
+  if tempC.env in env_map:
+    Env = env_map[tempC.env]
+    parser.set_defaults(**Env.ENV_DC)
+    parser.set_defaults(**{'goals': 1})
   C = parser.parse_args()
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base

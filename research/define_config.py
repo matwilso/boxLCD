@@ -1,3 +1,4 @@
+import gym
 import argparse
 from research import wrappers
 import subprocess
@@ -10,13 +11,18 @@ from boxLCD.utils import args_type
 
 def env_fn(C, seed=None):
   def _make():
-    env = env_map[C.env](C)
-    env.seed(seed)
-    if C.goals:
-      if 'Cube' not in C.env:
-        env = wrappers.StateGoalEnv(env, C)
-      else:
-        env = wrappers.CubeGoal(env, C)
+    if C.env in env_map:
+      env = env_map[C.env](C)
+      env.seed(seed)
+      if C.goals:
+        if 'Cube' not in C.env:
+          env = wrappers.StateGoalEnv(env, C)
+        else:
+          env = wrappers.CubeGoal(env, C)
+    else:
+      env = gym.make(C.env)
+      env = wrappers.WrappedGym(env, C)
+      env.seed(seed)
     return env
   return _make
 
@@ -52,7 +58,7 @@ def config():
   C.n_head = 4
   C.n_embed = 128
   C.hidden_size = 128
-  C.nfilter = 64
+  C.nfilter = 128
   C.vidstack = -1
   C.stacks_per_block = 32
 

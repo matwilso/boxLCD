@@ -53,12 +53,10 @@ class BaseCNN(nn.Module):
   def forward(self, obs):
     assert obs['lcd'].max().detach().cpu() <= 1.0
     s, g = obs['lcd'], obs['goal:lcd']
-    #s = self.net(s[:, None])
-    #g = self.net(g[:, None])
-    s = self.net(obs['lcd'][:, None])
+    s = self.net(s[:, None])
+    g = self.net(g[:, None])
     if self.C.zdelta:
-      x = s
-      #x = g - s
+      x = g - s
     else:
       x = th.cat([s, g], -1)
     x = self.linear(x)
@@ -84,8 +82,7 @@ class BaseCMLP(nn.Module):
     s = self.net(s.flatten(-2))
     g = self.net(g.flatten(-2))
     if self.C.zdelta:
-      x = s
-      #x = g- s
+      x = g - s
     else:
       x = th.cat([s, g], -1)
     x = self.linear(x)

@@ -35,6 +35,7 @@ class StateGoalEnv:
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
+    self.last_obs = copy.deepcopy(obs)
     return obs
 
   def simi2rew(self, similarity):
@@ -55,19 +56,25 @@ class StateGoalEnv:
     done = False
     if self.C.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
+      #keys = utils.filtlist(self._env.pobs_keys, '.*x:p')
       keys = utils.filtlist(self._env.pobs_keys, '.*(x|y):p')
       idxs = [self._env.pobs_keys.index(x) for x in keys]
       delta = delta[idxs].mean()
-      rew = -delta**0.5
-      info['simi'] = delta
+      if self.C.diff_delt:
+        last_delta = ((self.last_obs['goal:pstate'] - self.last_obs['pstate'])**2)[idxs].mean()
+        rew = -0.05 + 10*(last_delta**0.5 - delta**0.5)
+      else:
+        rew = -delta**0.5
+
+      info['delta'] = delta
       if delta < 0.010:
-        rew = 0
+        rew += 1.0
         #done = False
         done = True
     else:
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
       rew = -1 + similarity
-      info['simi'] = similarity
+      info['delta'] = similarity
       if similarity > 0.70:
         rew = 0
         #done = False
@@ -83,6 +90,7 @@ class StateGoalEnv:
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
     rew = rew * self.C.rew_scale
+    self.last_obs = copy.deepcopy(obs)
     return obs, rew, done, info
 
   def close(self):
@@ -96,9 +104,10 @@ if __name__ == '__main__':
   import torch as th
   import pathlib
   import time
+  import PIL
+  from PIL import Image, ImageDraw, ImageFont
   C = utils.AttrDict()
-  C.env = 'UrchinCube'
-  C.state_rew = 0
+  C.state_rew = 1
   C.device = 'cpu'
   C.lcd_h = 16
   C.lcd_w = 32
@@ -106,14 +115,19 @@ if __name__ == '__main__':
   C.lr = 1e-3
   #C.lcd_base = 32
   C.rew_scale = 1.0
-  env = envs.UrchinCube(C)
+  C.diff_delt = 1
+  C.env = 'Luxo'
+  env = envs.Luxo(C)
+  #C.env = 'Urchin'
+  #env = envs.Urchin(C)
   C.fps = env.C.fps
   env = StateGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   obs = env.reset()
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
-  rews = []
+  rews = [-np.inf]
+  deltas = [-np.inf]
   while True:
     env.render(mode='human')
     act = env.action_space.sample()
@@ -122,16 +136,30 @@ if __name__ == '__main__':
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     rews += [rew]
+    deltas += [info['delta']]
     #plt.imshow(obs['lcd'] != obs['goal:lcd']); plt.show()
     #plt.imshow(np.c_[obs['lcd'], obs['goal:lcd']]); plt.show()
     if done:
       break
 
   def outproc(img):
-    return (255 * img[..., None].repeat(3, -1)).astype(np.uint8)
+    return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
   lcds = np.stack(lcds)
   glcds = np.stack(glcds)
   lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
-  utils.write_gif('test.gif', outproc(lcds), fps=C.fps)
+  lcds = outproc(lcds)
+  dframes = []
+  for i in range(len(lcds)):
+    frame = lcds[i]
+    pframe = Image.fromarray(frame)
+    # get a drawing context
+    draw = ImageDraw.Draw(pframe)
+    fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
+    color = (255, 255, 255)
+    #draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fnt=fnt)
+    draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fill=color, fnt=fnt)
+    dframes += [np.array(pframe)]
+  dframes = np.stack(dframes)
+  utils.write_video('mtest.mp4', dframes, fps=C.fps)
 
 

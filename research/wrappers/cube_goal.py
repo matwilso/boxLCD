@@ -68,21 +68,14 @@ class CubeGoal:
   def comp_rew_done(self, obs, info={}):
     done = False
     if self.C.state_rew:
-      movement = (np.abs((obs['full_state'][self.idxs] - self.last_obs['full_state'][self.idxs])[..., 0]) > 1e-4)
       delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2).mean()
-      odelta = ((obs['full_state'][..., self.root_idxs] - obs['full_state'][..., self.idxs])**2)[..., 0].mean()**0.5
-
-      #delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2)[0].mean()
-      #last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2)[0].mean()
-      ## rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
-      ## rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
-      #rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
-
-      #rew = movement
-      #rew = -0.2 - delta**0.5 + 0.1*movement
-      # rew = -delta**0.5 + movement #- odelta
-      #rew = -delta**0.5 + -odelta
-      rew = -delta**0.5
+      if self.C.diff_delt:
+        last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2)[0].mean()
+        # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+        # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+        rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+      else:
+        rew = -delta**0.5
       #rew = -1.0 + 0.5*movement
       info['delta'] = delta
       done = False
