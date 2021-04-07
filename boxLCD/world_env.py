@@ -445,7 +445,8 @@ class WorldEnv(gym.Env, EzPickle):
           self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name + ':torque']))
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
     # RUN SIM STEP
-    self.b2_world.Step(1.0 / self.FPS, 6 * 30, 2 * 30)
+    self.b2_world.Step(1.0 / (self.FPS*2), 6 * 30, 2 * 30)
+    self.b2_world.Step(1.0 / (self.FPS*2), 6 * 30, 2 * 30)
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
     info = {}
