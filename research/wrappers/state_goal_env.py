@@ -30,7 +30,9 @@ class StateGoalEnv:
    return base_space
 
   def reset(self, *args, **kwargs):
+    #self._env.seed(5)
     self.goal = self._env.reset()
+    #self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])

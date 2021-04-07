@@ -42,7 +42,7 @@ class WorldEnv(gym.Env, EzPickle):
   ENV_DC.all_corners = 0  # use corner keypoint obs instead of sin+cos of theta
   ENV_DC.walls = 1  # bound the environment with walls on both sides
   ENV_DC.debug = 0
-  ENV_DC.fps = 30
+  ENV_DC.fps = 10
 
   def __init__(self, world_def, C={}):
     """

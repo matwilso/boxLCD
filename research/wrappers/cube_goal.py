@@ -39,7 +39,7 @@ class CubeGoal:
 
   def reset(self, *args, **kwargs):
     self.goal = self._env.reset()
-    for i in range(20):
+    for i in range(10):
       self.goal = self._env.step(np.zeros(self._env.action_space.shape))[0]
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
@@ -70,9 +70,10 @@ class CubeGoal:
     if self.C.state_rew:
       delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2).mean()
       if self.C.diff_delt:
-        last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2)[0].mean()
+        last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2).mean()
         # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
         # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+        #print(last_delta**0.5 - delta**0.5)
         rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
       else:
         rew = -delta**0.5
@@ -115,6 +116,8 @@ if __name__ == '__main__':
   C.lr = 1e-3
   #C.lcd_base = 32
   C.rew_scale = 1.0
+  C.diff_delt = 1 
+  C.fps = 10
   env = envs.UrchinCube(C)
   C.fps = env.C.fps
   env = CubeGoal(env, C)

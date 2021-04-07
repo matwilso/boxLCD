@@ -2,6 +2,8 @@
 
 **ENTER AT YOUR OWN RISK**
 
-These are active experiments and hacking I am doing. 
+This folder contains active experiments on models and on boxLCD components.
 
-Maybe not the best etiquette to keep this in the same repo, but it makes it easier to simultaneously use boxLCD and work on improving it.
+There are some descriptions and commands to run models, but they are unstable and subject to change.
+
+See the `common.sh` for many commands.

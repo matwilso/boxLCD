@@ -63,6 +63,7 @@ class FlatImageTransformer(nn.Module):
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
     x = th.cat([th.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
+    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.C.device), acts[:,:-1]], dim=1)
     # forward the GPT model
     if self.C.conv_io:
       x = self.custom_embed(x)
@@ -159,7 +160,12 @@ class FlatImageTransformer(nn.Module):
     acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
     prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
     # dupe
-    for key in prompts: prompts[key][4:] = prompts[key][4:5]
+    # dupe
+    for key in obses:
+      obses[key][4:] = obses[key][4:5]
+    acts = np.array(acts)
+    acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
+    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
     acts[4:] = acts[4:5]
     prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
     real_lcd = obses['lcd'][:, :, None]

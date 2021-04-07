@@ -56,6 +56,7 @@ class BaseCNN(nn.Module):
     s = self.net(s[:, None])
     g = self.net(g[:, None])
     if self.C.zdelta:
+      #x = s
       x = g - s
     else:
       x = th.cat([s, g], -1)
@@ -83,6 +84,7 @@ class BaseCMLP(nn.Module):
     g = self.net(g.flatten(-2))
     if self.C.zdelta:
       x = g - s
+      #x = s
     else:
       x = th.cat([s, g], -1)
     x = self.linear(x)
