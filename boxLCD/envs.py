@@ -85,7 +85,7 @@ class UrchinCube(WorldEnv):
     #w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.2, density=0.1, linearDamping=5.0, angularDamping=1.0) for i in range(1)])
     #w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1, friction=1.0) for i in range(1)])
 
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.3, density=0.1, linearDamping=5.0, angularDamping=1.0) for i in range(1)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1, linearDamping=5.0, angularDamping=1.0) for i in range(1)])
     super().__init__(w, C)
 
 @cc(wh_ratio=2.0)

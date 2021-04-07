@@ -14,6 +14,19 @@ Eventually we care about predictive models that are trained on real world data a
 However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-future/),
 and that small scale testbeds are very useful for making progress.
 
+
+boxLCD is meant to vary from extremely simple environments with low resolution, binarized rendering, and
+low frames per second (FPS) / frequency (Hz) for getting started, to increasingly complicated environments that push
+the frontiers more.
+
+It is designed around a skill tree, progressive difficulty setup. 
+Each step in the tree represents increased difficulty of task.
+For getting started, you begin at the base. Or if you have some specific task in mind,
+you can skip to that point in the tree and work on it.
+You can see the tree and the increasing difficulty here: TODO.
+
+(maybe include the skill tree right here. idk.)
+
 <!--
 boxLCD can be thought of as something akin to MNIST, but for learning dynamics models in robotics.
 Generating MNIST digits is not very useful and has become fairly trivial.
@@ -23,8 +36,6 @@ compared to learning models of the real world.
 But it provides a much more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
 -->
 
-boxLCD is somewhat of a minimum viable product at this point.
-It's currently useful for testing out simple generative models, but it is limited in scope.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
 
 ## Installation ‍💻
@@ -149,15 +160,20 @@ I do believe that pushing on accuracy purely will be highely correlated with use
 But in the future, we plan to expand this scope and design tasks that leverage our learned models.
 
 ### Future Features
-- goal-based envs that leverage our models
-  - maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but fully physics based
-- more robots and varied objects
 - support for scrolling (environments which do not fit on the screen all at once)
 - static environment features like ramps and walls
+- more challening robots and varied objects, which likely require higher resolution and maybe color to fully distinguish.
 - maybe multiple image channels to represent these different layers 
+- maybe something like [block dude](https://www.calculatorti.com/ti-games/ti-83-plus-ti-84-plus/mirageos/block-dude/) but fully physics based
 - envs that challenge the ability to interface with information about a scene, like descriptions of properties of multiple objects and inferring which properties describe which object
 - more formal benchmarks and bits/dim baselines
 - adding modality of sound. possibly through some pseudo-sound signal. like some simple and short waveform if the robot's limb hits the ground. for a bouncing ball, it would be a different waveform with amplitude proportional to distance from robot.
+- perhaps stochastic delays in observations and stuff like that
+- safety constraints to respect, to emulate constraints of real world (like can't be too hard on the robot or it will break)
+- more evaluations of learned simulators, like how can we leverage them (for building curriculum, specifying goals, etc.)
+- lifelong learning tasks that tests the ability to remember from episode experience how to do a task many steps later. not terminating the environment basically ever.
+- tests for temporal abstraction. if we crank up the FPS and have tasks that require longer horizon thinking, this makes it harder for single step RL to work, so it would help select for methods that do better at temporal abstraction.
+- 
 
 ![](./assets/roadmap_pic.png)
 
