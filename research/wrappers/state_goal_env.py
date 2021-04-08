@@ -30,9 +30,7 @@ class StateGoalEnv:
    return base_space
 
   def reset(self, *args, **kwargs):
-    #self._env.seed(5)
     self.goal = self._env.reset()
-    #self._env.seed()
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
@@ -69,9 +67,10 @@ class StateGoalEnv:
         rew = -delta**0.5
 
       info['delta'] = delta
-      if delta < 0.010:
+      if delta < self.C.goal_thresh:
         rew += 1.0
         #done = False
+        info['success'] = True
         done = True
     else:
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
@@ -79,6 +78,7 @@ class StateGoalEnv:
       info['delta'] = similarity
       if similarity > 0.70:
         rew = 0
+        info['success'] = True
         #done = False
         done = True
     return rew, done

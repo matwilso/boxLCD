@@ -186,6 +186,8 @@ def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), n
 def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
 # map from bounds to -1,1
 def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
+def prefix_dict(name, dict): return {name+key: dict[key] for key in dict}
+
 
 class AttrDict(dict):
   __setattr__ = dict.__setitem__

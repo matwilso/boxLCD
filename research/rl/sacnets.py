@@ -90,7 +90,6 @@ class BaseCMLP(nn.Module):
     x = self.linear(x)
     return x
 
-
 class BaseMLP(nn.Module):
   def __init__(self, in_size, out_size, C):
     super().__init__()

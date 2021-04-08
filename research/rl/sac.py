@@ -1,3 +1,4 @@
+from functools import update_wrapper
 import matplotlib.pyplot as plt
 import yaml
 from datetime import datetime
@@ -28,6 +29,7 @@ from async_vector_env import AsyncVectorEnv
 from research import wrappers
 from research.learned_env import LearnedEnv, RewardLenv
 from research.nets.flat_everything import FlatEverything
+from jax.tree_util import tree_multimap, tree_map
 
 def sac(C):
   print(C.full_cmd)
@@ -40,7 +42,7 @@ def sac(C):
   tenv = env_fn(C, C.seed)()  # test env
   obs_space = tenv.observation_space
   act_space = tenv.action_space
-  TN = 4
+  TN = 8
   real_tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
   if C.lenv:
     MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
@@ -59,7 +61,7 @@ def sac(C):
   ac = ActorCritic(tenv.observation_space, tenv.action_space, C=C).to(C.device)
   ac_targ = deepcopy(ac)
 
-  # Freeze target networks with respect to optimizers (only update via polyak averaging)
+  # Freeze target networks with respect to optimizers (only updte via polyak averaging)
   for p in ac_targ.parameters():
     p.requires_grad = False
 
@@ -179,7 +181,7 @@ def sac(C):
       p.requires_grad = True
 
     # Record things
-    logger['LossPi'] += [loss_pi.item()]
+    logger['LossPi'] += [loss_pi.detach().cpu()]
     for key in pi_info:
       logger[key] += [pi_info[key]]
 
@@ -225,6 +227,7 @@ def sac(C):
     rs = []
     qs = []
     all_done = pf.zeros_like(ep_ret)
+    success = pf.zeros_like(ep_ret)
     for i in range(C.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
@@ -233,6 +236,8 @@ def sac(C):
         q = q.cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
+      if i != (C.ep_len - 1):
+        success = pf.logical_or(success, d)
       rs += [r]
       qs += [q]
       dones += [d]
@@ -247,7 +252,7 @@ def sac(C):
         frames = []
 
     if use_lenv:
-      proc = lambda x: x.detach().cpu()
+      proc = lambda x: x.detach().cpu().float()
       prefix = 'learned'
     else:
       proc = lambda x: x
@@ -264,6 +269,8 @@ def sac(C):
         frames[:,:,k*REP*C.lcd_w] = 0.0
 
       dframes = []
+      yellow = (255, 255, 50)
+      white = (255, 255, 255)
       for i in range(len(frames)):
         frame = frames[i]
         pframe = Image.fromarray((frame * 255).astype(np.uint8))
@@ -272,11 +279,13 @@ def sac(C):
         fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
         for j in range(TN):
           if use_lenv:
-            color = (255, 255, 50) if dones[i][j].cpu().numpy() and i != C.ep_len-1 else (255, 255, 255)
+            color = yellow if dones[i][j].cpu().numpy() and i != C.ep_len-1 else white
             draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+            draw.text((C.lcd_w*REP*j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
           else:
-            color = (255, 255, 50) if dones[i][j] and i != C.ep_len-1 else (255, 255, 255)
+            color = yellow if dones[i][j] and i != C.ep_len-1 else white
             draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
+            draw.text((C.lcd_w*REP*j + 5, 5), f'{"*"*int(success[j])}', fill=yellow, fnt=fnt)
         dframes += [np.array(pframe)]
       dframes = np.stack(dframes)
       vid = dframes.transpose(0, -1, 1, 2)[None]
@@ -284,16 +293,63 @@ def sac(C):
       print('wrote video', prefix)
     logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
     logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
+    logger[f'{prefix}_test/success_rate'] += [proc(success).mean()]
   test_agent()
   if C.lenv: test_agent(use_lenv=True)
 
   # Prepare for interaction with environment
   total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
+
+  if C.lenv and C.lenv_cont_roll:
+    # TODO: try this with backpropping through stuff
+    o = env.reset(np.arange(C.num_envs))
+    for itr in itertools.count(1):
+      a = get_action(o).detach()
+      o2, rew, done, info = env.step(a)
+      batch = {'obs': o, 'act': a, 'rew': rew, 'obs2': o2, 'done': done}
+      batch = tree_map(lambda x: x.detach(), batch)
+      update(batch)
+      o = o2
+      #success = info['success']
+      #env._reset_goals(success)
+      #print(itr)
+      if itr % 200 == 0:
+        o = env.reset()
+      if itr % C.steps_per_epoch == 0:
+        test_agent()
+        if C.lenv: test_agent(use_lenv=True)
+        # Log info about epoch
+        print('=' * 30)
+        logger['var_count'] = [sum_count]
+        logger['dt'] = dt = time.time() - epoch_time
+        for key in logger:
+          val = np.mean(logger[key])
+          writer.add_scalar(key, val, itr//C.steps_per_epoch)
+          print(key, val)
+        writer.flush()
+        print('Time', time.time() - start_time)
+        print('dt', dt)
+        print(C.logdir)
+        print(C.full_cmd)
+        print('=' * 30)
+        logger = defaultdict(lambda: [])
+        epoch_time = time.time()
+        with open(C.logdir / 'hps.yaml', 'w') as f:
+          yaml.dump(C, f, width=1000)
+
+
+
   if C.lenv:
     o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), th.zeros(C.num_envs).to(C.device), th.zeros(C.num_envs).to(C.device)
+    success = th.zeros(C.num_envs).to(C.device)
+    time_to_succ = C.ep_len*th.ones(C.num_envs).to(C.device)
+    pf = th
   else:
     o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
+    success = np.zeros(C.num_envs, dtype=np.bool)
+    time_to_succ = C.ep_len*np.ones(C.num_envs)
+    pf = np
   # Main loop: collect experience in venv and update/log each epoch
   for t in range(total_steps):
     # Until start_steps have elapsed, randomly sample actions
@@ -307,7 +363,7 @@ def sac(C):
       a = env.action_space.sample()
 
     # Step the venv
-    o2, r, d, _ = env.step(a)
+    o2, r, d, info = env.step(a)
     ep_ret += r
     ep_len += 1
 
@@ -315,6 +371,9 @@ def sac(C):
     # horizon (that is, when it's an artificial terminal signal
     # that isn't based on the agent's state)
     d[ep_len == C.ep_len] = False
+    success = pf.logical_or(success, d)
+    time_to_succ = pf.minimum(time_to_succ, C.ep_len * ~success + ep_len * success)
+    #print(time_to_succ)
 
     # Store experience to replay buffer
     trans = {'act': a, 'rew': r, 'done': d}
@@ -324,7 +383,7 @@ def sac(C):
       trans[f'o2:{key}'] = o2[key]
     replay_buffer.store_n(trans)
 
-    # Super critical, easy to overlook step: make sure to update
+    # Super critical, easy to overlook step: make sure to updte
     # most recent observation!
     o = o2
 
@@ -332,7 +391,7 @@ def sac(C):
     if C.lenv:
       done = th.logical_or(d, ep_len == C.ep_len)
       dixs = th.nonzero(done)
-      proc = lambda x: x.cpu()
+      proc = lambda x: x.cpu().float()
     else:
       done = np.logical_or(d, ep_len == C.ep_len)
       dixs = np.nonzero(done)[0]
@@ -342,9 +401,14 @@ def sac(C):
       for idx in dixs:
         logger['EpRet'] += [proc(ep_ret[idx])]
         logger['EpLen'] += [proc(ep_len[idx])]
+        logger['success_rate'] += [proc(success[idx])]
+        logger['time_to_succ'] += [proc(time_to_succ[idx])]
         ep_ret[idx] = 0
         ep_len[idx] = 0
-        logger['success_rate'] += [proc(d[idx])]
+        success[idx] = 0
+        time_to_succ[idx] = C.ep_len
+        #logger['success_rate'] += [proc(d[idx])]
+        #logger['success_rate_nenv'] += [proc(d[idx])**(1/C.num_envs)]
       if len(dixs) != 0:
         o = env.reset(dixs)
         if C.lenv:
@@ -353,12 +417,12 @@ def sac(C):
           assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
         #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
-    # Update handling
+    # Updte handling
     if t >= C.update_after and t % C.update_every == 0:
       for j in range(int(C.update_every*1.0)):
         with utils.Timer(logger, 'sample_batch'):
          batch = replay_buffer.sample_batch(C.bs)
-        with utils.Timer(logger, 'update'):
+        with utils.Timer(logger, 'updte'):
           update(data=batch)
 
     # End of epoch handling
@@ -436,10 +500,14 @@ _C.zdelta = 1
 _C.lenv = 0
 _C.lenv_mode = 'swap'
 _C.lenv_temp = 1.0
+_C.lenv_cont_roll = 0
+_C.lenv_goals = 0
 _C.reset_prompt = 0 
 _C.succ_reset = 1 # between lenv and normal env 
 _C.state_key = 'pstate'
 _C.diff_delt = 0
+_C.goal_thresh = 0.010
+
 
 if __name__ == '__main__':
   import argparse

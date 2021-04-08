@@ -449,10 +449,9 @@ class WorldEnv(gym.Env, EzPickle):
     self.b2_world.Step(1.0 / (self.FPS*2), 6 * 30, 2 * 30)
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
-    info = {}
     reward = 0.0  # no reward swag
     done = self.ep_t >= self.C.ep_len
-
+    info = {'timeout': done}
     return self._get_obs(), reward, done, info
 
   def lcd_render(self, width=None, height=None, pretty=False):

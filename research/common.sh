@@ -18,7 +18,10 @@ python main.py --mode=train --env=Luxo --datapath=$DP --model=frame_token --logd
 # state vqvae so that state is discrete binary
 python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=statevq --window=16 --log_n=1000 --lr=1e-3 --logdir=logs/ternary/juststate128_512_save/ --bs=32 --log_n=1000 --lr=1e-3 --vqK=128 --hidden_size=512
 # then flat everything model
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/med_bs32_ESR --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=200 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512
+# a
+python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/med_bs32_ESR --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512
+# b
+python main.py --mode=train --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/100window/smallnet_bs32_8e-4_fix --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512 --lr=8e-4
 
 # RL
 python rl/sac.py --env=Luxo --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=mlp --logdir=logs/rl/luxo
@@ -28,9 +31,11 @@ python rl/sac.py --env=Urchin --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=cn
 
 # LEARNED SIMULATION
 # test learned simulator
-python learned_env.py --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --weightdir=logs/flatev/x/monsta2/ --goals=1 --num_envs=8 --window=100
+python learned_env.py --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --weightdir=logs/flatev/x/monsta2/ --goals=1 --num_envs=8 --window=100 
 # run RL on learned simulator env, and non-learned env
-python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatev --weightdir=logs/flatev/x/ --window=100 --goals=1 --num_envs=8 --lenv=1 --logdir=logs/rl/lenv/x --lenv_temp=0.1 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0
+python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatev --weightdir=logs/flatev/x/ --window=100 --goals=1 --num_envs=8 --lenv=1 --logdir=logs/rl/lenv/x --lenv_temp=0.1 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0
+
+
 
 # CUBES
 python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 --lenv=0 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --state_key=full_state --use_done=0 --wh_ratio=2.0

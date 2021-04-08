@@ -1,5 +1,5 @@
 import os
-from jax.tree_util import tree_multimap
+from jax.tree_util import tree_multimap, tree_map
 import time
 from collections import defaultdict
 import copy
@@ -19,7 +19,7 @@ import gym
 from boxLCD import env_map
 
 def outproc(img):
-  return (255 * img[..., None].repeat(3, -1)).astype(np.uint8)
+  return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
 
 class RewardLenv:
   def __init__(self, env):
@@ -30,6 +30,7 @@ class RewardLenv:
     self.real_env = self.lenv.real_env
     self.pobs_keys = self.lenv.pobs_keys
     self.obs_keys = self.lenv.obs_keys
+    self.goal = {key: th.zeros(space.shape).to(self.C.device).float() for key, space in self.observation_space.spaces.items() if 'goal' in key}
 
   @property
   def action_space(self):
@@ -44,18 +45,32 @@ class RewardLenv:
 
   def step(self, act):
     obs, rew, done, info = self.lenv.step(act)
-    obs['goal:pstate'] = self.goal['pstate'].detach().clone()
-    obs['goal:lcd'] = self.goal['lcd'].detach().clone()
-    rew, done = self.comp_rew_done(obs)
+    obs['goal:pstate'] = self.goal['goal:pstate'].detach().clone()
+    obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+    rew, _done = self.comp_rew_done(obs, info)
+    done = th.logical_or(done, _done)
     rew = rew * self.C.rew_scale
     return obs, rew, done, info
 
+  def _reset_goals(self, mask):
+    mask = mask.bool()
+    if not self.C.lenv_goals:
+      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:') for _ in np.arange(self.lenv.num_envs)]
+      new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device).float(), new_goal[0], *new_goal[1:])
+    else:
+      #assert not self.C.reset_prompt, 'we dont want to use prompts for this because its slow'
+      new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
+    def tileup(x, y):
+      while x.ndim != y.ndim:
+        y = y[...,None]
+      return y
+    self.goal = tree_multimap(lambda x, y: x*tileup(x,mask) + y*~tileup(y,mask), new_goal, self.goal)
+
   def reset(self, *args, **kwargs):
-    goals = [self.real_env.reset() for _ in range(self.lenv.num_envs)]
-    self.goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device), goals[0], *goals[1:])
+    self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.C.device))
     obs = self.lenv.reset(*args, **kwargs)
-    obs['goal:lcd'] = self.goal['lcd'].detach().clone()
-    obs['goal:pstate'] = self.goal['pstate'].detach().clone()
+    obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+    obs['goal:pstate'] = self.goal['goal:pstate'].detach().clone()
     return obs
 
   def render(self, *args, **kwargs):
@@ -71,7 +86,8 @@ class RewardLenv:
       rew = -delta**0.5
       info['simi'] = delta
       #rew[delta < 0.010] = 0
-      done[delta < 0.010] = 1
+      done[delta < self.C.goal_thresh] = 1
+      info['success'] = done
     else:
       import ipdb; ipdb.set_trace()
       similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
@@ -112,7 +128,7 @@ class LearnedEnv:
       spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
     self.observation_space = gym.spaces.Dict(spaces)
 
-  def reset(self, *args, **kwargs):
+  def reset(self, *args, update_window_batch=True, **kwargs):
     prompts = [self.real_env.reset() for _ in range(self.num_envs)]
     prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device), prompts[0], *prompts[1:])
     window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
@@ -127,13 +143,14 @@ class LearnedEnv:
     else:
       window_batch['acts'] += 2.0 * th.rand(window_batch['acts'].shape).to(self.C.device) - 1.0
       with th.no_grad():
-       for self.ptr in range(20):
+       for self.ptr in range(10):
          window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
-       window_batch = {key: th.cat([val[:, 10:], th.zeros_like(val)[:, :10]], 1) for key, val in window_batch.items()}
-       self.ptr = 9
+       window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
+       self.ptr = 4
       
     obs = {key: val[:, self.ptr-1] for key, val in window_batch.items() if key in self.keys}
-    self.window_batch = window_batch
+    if update_window_batch: # False if we want to preserve the simulator state
+      self.window_batch = window_batch
     return obs
 
   def step(self, act):
@@ -159,17 +176,19 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  tempC = parser.parse_args()
+  tempC, _ = parser.parse_known_args()
   # grab defaults from the env
   Env = env_map[tempC.env]
   parser.set_defaults(**Env.ENV_DC)
   parser.set_defaults(**{'goals': 1})
-  C = parser.parse_args()
+  C, _ = parser.parse_known_args()
   C.lcd_w = int(C.wh_ratio * C.lcd_base)
   C.lcd_h = C.lcd_base
   C.imsize = C.lcd_w * C.lcd_h
-  C.lenv_temp = 1.0
+  C.lenv_temp = 2.0
   C.reset_prompt = 0
+  C.diff_delt = 0
+  C.goal_thresh = 0.01
 
   env = env_fn(C)()
 
@@ -186,12 +205,11 @@ if __name__ == '__main__':
     obs, rew, done, info = lenv.step(act)
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
-    print(done)
     pslcds += [env.reset(pstate=obs['pstate'][0].cpu())['lcd']]
 
   lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
   glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()
-  lcds = (lcds - glcds + 1.0) / 2.0
+  #lcds = (lcds - glcds + 1.0) / 2.0
   print('1', time.time() - start)
   utils.write_gif('test.gif', outproc(lcds), fps=C.fps)
   utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=C.fps)

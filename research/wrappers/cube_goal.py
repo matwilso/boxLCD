@@ -83,6 +83,7 @@ class CubeGoal:
       if delta < 0.01:
         done = True
         rew += 1.0
+        info['success'] = True
       # if delta < 0.005:
       # done = False
     else:
@@ -90,6 +91,7 @@ class CubeGoal:
       rew = -1 + similarity
       info['delta'] = similarity
       if similarity > 0.70:
+        info['success'] = True
         rew = 0
         #done = False
         done = True
