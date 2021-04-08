@@ -32,7 +32,7 @@ class WorldEnv(gym.Env, EzPickle):
   ENV_DC = utils.AttrDict()
   ENV_DC.base_dim = 5  # base size of box2D physics world
   ENV_DC.lcd_base = 16  # base size of lcd rendered image. this represents the height. width = wh_ratio*height
-  ENV_DC.wh_ratio = 1.0  # width:height ratio of the world and images
+  ENV_DC.wh_ratio = 2.0  # width:height ratio of the world and images
   ENV_DC.ep_len = 200  # length to run episode before done timeout
   # settings for different obs and action spaces
   ENV_DC.angular_offset = 0  # compute joint angular offsets from robot roots

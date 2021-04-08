@@ -4,7 +4,6 @@
 convert -resize 100% -delay 2 -loop 0 *.png test.gif
 
 # collect data
-python main.py --mode=collect --env=Urchin --collect_n=10000
 python main.py --mode=collect --env=UrchinCube --train_barrels=1000 --logdir=logs/datadump/urchin_cube
 
 # MODEL LEARNING
@@ -40,3 +39,7 @@ python rl/sac.py --env=CrabCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 -
 # these 2 worked
 python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 --lenv=0 --logdir=logs/rl/urchin_cube/10fps/diffdelt_1.5_2 --bs=128 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --state_key=full_state --use_done=0 --wh_ratio=1.5 --diff_delt=1 --fps=10
 python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 --lenv=0 --logdir=logs/rl/urchin_cube/10fps/nodiffdelt_1.5 --bs=128 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --state_key=full_state --use_done=0 --wh_ratio=1.5 --diff_delt=0 --fps=10
+
+# same
+python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 --lenv=0 --logdir=logs/rl/urchin_cube/10fps/diffdelt_2.0_objchanges_halfmass --bs=128 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --state_key=full_state --use_done=0 --wh_ratio=2.0 --diff_delt=1 --fps=10
+#python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8 --lenv=0 --logdir=logs/rl/urchin_cube/10fps/diffdelt_1.5_objchanges_halfmass --bs=128 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --state_key=full_state --use_done=0 --wh_ratio=1.5 --diff_delt=1 --fps=10
