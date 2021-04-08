@@ -320,12 +320,14 @@ def sac(C):
         test_agent()
         if C.lenv: test_agent(use_lenv=True)
         # Log info about epoch
+        epoch = itr//C.steps_per_epoch
         print('=' * 30)
+        print('Epoch', epoch)
         logger['var_count'] = [sum_count]
         logger['dt'] = dt = time.time() - epoch_time
         for key in logger:
           val = np.mean(logger[key])
-          writer.add_scalar(key, val, itr//C.steps_per_epoch)
+          writer.add_scalar(key, val, epoch)
           print(key, val)
         writer.flush()
         print('Time', time.time() - start_time)

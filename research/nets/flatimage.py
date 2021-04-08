@@ -13,6 +13,7 @@ from torch import nn
 import torch.nn.functional as F
 from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
 import utils
+import ignite
 
 class FlatImageTransformer(nn.Module):
   def __init__(self, env, C):
@@ -102,7 +103,7 @@ class FlatImageTransformer(nn.Module):
     batch['lcd'][:, i] = dist.sample()[:, i]
     return batch
 
-  def sample(self, n, acts=None, prompts=None):
+  def sample(self, n, acts=None, prompts=None, prompt_n=10):
     # TODO: feed act_n
     with th.no_grad():
       if acts is not None:
@@ -113,8 +114,8 @@ class FlatImageTransformer(nn.Module):
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
-        batch['lcd'][:, :10] = lcd
-        start = lcd.shape[1]
+        batch['lcd'][:, :prompt_n] = lcd[:, :prompt_n]
+        start = prompt_n
 
       for i in range(start, self.block_size):
         # TODO: check this setting since we have modified things
@@ -125,55 +126,3 @@ class FlatImageTransformer(nn.Module):
           sample_loss = self.loss(batch)[0]
     batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
     return batch, sample_loss.mean().cpu().detach()
-
-  def evaluate(self, writer, batch, epoch):
-    N = self.C.num_envs
-    # unpropted
-    acts = (th.rand(N, self.C.window, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
-    sample, sample_loss = self.sample(N, acts=acts)
-    lcd = sample['lcd']
-    lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    #writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
-    utils.add_video(writer, 'lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
-    # prompted
-    if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
-      if 'BoxOrCircle' == self.C.env:
-        reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
-      else:
-        reset_states = np.c_[np.random.uniform(-1, 1, N), np.random.uniform(-1, 1, N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
-    else:
-      reset_states = [None] * N
-    obses = {key: [[] for ii in range(N)] for key in self.env.observation_space.spaces}
-    acts = [[] for ii in range(N)]
-    for ii in range(N):
-      for key, val in self.env.reset(reset_states[ii]).items():
-        obses[key][ii] += [val]
-      for _ in range(self.C.window - 1):
-        act = self.env.action_space.sample()
-        obs = self.env.step(act)[0]
-        for key, val in obs.items():
-          obses[key][ii] += [val]
-        acts[ii] += [act]
-      acts[ii] += [np.zeros_like(act)]
-    obses = {key: np.array(val) for key, val in obses.items()}
-    acts = np.array(acts)
-    acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
-    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
-    # dupe
-    # dupe
-    for key in obses:
-      obses[key][4:] = obses[key][4:5]
-    acts = np.array(acts)
-    acts = th.as_tensor(acts, dtype=th.float32).to(self.C.device)
-    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
-    acts[4:] = acts[4:5]
-    prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
-    real_lcd = obses['lcd'][:, :, None]
-    lcd_psamp = prompted_samples['lcd']
-    lcd_psamp = lcd_psamp.cpu().detach().numpy()
-    error = (lcd_psamp - real_lcd + 1.0) / 2.0
-    blank = np.zeros_like(real_lcd)[..., :1, :]
-    out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
-    out = out.repeat(4, -1).repeat(4, -2)
-    #writer.add_video('prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)
-    utils.add_video(writer, 'prompted_lcd', utils.force_shape(out), epoch, fps=self.C.fps)

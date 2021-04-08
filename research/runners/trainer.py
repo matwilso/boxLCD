@@ -16,6 +16,8 @@ import utils
 from utils import Timer
 import data
 from define_config import env_fn
+import ignite
+from rl.async_vector_env import AsyncVectorEnv
 
 class Trainer:
   def __init__(self, model, env, C):
@@ -37,6 +39,47 @@ class Trainer:
     print('num_vars', self.num_vars)
     self.C = C
     self.b = lambda x: {key: val.to(C.device) for key, val in x.items()}
+    self.venv = AsyncVectorEnv([env_fn(C) for _ in range(self.C.num_envs)])
+    self.ssim = ignite.metrics.SSIM(1.0, device=self.C.device)
+    self.psnr = ignite.metrics.PSNR(1.0, device=self.C.device)
+
+  def evaluate(self, batch, itr):
+    N = self.C.num_envs
+    # UNPROMPTED SAMPLE
+    acts = (th.rand(N, self.C.window, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
+    sample, sample_loss = self.model.sample(N, acts=acts)
+    if 'lcd' in sample:
+      lcd = sample['lcd']
+      lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
+      #writer.add_video('lcd_samples', utils.force_shape(lcd), itr, fps=self.C.fps)
+      utils.add_video(self.writer, 'unprompted/lcd', utils.force_shape(lcd), itr, fps=self.C.fps)
+    if 'pstate' in sample:
+      # TODO: add support for pstate
+      import ipdb; ipdb.set_trace()
+
+    # PROMPTED SAMPLE
+    prompted_samples, prompt_loss = self.model.sample(N, acts=batch['acts'], prompts=batch, prompt_n=10)
+    pred_lcd = prompted_samples['lcd']
+    real_lcd = batch['lcd'][:,:,None]
+    # metrics 
+    self.ssim.update((pred_lcd.flatten(0,1), real_lcd.flatten(0,1)))
+    ssim = self.ssim.compute().cpu().detach()
+    self.logger['eval/ssim'] += [ssim]
+    # TODO: try not flat
+    self.psnr.update((pred_lcd.flatten(0,1), real_lcd.flatten(0,1)))
+    psnr = self.psnr.compute().cpu().detach()
+    self.logger['eval/psnr'] += [psnr]
+
+    # visualization
+    pred_lcd = pred_lcd[:8].cpu().detach().numpy()
+    real_lcd = real_lcd[:8].cpu().detach().numpy()
+    error = (pred_lcd - real_lcd + 1.0) / 2.0
+    blank = np.zeros_like(real_lcd)[..., :1, :]
+    out = np.concatenate([real_lcd, blank, pred_lcd, blank, error], 3)
+    out = out.repeat(4, -1).repeat(4, -2)
+    #writer.add_video('prompted_lcd', utils.force_shape(out), itr, fps=self.C.fps)
+    utils.add_video(self.writer, 'prompted_lcd', utils.force_shape(out), itr, fps=self.C.fps)
+    return prompted_samples['lcd']
 
   def run(self):
     total_time = time.time()
@@ -66,7 +109,7 @@ class Trainer:
                 self.logger['test/' + key] += [metrics[key].detach().cpu()]
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            self.model.evaluate(self.writer, self.b(test_batch), itr)
+            samples = self.evaluate(self.b(test_batch), itr)
         self.model.train()
 
         # LOGGING
