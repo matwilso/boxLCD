@@ -25,6 +25,7 @@ from research.nets.multistep import Multistep
 from research.nets.vae import VAE
 from research.nets.combined import Combined
 from research.nets.qvae import QVAE
+from research.nets.vqvae import VQVAE
 
 import data
 
@@ -76,6 +77,8 @@ if __name__ == '__main__':
       model = Multistep(env, C)
     elif C.model == 'vae':
       model = VAE(C)
+    elif C.model == 'vqvae':
+      model = VQVAE(env, C)
     elif C.model == 'statevq':
       model = SVAE(env, C)
     elif C.model == 'qvae':

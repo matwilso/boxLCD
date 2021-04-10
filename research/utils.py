@@ -86,7 +86,7 @@ def combine_imgs(arr, row=5, col=5):
   """takes batch of video or image and pushes the batch dim into certain image shapes given by b,row,col"""
   if len(arr.shape) == 4:  # image
     BS, C, H, W = arr.shape
-    assert BS == row * col, (BS, row, col, H, W)
+    assert BS == row * col, f'{(BS, row, col, H, W)} {row*col},{BS}'
     if isinstance(arr, np.ndarray):
       x = arr.reshape([row, col, H, W]).transpose(0, 2, 1, 3).reshape([row * H, col * W])
     else:
