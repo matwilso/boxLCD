@@ -70,6 +70,24 @@ class Trainer:
     psnr = self.psnr.compute().cpu().detach()
     self.logger['eval/psnr'] += [psnr]
 
+    if 'pstate' in prompted_samples:
+      import ipdb; ipdb.set_trace()
+      pstate_samp = prompted_samples['pstate'].cpu().numpy()
+      imgs = []
+      shape = pstate_samp.shape
+      for ii in range(shape[0]):
+        col = []
+        for jj in range(shape[1]):
+          col += [self.env.reset(pstate=pstate_samp[ii, jj])['lcd']]
+        imgs += [col]
+      pstate_img = 1.0 * np.array(imgs)[:, :, None]
+      error = (pstate_img - real_lcd + 1.0) / 2.0
+      blank = np.zeros_like(real_lcd)[..., :1, :]
+      out = np.concatenate([real_lcd, blank, pstate_img, blank, error], 3)
+      out = out.repeat(4, -1).repeat(4, -2)
+      utils.add_video(writer, 'prompted_state', utils.force_shape(out), epoch, fps=self.C.fps)
+
+
     # visualization
     pred_lcd = pred_lcd[:8].cpu().detach().numpy()
     real_lcd = real_lcd[:8].cpu().detach().numpy()
@@ -109,7 +127,8 @@ class Trainer:
                 self.logger['test/' + key] += [metrics[key].detach().cpu()]
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            samples = self.evaluate(self.b(test_batch), itr)
+            #samples = self.evaluate(self.b(test_batch), itr)
+            self.model.evaluate(self.writer, self.b(test_batch), itr)
         self.model.train()
 
         # LOGGING

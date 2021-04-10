@@ -24,6 +24,7 @@ from research.nets.statevq import SVAE
 from research.nets.multistep import Multistep
 from research.nets.vae import VAE
 from research.nets.combined import Combined
+from research.nets.qvae import QVAE
 
 import data
 
@@ -77,6 +78,10 @@ if __name__ == '__main__':
       model = VAE(C)
     elif C.model == 'statevq':
       model = SVAE(env, C)
+    elif C.model == 'qvae':
+      model = QVAE(env, C)
+    else:
+      assert "we don't have that model", C.model
     model.to(C.device)
     C.num_vars = utils.count_vars(model)
 
