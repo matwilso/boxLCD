@@ -124,8 +124,8 @@ class QFunction(nn.Module):
 
     if 'vae' in self.C.net:
       self.preproc = preproc
-      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
       self.act_head = nn.Sequential(
           nn.Linear(H + H, H),
           nn.ReLU(),
@@ -153,7 +153,8 @@ class QFunction(nn.Module):
         goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         gx = self.preproc.encode(goals)
         gx = self.goalie(gx)
-        x = x + gx
+        x = th.cat([x, gx], -1)
+        #x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
       x = self.act_head(x)
@@ -179,8 +180,8 @@ class SquashedGaussianActor(nn.Module):
       self.net = BaseCNN(obs_space, 2 * act_dim, C)
     elif 'bvae' in self.C.net:
       self.preproc = preproc
-      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
       self.net = nn.Sequential(
           nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
@@ -202,7 +203,8 @@ class SquashedGaussianActor(nn.Module):
         goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         gx = self.preproc.encode(goals)
         gx = self.goalie(gx)
-        x = x + gx
+        x = th.cat([x, gx], -1)
+        #x = x + gx
     else:
       x = obs
 

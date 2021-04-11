@@ -35,6 +35,19 @@ python learned_env.py --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_rat
 # run RL on learned simulator env, and non-learned env
 python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatev --weightdir=logs/flatev/x/ --window=100 --goals=1 --num_envs=8 --lenv=1 --logdir=logs/rl/lenv/x --lenv_temp=0.1 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0
 
+# TRAIN BVAE
+env=LuxoCube
+DP=logs/datadump/10fps/luxocube/
+python main.py --mode=train --env=$ENV_NAME --datapath=$DP --model=bvae --window=4 --bs=64 --log_n=1000   --lr=1e-3 --skip_train=0 --vqK=64 --hidden_size=64 --nfilter=64 --vqD=32 --log_n=100 --logdir=logs/bvae/x
+python main.py --mode=train --env=$ENV_NAME --datapath=$DP --model=flatb --window=100 --bs=32 --log_n=1000 --lr=1e-3 --weightdir=$WD --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --log_n=100 --logdir=logs/flatb/luxocube/bigger
+
+
+# BVAE preproc, real env
+python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatb --weightdir=logs/flatb/bigger/ --window=100 --goals=1 --num_envs=12 --lenv=1 --logdir=logs/rl/flatb/nolenv/bvae_preproc_bs64_fixgoal --lenv_temp=0.1 --bs=64 --hidden_size=128 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0 --lenv=0 --net=bvae
+
+
+
+
 
 
 # CUBES

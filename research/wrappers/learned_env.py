@@ -13,7 +13,6 @@ import yaml
 from datetime import datetime
 from boxLCD.utils import A, NamedArray
 import utils
-from research.define_config import env_fn
 import gym
 from boxLCD import env_map
 

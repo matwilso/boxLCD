@@ -1,4 +1,3 @@
-from re import I
 import yaml
 import sys
 from collections import defaultdict
@@ -103,7 +102,7 @@ class FlatBToken(nn.Module):
     metrics = {}
     logits = self.forward(batch)
     dist = self.dist_head(logits)
-    z_q = self.bvae.encode({key: val.flatten(1, 1) for key, val in batch.items()})
+    z_q = self.bvae.encode({key: val.flatten(0, 1) for key, val in batch.items()})
     z_q = z_q.reshape([BS, EPL, -1]).detach()
     loss = -dist.log_prob(z_q).mean()
     metrics['loss/total'] = loss

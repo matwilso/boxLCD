@@ -4,17 +4,18 @@ import numpy as np
 from gym.utils import seeding, EzPickle
 from research import utils
 
-class LearnedPreprocEnv:
+class PreprocEnv:
   """
   Learned model that preprocesses observations and produces a `zstate`
   """
   def __init__(self, model, env, C, device='cpu'):
-    self._model = model
+    self.model = model
     self._env = env
     self.SCALE = 2
     self.C = C
     self.device = device
-    self.goal_based = self._env.goal_based
+    self.model.to(device)
+    self.model.eval()
 
   @property
   def action_space(self):
@@ -23,13 +24,20 @@ class LearnedPreprocEnv:
   @property
   def observation_space(self):
     base_space = self._env.observation_space
-    base_space.spaces['zstate'] = gym.spaces.Box(-10, 10, (self._model.z_size,))
-    ## TODO: deal with goal_based envs. probably add a little indicator.
-    #base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
+    base_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
+    if 'goal:pstate' in base_space.spaces:
+      base_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
     return base_space
 
   def _preproc_obs(self, obs):
-    import ipdb; ipdb.set_trace()
+    batch_obs = {key: th.as_tensor(1.0 * val[None]).float().to(self.C.device) for key, val in obs.items()}
+    zstate = self.model.encode(batch_obs)
+    obs['zstate'] = zstate.detach().cpu().numpy()
+    if 'goal:pstate' in batch_obs:
+      goal = utils.filtdict(batch_obs, 'goal:', fkey=lambda x: x[5:])
+      zgoal = self.model.encode(goal)
+      obs['goal:zstate'] = zgoal.detach().cpu().numpy()
+    return obs
 
   def reset(self, *args, **kwargs):
     obs = self._env.reset(*args, **kwargs)
@@ -46,6 +54,7 @@ class LearnedPreprocEnv:
     self._env.close()
 
 if __name__ == '__main__':
+  from body_goal import BodyGoalEnv
   from PIL import Image, ImageDraw, ImageFont
   import matplotlib.pyplot as plt
   from boxLCD import envs
@@ -54,29 +63,38 @@ if __name__ == '__main__':
   import torch as th
   import pathlib
   import time
+  from research.nets.bvae import BVAE
   C = utils.AttrDict()
-  C.env = 'UrchinCube'
+  C.env = 'Urchin'
   C.state_rew = 1
   C.device = 'cpu'
   C.lcd_h = 16
   C.lcd_w = 32
-  C.wh_ratio = 1.5
+  C.wh_ratio = 2.0
   C.lr = 1e-3
   #C.lcd_base = 32
   C.rew_scale = 1.0
   C.diff_delt = 1 
   C.fps = 10
-  env = envs.UrchinCube(C)
+  C.hidden_size = 128
+  C.nfilter = 128
+  C.vqK = 128
+  C.vqD = 128
+  C.goal_thresh = 0.01
+  env = envs.Urchin(C)
   C.fps = env.C.fps
-  env = CubeGoalEnv(env, C)
+  model = BVAE(env, C)
+  env = BodyGoalEnv(env, C)
+  env = PreprocEnv(model, env, C, device='cpu')
   print(env.observation_space, env.action_space)
+  start = time.time()
   obs = env.reset()
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
   rews = [-np.inf]
   deltas = [-np.inf]
   while True:
-    env.render(mode='human')
+    #env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
     #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
@@ -95,6 +113,7 @@ if __name__ == '__main__':
   glcds = np.stack(glcds)
   lcds = (1.0 * lcds - 1.0 * glcds + 1.0) / 2.0
   lcds = outproc(lcds)
+  print('dt', time.time()-start)
   dframes = []
   for i in range(len(lcds)):
     frame = lcds[i]
