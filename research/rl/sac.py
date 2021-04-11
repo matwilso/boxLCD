@@ -58,7 +58,7 @@ def sac(C):
   epoch = -1
 
   # Create actor-critic module and target networks
-  ac = ActorCritic(tenv.observation_space, tenv.action_space, C=C).to(C.device)
+  ac = ActorCritic(tenv, C=C).to(C.device)
   ac_targ = deepcopy(ac)
 
   # Freeze target networks with respect to optimizers (only updte via polyak averaging)

@@ -34,6 +34,7 @@ class BVAE(nn.Module):
     self.optimizer = Adam(self.parameters(), C.lr)
     self.env = env
     self.C = C
+    self.z_size = 4 * 8 * C.vqD
 
   def train_step(self, batch, dry=False):
     if dry:
@@ -98,6 +99,13 @@ class BVAE(nn.Module):
     if eval: metrics['decoded'] = decoded
     if return_idxs: metrics['idxs'] = idxs
     return loss, metrics
+
+  def encode(self, x):
+    z_e = self.encoder(x)
+    z_q, embed_loss, idxs = self.vq(z_e)
+    z_q = z_q.flatten(-3)
+    assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
+    return z_q
 
   def forward(self, x):
     z_e = self.encoder(x)

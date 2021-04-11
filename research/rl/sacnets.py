@@ -15,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from nets.vae import VAE
+from nets.bvae import BVAE
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
@@ -120,13 +121,13 @@ class QFunction(nn.Module):
       self.base = BaseCNN(obs_space, H, C)
     self.actin = nn.Linear(act_dim, H)
 
-    if self.C.net == 'vae':
+    if 'vae' in self.C.net:
       self.preproc = preproc
       self.act_head = nn.Sequential(
           nn.Linear(self.preproc.z_size + H, H),
           nn.ReLU(),
-          nn.Linear(H, H),
-          nn.ReLU(),
+          #nn.Linear(H, H),
+          #nn.ReLU(),
           nn.Linear(H, H),
           nn.ReLU(),
           nn.Linear(H, 1),
@@ -142,8 +143,8 @@ class QFunction(nn.Module):
     if self.C.net == 'mlp':
       x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key], act], -1)
       return self.base(x).squeeze(-1)
-    elif self.C.net == 'vae':
-      x = self.preproc.encoder(obs['lcd'][:, None]).mean
+    elif self.C.net == 'bvae':
+      x = self.preproc.encode(obs)
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
       x = self.act_head(x)
@@ -167,13 +168,13 @@ class SquashedGaussianActor(nn.Module):
       self.net = BaseCMLP(obs_space, 2 * act_dim, C)
     elif self.C.net == 'cnn':
       self.net = BaseCNN(obs_space, 2 * act_dim, C)
-    elif self.C.net == 'vae':
+    elif 'bvae' in self.C.net:
       self.preproc = preproc
       self.net = nn.Sequential(
           nn.Linear(self.preproc.z_size, C.hidden_size),
           nn.ReLU(),
-          nn.Linear(C.hidden_size, C.hidden_size),
-          nn.ReLU(),
+          #nn.Linear(C.hidden_size, C.hidden_size),
+          #nn.ReLU(),
           nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
           nn.Linear(C.hidden_size, 2 * act_dim),
@@ -183,8 +184,8 @@ class SquashedGaussianActor(nn.Module):
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
       obs = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
-    if self.C.net == 'vae':
-      obs = self.preproc.encoder.forward(obs['lcd'][:, None]).mean
+    if self.C.net == 'bvae':
+      obs = self.preproc.encode(obs)
     net_out = self.net(obs)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
@@ -214,13 +215,22 @@ class SquashedGaussianActor(nn.Module):
     return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
 
 class ActorCritic(nn.Module):
-  def __init__(self, obs_space, act_space, C=None):
+  def __init__(self, env, C=None):
     super().__init__()
+    obs_space = env.observation_space
+    act_space = env.action_space
     act_dim = act_space.shape[0]
 
     self.preproc = None
     if C.net == 'vae':
       self.preproc = VAE(C)
+      self.preproc.load(C.weightdir)
+      for p in self.preproc.parameters():
+        p.requires_grad = False
+      self.preproc.eval()
+    if C.net == 'bvae':
+      MC = th.load(C.weightdir / 'bvae.pt').pop('C')
+      self.preproc = BVAE(env, MC)
       self.preproc.load(C.weightdir)
       for p in self.preproc.parameters():
         p.requires_grad = False
@@ -234,17 +244,6 @@ class ActorCritic(nn.Module):
       self.target_entropy = -np.prod(act_space.shape)
       self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))
     self.C = C
-
-  def comp_rew(self, batch):
-    zo = self.preproc.encoder(batch['lcd'][:, None]).mean
-    zg = self.preproc.encoder(batch['goal:lcd'][:, None]).mean
-    cosine_dist = (zo * zg).sum(dim=1) / (th.linalg.norm(zo, dim=1) * th.linalg.norm(zg, dim=1))
-    ang_dist = th.zeros_like(cosine_dist)
-    ang_dist = th.where(cosine_dist != 1.0, th.acos(cosine_dist) / np.pi, cosine_dist)
-    if th.isnan(ang_dist).any():
-      import ipdb; ipdb.set_trace()
-    return -ang_dist**2 * self.C.rew_scale
-    # return -th.linalg.norm(zo-zg, dim=1) / self.C.rew_scale
 
   def act(self, obs, deterministic=False):
     with th.no_grad():
