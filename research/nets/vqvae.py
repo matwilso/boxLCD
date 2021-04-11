@@ -72,6 +72,7 @@ class VQVAE(nn.Module):
     #recon = 1.0 * (decoded.exp() > 0.5).cpu()
     #recon = th.sigmoid(decoded) > 0.5
     recon = 1.0 * (th.sigmoid(decoded)).cpu()
+    #recon = 1.0 * (th.sigmoid(decoded) > 0.5).cpu()
     #recon = th.sigmoid(decoded.exp()).cpu()
     recon = th.cat([lcd[:,None].cpu(), recon], 0)
     writer.add_image('reconstruction', utils.combine_imgs(recon, 2, 8)[None], epoch)
@@ -89,16 +90,16 @@ class VQVAE(nn.Module):
 class Encoder(nn.Module):
   def __init__(self, C):
     super().__init__()
-    H = C.hidden_size
+    H = C.nfilter
     self.net = nn.Sequential(
         nn.Conv2d(1, H, 3, 2, padding=1),
         nn.ReLU(),
         nn.Conv2d(H, H, 3, 2, padding=1),
         nn.ReLU(),
+        nn.GroupNorm(32, H),
         nn.Conv2d(H, H, 3, 1, padding=1),
         nn.ReLU(),
-        nn.Conv2d(H, C.vqD, 3, 1, padding=1),
-        nn.ReLU(),
+        nn.Conv2d(H, C.vqD, 1, 1),
     )
   def forward(self, x):
     return self.net(x[:,None])
@@ -113,16 +114,20 @@ class Upsample(nn.Module):
     x = self.conv(x)
     return x
 
-
 class Decoder(nn.Module):
   def __init__(self, C):
     super().__init__()
-    H = C.hidden_size
+    H = C.nfilter
     self.net = nn.Sequential(
-      nn.ConvTranspose2d(C.vqD, H, 4, 2, padding=2),
+      nn.ConvTranspose2d(C.vqD, H, 1, 1),
+      nn.ReLU(),
+      nn.GroupNorm(32, H),
+      nn.ConvTranspose2d(H, H, 4, 2, padding=2),
+      #nn.ConvTranspose2d(C.vqD, H, 4, 2, padding=2),
       nn.ReLU(),
       nn.ConvTranspose2d(H, H, 3, 1),
       nn.ReLU(),
+      nn.GroupNorm(32, H),
       nn.ConvTranspose2d(H, H, 3, 1, padding=1),
       nn.ReLU(),
       nn.ConvTranspose2d(H, 1, 4, 2, padding=1),
