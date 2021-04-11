@@ -23,7 +23,7 @@ import numpy as np
 from .vq import VectorQuantizer
 import utils
 
-class QVAE(nn.Module):
+class BVAE(nn.Module):
   def __init__(self, env, C):
     super().__init__()
     H = C.hidden_size
@@ -48,14 +48,14 @@ class QVAE(nn.Module):
 
   def save(self, dir):
     print("SAVED MODEL", dir)
-    path = dir / 'qvae.pt'
+    path = dir / 'bvae.pt'
     sd = self.state_dict()
     sd['C'] = self.C
     th.save(sd, path)
     print(path)
 
   def load(self, dir):
-    path = dir / 'qvae.pt'
+    path = dir / 'bvae.pt'
     sd = th.load(path)
     C = sd.pop('C')
     self.load_state_dict(sd)
@@ -102,7 +102,6 @@ class QVAE(nn.Module):
   def forward(self, x):
     z_e = self.encoder(x)
     z_q, embed_loss, idxs = self.vq(z_e)
-    import ipdb; ipdb.set_trace()
     decoded = self.decoder(z_q)
     return embed_loss, decoded, idxs
 
@@ -112,7 +111,6 @@ class Encoder(nn.Module):
     H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     act_n = env.action_space.shape[0]
-
     self.state_embed = nn.Sequential(
       nn.Linear(state_n, H),
       nn.ReLU(),
@@ -120,13 +118,14 @@ class Encoder(nn.Module):
       nn.ReLU(),
       nn.Linear(H, H),
     )
+    H = C.nfilter
     self.seq = nn.ModuleList([
         nn.Conv2d(1, H, 3, 1, padding=1),
-        ResBlock(H, emb_channels=H),
+        ResBlock(H, emb_channels=C.hidden_size),
         nn.Conv2d(H, H, 3, 2, padding=1),
-        ResBlock(H, emb_channels=H),
+        ResBlock(H, emb_channels=C.hidden_size),
         nn.Conv2d(H, H, 3, 2, padding=1),
-        ResBlock(H, emb_channels=H),
+        ResBlock(H, emb_channels=C.hidden_size),
         nn.Conv2d(H, C.vqD, 1, 1),
     ])
 
@@ -155,8 +154,8 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, env, C):
     super().__init__()
-    H = C.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
+    H = C.hidden_size
     self.state_net = nn.Sequential(
       nn.Flatten(-3),
       nn.Linear(C.vqD*4*8, H),
@@ -165,6 +164,7 @@ class Decoder(nn.Module):
       nn.ReLU(),
       nn.Linear(H, state_n),
     )
+    H = C.nfilter
     self.net = nn.Sequential(
         Upsample(C.vqD, H),
         nn.ReLU(),

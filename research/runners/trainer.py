@@ -125,6 +125,7 @@ class Trainer:
               metrics = self.model.train_step(self.b(test_batch), dry=True)
               for key in metrics:
                 self.logger['test/' + key] += [metrics[key].detach().cpu()]
+              break
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
             #samples = self.evaluate(self.b(test_batch), itr)

@@ -322,6 +322,7 @@ class WorldEnv(gym.Env, EzPickle):
     self._reset_bodies()
     #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
     if pstate is not None:
+      assert pstate.shape[-1] == self.observation_space.spaces['pstate'].shape[-1], f'invalid shape for pstate {pstate.shape} {self.observation_space.spaces["pstate"]}'
       full_state = np.zeros(self.observation_space.spaces['full_state'].shape)
       full_state[self.pobs_idxs] = pstate
     if full_state is not None:

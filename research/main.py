@@ -24,8 +24,9 @@ from research.nets.statevq import SVAE
 from research.nets.multistep import Multistep
 from research.nets.vae import VAE
 from research.nets.combined import Combined
-from research.nets.qvae import QVAE
+from research.nets.bvae import BVAE
 from research.nets.vqvae import VQVAE
+from research.nets.flat_btoken import FlatBToken
 
 import data
 
@@ -69,6 +70,8 @@ if __name__ == '__main__':
       model = FlatImageTransformer(env, C)
     if C.model == 'flatev':
       model = FlatEverything(env, C)
+    if C.model == 'flatb':
+      model = FlatBToken(env, C)
     elif C.model == 'single':
       assert C.datamode == 'image'
       model = Combined(env, C)
@@ -81,8 +84,8 @@ if __name__ == '__main__':
       model = VQVAE(env, C)
     elif C.model == 'statevq':
       model = SVAE(env, C)
-    elif C.model == 'qvae':
-      model = QVAE(env, C)
+    elif C.model == 'bvae':
+      model = BVAE(env, C)
     else:
       assert "we don't have that model", C.model
     model.to(C.device)

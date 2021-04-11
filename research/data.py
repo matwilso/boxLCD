@@ -79,6 +79,7 @@ class RolloutDataset(IterableDataset):
     """recheck the directory for new barrels"""
     self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))
     self.nbarrels = len(self.barrel_files)
+    assert self.nbarrels > 0, 'didnt find any barrels at datapath'
 
   def __iter__(self):
     worker_info = th.utils.data.get_worker_info()
