@@ -1,3 +1,4 @@
+from research import utils
 from datetime import datetime
 import PIL
 import argparse
@@ -123,8 +124,10 @@ class QFunction(nn.Module):
 
     if 'vae' in self.C.net:
       self.preproc = preproc
+      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
       self.act_head = nn.Sequential(
-          nn.Linear(self.preproc.z_size + H, H),
+          nn.Linear(H + H, H),
           nn.ReLU(),
           #nn.Linear(H, H),
           #nn.ReLU(),
@@ -145,6 +148,12 @@ class QFunction(nn.Module):
       return self.base(x).squeeze(-1)
     elif self.C.net == 'bvae':
       x = self.preproc.encode(obs)
+      x = self.statie(x)
+      if 'goal:pstate' in obs:
+        goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
+        gx = self.preproc.encode(goals)
+        gx = self.goalie(gx)
+        x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
       x = self.act_head(x)
@@ -170,8 +179,10 @@ class SquashedGaussianActor(nn.Module):
       self.net = BaseCNN(obs_space, 2 * act_dim, C)
     elif 'bvae' in self.C.net:
       self.preproc = preproc
+      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
       self.net = nn.Sequential(
-          nn.Linear(self.preproc.z_size, C.hidden_size),
+          nn.Linear(C.hidden_size, C.hidden_size),
           nn.ReLU(),
           #nn.Linear(C.hidden_size, C.hidden_size),
           #nn.ReLU(),
@@ -183,10 +194,19 @@ class SquashedGaussianActor(nn.Module):
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
-      obs = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
-    if self.C.net == 'bvae':
-      obs = self.preproc.encode(obs)
-    net_out = self.net(obs)
+      x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
+    elif self.C.net == 'bvae':
+      x = self.preproc.encode(obs)
+      x = self.statie(x)
+      if 'goal:pstate' in obs:
+        goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
+        gx = self.preproc.encode(goals)
+        gx = self.goalie(gx)
+        x = x + gx
+    else:
+      x = obs
+
+    net_out = self.net(x)
     mu, log_std = th.split(net_out, self.act_dim, dim=-1)
 
     log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)

@@ -1,3 +1,5 @@
-from .state_goal_env import StateGoalEnv
-from .cube_goal import CubeGoal
+from .body_goal import BodyGoalEnv
+from .cube_goal import CubeGoalEnv
 from .wrapped_gym import WrappedGym
+from .learned_env import LearnedEnv, RewardLenv
+from .async_vector_env import AsyncVectorEnv

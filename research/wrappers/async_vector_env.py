@@ -18,13 +18,10 @@ __all__ = ['AsyncVectorEnv']
 # stolen from: https://github.com/openai/gym/blob/master/gym/vector/async_vector_env.py
 # and then modified to support my custom APIs
 
-
 class AsyncState(Enum):
   DEFAULT = 'default'
   WAITING_RESET = 'reset'
   WAITING_STEP = 'step'
-
-# TODO: make add compute reward function
 
 class AsyncVectorEnv(VectorEnv):
   """Vectorized environment that runs multiple environments in parallel. It

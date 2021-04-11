@@ -12,7 +12,7 @@ from gym.utils import seeding, EzPickle
 from research import utils
 
 
-class StateGoalEnv:
+class BodyGoalEnv:
   def __init__(self, env, C):
     self._env = env
     self.SCALE = 2
@@ -123,7 +123,7 @@ if __name__ == '__main__':
   #C.env = 'Urchin'
   #env = envs.Urchin(C)
   C.fps = env.C.fps
-  env = StateGoalEnv(env, C)
+  env = BodyGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   obs = env.reset()
   lcds = [obs['lcd']]

@@ -1,20 +1,10 @@
 import copy
-import atexit
-import functools
-from re import I
-import sys
-import threading
-import traceback
-
 import gym
 import numpy as np
-from PIL import Image
 from gym.utils import seeding, EzPickle
 from research import utils
-import PIL
-from PIL import Image, ImageDraw, ImageFont
 
-class CubeGoal:
+class CubeGoalEnv:
   def __init__(self, env, C):
     self._env = env
     self.SCALE = 2
@@ -101,6 +91,7 @@ class CubeGoal:
     self._env.close()
 
 if __name__ == '__main__':
+  from PIL import Image, ImageDraw, ImageFont
   import matplotlib.pyplot as plt
   from boxLCD import envs
   import utils
@@ -122,7 +113,7 @@ if __name__ == '__main__':
   C.fps = 10
   env = envs.UrchinCube(C)
   C.fps = env.C.fps
-  env = CubeGoal(env, C)
+  env = CubeGoalEnv(env, C)
   print(env.observation_space, env.action_space)
   obs = env.reset()
   lcds = [obs['lcd']]

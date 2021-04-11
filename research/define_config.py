@@ -16,9 +16,9 @@ def env_fn(C, seed=None):
       env.seed(seed)
       if C.goals:
         if 'Cube' not in C.env:
-          env = wrappers.StateGoalEnv(env, C)
+          env = wrappers.BodyGoalEnv(env, C)
         else:
-          env = wrappers.CubeGoal(env, C)
+          env = wrappers.CubeGoalEnv(env, C)
     else:
       env = gym.make(C.env)
       env = wrappers.WrappedGym(env, C)

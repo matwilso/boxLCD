@@ -13,8 +13,7 @@ import yaml
 from datetime import datetime
 from boxLCD.utils import A, NamedArray
 import utils
-import data
-from define_config import env_fn
+from research.define_config import env_fn
 import gym
 from boxLCD import env_map
 
@@ -172,7 +171,7 @@ if __name__ == '__main__':
   from research import utils
   import argparse
   from boxLCD import env_map
-  from rl.async_vector_env import AsyncVectorEnv
+  from wrappers import AsyncVectorEnv
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)

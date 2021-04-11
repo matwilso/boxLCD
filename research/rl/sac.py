@@ -25,9 +25,7 @@ from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
 import boxLCD
 from research import utils
-from async_vector_env import AsyncVectorEnv
 from research import wrappers
-from research.learned_env import LearnedEnv, RewardLenv
 from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
 
@@ -43,15 +41,15 @@ def sac(C):
   obs_space = tenv.observation_space
   act_space = tenv.action_space
   TN = 8
-  real_tvenv = AsyncVectorEnv([env_fn(C) for _ in range(TN)])
+  real_tvenv = wrappers.AsyncVectorEnv([env_fn(C) for _ in range(TN)])
   if C.lenv:
     MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
     model = FlatEverything(tenv, MC)
-    env = RewardLenv(LearnedEnv(C.num_envs, model, C))
-    tvenv = learned_tvenv = RewardLenv(LearnedEnv(TN, model, C))
+    env = wrappers.RewardLenv(wrappers.LearnedEnv(C.num_envs, model, C))
+    tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, C))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
   else:
-    env = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+    env = wrappers.AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
     tvenv = real_tvenv
 
   #tenv.reset()

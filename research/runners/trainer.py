@@ -17,7 +17,7 @@ from utils import Timer
 import data
 from define_config import env_fn
 import ignite
-from rl.async_vector_env import AsyncVectorEnv
+from wrappers import AsyncVectorEnv
 
 class Trainer:
   def __init__(self, model, env, C):
