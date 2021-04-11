@@ -1,4 +1,5 @@
-from re import I
+from os import stat
+from shutil import ignore_patterns
 import sys
 from collections import defaultdict
 import numpy as np
@@ -27,10 +28,12 @@ class VQVAE(nn.Module):
     super().__init__()
     H = C.hidden_size
     # encoder -> VQ -> decoder
-    self.encoder = Encoder(C)
+    self.encoder = Encoder(env, C)
     self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
-    self.decoder = Decoder(C)
+    self.decoder = Decoder(env, C)
     self.optimizer = Adam(self.parameters(), C.lr)
+    self.env = env
+    self.C = C
 
   def train_step(self, batch, dry=False):
     if dry:
@@ -46,17 +49,43 @@ class VQVAE(nn.Module):
   def save(self, *args, **kwargs):
     pass
 
+  def evaluate(self, writer, batch, epoch):
+    bs = batch['pstate'].shape[0]
+    #ebatch = self.flatbatch(batch)
+    flatter_batch = {key: val[:8, 0] for key, val in batch.items()}
+    _, decoded, _, idxs = self.forward(flatter_batch)
+    pred_lcd = 1.0 * (decoded['lcd'].probs > 0.5)[:8]
+    lcd = flatter_batch['lcd'][:8,None]
+    error = (pred_lcd - lcd + 1.0) / 2.0
+    stack = th.cat([lcd, pred_lcd, error], -2)
+    writer.add_image('image/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
+
+    import ipdb; ipdb.set_trace()
+    pred_state = decoded['pstate'].mean[:8,0].detach().cpu()
+    true_state = flatter_batch['pstate'][:8,0].cpu()
+    preds = []
+    for s in pred_state:
+      preds += [self.env.reset(pstate=s)['lcd']]
+    truths = []
+    for s in true_state:
+      truths += [self.env.reset(pstate=s)['lcd']]
+    preds = 1.0 * np.stack(preds)
+    truths = 1.0 * np.stack(truths)
+    error = (preds - truths + 1.0) / 2.0
+    stack = np.concatenate([truths, preds, error], -2)[:, None]
+    writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
+
+
   def loss(self, batch, eval=False, return_idxs=False):
-    x = batch['lcd']
-    embed_loss, decoded, perplexity, idxs = self.forward(x)
-    recon_loss = -thd.Bernoulli(logits=decoded).log_prob(x).mean()
+    embed_loss, decoded, perplexity, idxs = self.forward(batch)
+    recon_losses = {}
+    recon_losses['recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:,None]).mean()
+    recon_loss = sum(recon_losses.values())
     loss = recon_loss + embed_loss
-    prior_loss = th.zeros(1)
-    metrics = {'vq_vae_loss': loss, 'recon_loss': recon_loss, 'embed_loss': embed_loss, 'perplexity': perplexity, 'prior_loss': prior_loss}
-    if eval:
-      metrics['decoded'] = decoded
-    if return_idxs:
-      metrics['idxs'] = idxs
+    metrics = {'vq_vae_loss': loss, 'embed_loss': embed_loss, 'perplexity': perplexity, **recon_losses, 'recon_loss': recon_loss}
+    if eval: metrics['decoded'] = decoded
+    if return_idxs: metrics['idxs'] = idxs
     return loss, metrics
 
   def forward(self, x):
@@ -65,44 +94,40 @@ class VQVAE(nn.Module):
     decoded = self.decoder(z_q)
     return embed_loss, decoded, perplexity, idxs
 
-  def evaluate(self, writer, batch, epoch):
-    flatter_batch = {key: val[:8, 0] for key, val in batch.items()}
-    lcd = flatter_batch['lcd']
-    _, decoded, _, _ = self.forward(lcd)
-    #recon = 1.0 * (decoded.exp() > 0.5).cpu()
-    #recon = th.sigmoid(decoded) > 0.5
-    recon = 1.0 * (th.sigmoid(decoded)).cpu()
-    #recon = 1.0 * (th.sigmoid(decoded) > 0.5).cpu()
-    #recon = th.sigmoid(decoded.exp()).cpu()
-    recon = th.cat([lcd[:,None].cpu(), recon], 0)
-    writer.add_image('reconstruction', utils.combine_imgs(recon, 2, 8)[None], epoch)
-    #samples = self.sample(25)
-    #writer.add_image('samples', utils.combine_imgs(samples, 5, 5)[None], epoch)
-
-  def sample(self, n):
-    import ipdb; ipdb.set_trace()
-    prior_idxs = self.transformerCNN.sample(n)[0]
-    prior_enc = self.vq.idx_to_encoding(prior_idxs)
-    prior_enc = prior_enc.reshape([n, 7, 7, -1]).permute(0, 3, 1, 2)
-    decoded = self.decoder(prior_enc)
-    return 1.0*(decoded.exp() > 0.5).cpu()
-
 class Encoder(nn.Module):
-  def __init__(self, C):
+  def __init__(self, env, C):
     super().__init__()
-    H = C.nfilter
-    self.net = nn.Sequential(
-        nn.Conv2d(1, H, 3, 2, padding=1),
-        nn.ReLU(),
-        nn.Conv2d(H, H, 3, 2, padding=1),
-        nn.ReLU(),
-        nn.GroupNorm(32, H),
-        nn.Conv2d(H, H, 3, 1, padding=1),
-        nn.ReLU(),
-        nn.Conv2d(H, C.vqD, 1, 1),
+    H = C.hidden_size
+    state_n = env.observation_space.spaces['pstate'].shape[0]
+    act_n = env.action_space.shape[0]
+
+    self.state_embed = nn.Sequential(
+      nn.Linear(state_n, H),
+      nn.ReLU(),
+      nn.Linear(H, H),
+      nn.ReLU(),
+      nn.Linear(H, H),
     )
-  def forward(self, x):
-    return self.net(x[:,None])
+    self.seq = nn.ModuleList([
+        nn.Conv2d(1, H, 3, 1, padding=1),
+        ResBlock(H, emb_channels=H),
+        nn.Conv2d(H, H, 3, 2, padding=1),
+        ResBlock(H, emb_channels=H),
+        nn.Conv2d(H, H, 3, 2, padding=1),
+        ResBlock(H, emb_channels=H),
+    ])
+
+  def forward(self, batch):
+    state = batch['pstate']
+    lcd = batch['lcd']
+    emb = self.state_embed(state)
+    x = lcd[:,None]
+    for layer in self.seq:
+      if isinstance(layer, ResBlock):
+        x = layer(x, emb)
+      else:
+        x = layer(x)
+    return x
 
 class Upsample(nn.Module):
   """double the size of the input"""
@@ -115,23 +140,60 @@ class Upsample(nn.Module):
     return x
 
 class Decoder(nn.Module):
-  def __init__(self, C):
+  def __init__(self, env, C):
     super().__init__()
-    H = C.nfilter
-    self.net = nn.Sequential(
-      nn.ConvTranspose2d(C.vqD, H, 1, 1),
+    H = C.hidden_size
+    state_n = env.observation_space.spaces['pstate'].shape[0]
+    self.state_net = nn.Sequential(
+      nn.Flatten(-3),
+      nn.Linear(C.vqD*4*8, H),
       nn.ReLU(),
-      nn.GroupNorm(32, H),
-      nn.ConvTranspose2d(H, H, 4, 2, padding=2),
-      #nn.ConvTranspose2d(C.vqD, H, 4, 2, padding=2),
+      nn.Linear(H, H),
       nn.ReLU(),
-      nn.ConvTranspose2d(H, H, 3, 1),
-      nn.ReLU(),
-      nn.GroupNorm(32, H),
-      nn.ConvTranspose2d(H, H, 3, 1, padding=1),
-      nn.ReLU(),
-      nn.ConvTranspose2d(H, 1, 4, 2, padding=1),
+      nn.Linear(H, state_n),
     )
-    
+    self.net = nn.Sequential(
+        Upsample(C.vqD, H),
+        nn.ReLU(),
+        Upsample(H, H),
+        nn.ReLU(),
+        nn.Conv2d(H, H, 3, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(H, 1, 3, padding=1),
+    )
   def forward(self, x):
-    return self.net(x)
+    lcd_dist = thd.Bernoulli(logits=self.net(x))
+    state_dist = thd.Normal(self.state_net(x), 1)
+    return {'lcd': lcd_dist, 'pstate': state_dist}
+
+class ResBlock(nn.Module):
+  def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0):
+    super().__init__()
+    self.out_channels = out_channels or channels
+
+    self.in_layers = nn.Sequential(
+        nn.GroupNorm(32, channels),
+        nn.SiLU(),
+        nn.Conv2d(channels, self.out_channels, 3, padding=1)
+    )
+    self.emb_layers = nn.Sequential(
+        nn.SiLU(),
+        nn.Linear(emb_channels, self.out_channels)
+    )
+    self.out_layers = nn.Sequential(
+        nn.GroupNorm(32, self.out_channels),
+        nn.SiLU(),
+        nn.Dropout(p=dropout),
+        utils.zero_module(nn.Conv2d(self.out_channels, self.out_channels, 3, padding=1))
+    )
+    if self.out_channels == channels:
+      self.skip_connection = nn.Identity()
+    else:
+      self.skip_connection = nn.Conv2d(channels, self.out_channels, 1)  # step down size
+
+  def forward(self, x, emb):
+    h = self.in_layers(x)
+    emb_out = self.emb_layers(emb)[..., None, None]
+    h = h + emb_out
+    h = self.out_layers(h)
+    return self.skip_connection(x) + h

@@ -26,7 +26,6 @@ from research.nets.vae import VAE
 from research.nets.combined import Combined
 from research.nets.qvae import QVAE
 from research.nets.vqvae import VQVAE
-from research.nets.ovae import OVAE
 
 import data
 
@@ -84,8 +83,6 @@ if __name__ == '__main__':
       model = SVAE(env, C)
     elif C.model == 'qvae':
       model = QVAE(env, C)
-    elif C.model == 'ovae':
-      model = OVAE(env, C)
     else:
       assert "we don't have that model", C.model
     model.to(C.device)

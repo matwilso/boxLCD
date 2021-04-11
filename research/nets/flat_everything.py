@@ -53,7 +53,7 @@ class FlatEverything(nn.Module):
 
   def save(self, dir):
     print("SAVED MODEL", dir)
-    path = dir / 'flatev2.pt'
+    path = dir / 'flatev.pt'
     sd = self.state_dict()
     sd['C'] = self.C
     th.save(sd, path)
@@ -61,7 +61,7 @@ class FlatEverything(nn.Module):
     self.svae.save(dir)
 
   def load(self, dir):
-    path = dir / 'flatev2.pt'
+    path = dir / 'flatev.pt'
     sd = th.load(path)
     C = sd.pop('C')
     self.load_state_dict(sd)
