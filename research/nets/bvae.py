@@ -13,7 +13,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
+#from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
 from torch import distributions as thd
 from torch.optim import Adam
@@ -102,6 +102,7 @@ class BVAE(nn.Module):
 
   def encode(self, x):
     z_e = self.encoder(x)
+    #return z_e.flatten(-3)
     z_q, embed_loss, idxs = self.vq(z_e)
     z_q = z_q.flatten(-3)
     assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
@@ -193,7 +194,7 @@ class ResBlock(nn.Module):
     self.out_channels = out_channels or channels
 
     self.in_layers = nn.Sequential(
-        nn.GroupNorm(32, channels),
+        nn.GroupNorm(4, channels),
         nn.SiLU(),
         nn.Conv2d(channels, self.out_channels, 3, padding=1)
     )
@@ -202,7 +203,7 @@ class ResBlock(nn.Module):
         nn.Linear(emb_channels, self.out_channels)
     )
     self.out_layers = nn.Sequential(
-        nn.GroupNorm(32, self.out_channels),
+        nn.GroupNorm(4, self.out_channels),
         nn.SiLU(),
         nn.Dropout(p=dropout),
         utils.zero_module(nn.Conv2d(self.out_channels, self.out_channels, 3, padding=1))

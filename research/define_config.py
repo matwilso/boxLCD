@@ -1,3 +1,4 @@
+import torch as th
 import gym
 import argparse
 from research import wrappers
@@ -9,6 +10,7 @@ from boxLCD import envs, env_map
 from boxLCD import ENV_DC
 from boxLCD.utils import args_type
 
+
 def env_fn(C, seed=None):
   def _make():
     if C.env in env_map:
@@ -19,6 +21,9 @@ def env_fn(C, seed=None):
           env = wrappers.BodyGoalEnv(env, C)
         else:
           env = wrappers.CubeGoalEnv(env, C)
+      #if C.preproc:
+      #  assert C.env == 'Luxo'
+      #  env = wrappers.PreprocEnv(env, C)
     else:
       env = gym.make(C.env)
       env = wrappers.WrappedGym(env, C)
@@ -83,6 +88,7 @@ def config():
 
   C.env = 'Dropbox'
   C.goals = 0
+  C.preproc = 0
   C.state_rew = 1
   C.rew_scale = 1.0
 

@@ -25,12 +25,16 @@ class VAE(nn.Module):
   def save(self, dir):
     print("SAVED MODEL", dir)
     path = dir / 'vae.pt'
-    th.save(self.state_dict(), path)
+    sd = self.state_dict()
+    sd['C'] = self.C
+    th.save(sd, path)
     print(path)
 
-  def load(self, path):
-    path = path / 'vae.pt'
-    self.load_state_dict(th.load(path))
+  def load(self, dir):
+    path = dir / 'vae.pt'
+    sd = th.load(path)
+    C = sd.pop('C')
+    self.load_state_dict(sd)
     print(f'LOADED {path}')
 
   def loss(self, batch):
@@ -55,6 +59,11 @@ class VAE(nn.Module):
       self.optimizer.step()
     return metrics
 
+  def encode(self, batch):
+    x = batch['lcd'][:,None]
+    z_post = self.encoder(x).mean
+    return z_post
+
   def evaluate(self, writer, batch, epoch):
     """run samples and other evaluations"""
     x = batch['lcd'].reshape([-1, 1, self.C.lcd_h, self.C.lcd_w])
@@ -64,8 +73,8 @@ class VAE(nn.Module):
     writer.add_image('reconstruction', utils.combine_imgs(recon, 2, 8)[None], epoch)
 
   def _decode(self, x):
-    return th.sigmoid(self.decoder(x)).cpu()
-    #return 1.0 * (th.sigmoid(x) > 0.5).cpu()
+    #return th.sigmoid(self.decoder(x)).cpu()
+    return 1.0 * (th.sigmoid(self.decoder(x)) > 0.5).cpu()
     #return 1.0 * (self.decoder(x).exp() > 0.5).cpu()
 
 class Encoder(nn.Module):

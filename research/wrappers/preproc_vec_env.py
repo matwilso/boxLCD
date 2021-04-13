@@ -1,11 +1,14 @@
+import torch as th
 import copy
+from re import I
 import gym
 import numpy as np
 from gym.utils import seeding, EzPickle
 from research import utils
 from wrappers.async_vector_env import AsyncVectorEnv
+from scipy.spatial.distance import cosine
 
-class PreprocVecEnv(AsyncVectorEnv):
+class PreprocVecEnv:
   """
   Learned model that preprocesses observations and produces a `zstate`
   """
@@ -17,6 +20,7 @@ class PreprocVecEnv(AsyncVectorEnv):
     self.device = device
     self.model.to(device)
     self.model.eval()
+    self.shared_memory = env.shared_memory
 
   @property
   def action_space(self):
@@ -48,9 +52,18 @@ class PreprocVecEnv(AsyncVectorEnv):
   def render(self, *args, **kwargs):
     self._env.render(*args, **kwargs)
 
+  def comp_rew(self, z, gz):
+    cos = np.zeros(z.shape[0])
+    for i in range(len(z)):
+      cos[i] = -cosine(z[i],gz[i])
+    return cos
+
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
-    return self._preproc_obs(obs), rew, done, info
+    obs = self._preproc_obs(obs)
+    if self.C.preproc_rew:
+      rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+    return obs, rew, done, info
 
   def close(self):
     self._env.close()

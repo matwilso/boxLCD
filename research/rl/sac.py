@@ -1,4 +1,6 @@
-from functools import update_wrapper
+from functools import WRAPPER_UPDATES, update_wrapper
+from re import I
+from research.nets.bvae import BVAE
 import matplotlib.pyplot as plt
 import yaml
 from datetime import datetime
@@ -51,13 +53,27 @@ def sac(C):
   else:
     env = wrappers.AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
     tvenv = real_tvenv
+    if C.preproc:
+      MC = th.load(C.weightdir / 'bvae.pt').pop('C')
+      preproc = BVAE(tenv, MC)
+      preproc.load(C.weightdir)
+      for p in preproc.parameters():
+        p.requires_grad = False
+      preproc.eval()
+
+      env = wrappers.PreprocVecEnv(preproc, env, C)
+      real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, C)
+      obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
+      if 'goal:pstate' in obs_space.spaces:
+        obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
 
   #tenv.reset()
   epoch = -1
 
   # Create actor-critic module and target networks
-  ac = ActorCritic(tenv, C=C).to(C.device)
+  ac = ActorCritic(obs_space, act_space, C=C).to(C.device)
   ac_targ = deepcopy(ac)
+
 
   # Freeze target networks with respect to optimizers (only updte via polyak averaging)
   for p in ac_targ.parameters():
@@ -76,12 +92,11 @@ def sac(C):
 
   # Set up function for computing SAC Q-losses
   def compute_loss_q(data):
+    q_info = {}
     alpha = C.alpha if not C.learned_alpha else th.exp(ac.log_alpha).detach()
     o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
     if not C.use_done:
       d = 0
-    if C.net == 'vae' and C.vae_rew:
-      r = ac.comp_rew(o).detach()
     q1 = ac.q1(o, a)
     q2 = ac.q2(o, a)
 
@@ -102,8 +117,16 @@ def sac(C):
     loss_q = loss_q1 + loss_q2
 
     # Useful info for logging
-    q_info = dict(Q1Vals=q1.mean().detach().cpu(), Q2Vals=q2.mean().detach().cpu())
-    q_info['batchR'] = r.mean().detach().cpu()
+    q_info['q1/mean'] = q1.mean()
+    q_info['q2/mean'] = q2.mean()
+    q_info['q1/min'] = q1.min()
+    q_info['q1/max'] = q1.max()
+    q_info['batchR/mean'] = r.mean()
+    q_info['batchR/min'] = r.min()
+    q_info['batchR/max'] = r.max()
+    q_info['residual_variance'] = (q1-backup).var() / backup.var()
+    q_info['target_min'] = backup.min()
+    q_info['target_max'] = backup.max()
     return loss_q, q_info
 
   # Set up function for computing SAC pi loss
@@ -149,13 +172,13 @@ def sac(C):
     # Record things
     logger['LossQ'] += [loss_q.detach().cpu()]
     for key in q_info:
-      logger[key] += [q_info[key]]
+      logger[key] += [q_info[key].detach().cpu()]
 
     # Freeze Q-networks so you don't waste computational effort
     # computing gradients for them during the policy learning step.
     for p in q_params:
       p.requires_grad = False
-      if C.net == 'vae':
+      if 'vae' in C.net:
         for p in ac.preproc.parameters():
           p.requires_grad = False
 
@@ -207,7 +230,7 @@ def sac(C):
       a = a.cpu().numpy()
     return a, q
 
-  def test_agent(use_lenv=False):
+  def test_agent(itr, use_lenv=False):
     # init
     REP = 4
     if use_lenv:
@@ -287,16 +310,15 @@ def sac(C):
         dframes += [np.array(pframe)]
       dframes = np.stack(dframes)
       vid = dframes.transpose(0, -1, 1, 2)[None]
-      utils.add_video(writer, f'{prefix}_rollout', vid, epoch, fps=C.fps)
+      utils.add_video(writer, f'{prefix}_rollout', vid, itr+1, fps=C.fps)
       print('wrote video', prefix)
     logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
     logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
     logger[f'{prefix}_test/success_rate'] += [proc(success).mean()]
-  test_agent()
-  if C.lenv: test_agent(use_lenv=True)
+  test_agent(-1)
+  if C.lenv: test_agent(-1,use_lenv=True)
 
   # Prepare for interaction with environment
-  total_steps = C.steps_per_epoch * C.epochs
   epoch_time = start_time = time.time()
 
   if C.lenv and C.lenv_cont_roll:
@@ -314,18 +336,19 @@ def sac(C):
       #print(itr)
       if itr % 200 == 0:
         o = env.reset()
-      if itr % C.steps_per_epoch == 0:
-        test_agent()
-        if C.lenv: test_agent(use_lenv=True)
+      if itr % C.log_n == 0:
+        epoch = itr//C.log_n
+        if epoch % C.test_n == 0:
+          test_agent(itr)
+          if C.lenv: test_agent(itr, use_lenv=True)
         # Log info about epoch
-        epoch = itr//C.steps_per_epoch
         print('=' * 30)
         print('Epoch', epoch)
         logger['var_count'] = [sum_count]
         logger['dt'] = dt = time.time() - epoch_time
         for key in logger:
           val = np.mean(logger[key])
-          writer.add_scalar(key, val, epoch)
+          writer.add_scalar(key, val, itr)
           print(key, val)
         writer.flush()
         print('Time', time.time() - start_time)
@@ -351,11 +374,11 @@ def sac(C):
     time_to_succ = C.ep_len*np.ones(C.num_envs)
     pf = np
   # Main loop: collect experience in venv and update/log each epoch
-  for t in range(total_steps):
+  for itr in range(C.total_steps):
     # Until start_steps have elapsed, randomly sample actions
     # from a uniform distribution for better exploration. Afterwards,
     # use the learned policy.
-    if t > C.start_steps:
+    if itr > C.start_steps:
       with utils.Timer(logger, 'action'):
         o = {key: val for key, val in o.items()}
         a = get_action(o)
@@ -418,7 +441,7 @@ def sac(C):
         #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
     # Updte handling
-    if t >= C.update_after and t % C.update_every == 0:
+    if itr >= C.update_after and itr % C.update_every == 0:
       for j in range(int(C.update_every*1.0)):
         with utils.Timer(logger, 'sample_batch'):
          batch = replay_buffer.sample_batch(C.bs)
@@ -426,24 +449,25 @@ def sac(C):
           update(data=batch)
 
     # End of epoch handling
-    if (t + 1) % C.steps_per_epoch == 0:
-      epoch = (t + 1) // C.steps_per_epoch
+    if (itr + 1) % C.log_n == 0:
+      epoch = (itr + 1) // C.log_n
 
       # Save model
-      if (epoch % C.save_freq == 0) or (epoch == C.epochs):
+      if (epoch % C.save_freq == 0) or (itr == C.total_steps):
         th.save(ac, C.logdir / 'weights.pt')
 
       if (C.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
 
       # Test the performance of the deterministic version of the agent.
-      if epoch % 1 == 0:
-        test_agent()
-        if C.lenv: test_agent(use_lenv=True)
+      if epoch % C.test_n == 0:
+        with utils.Timer(logger, 'test_agent'):
+          test_agent(itr)
+          if C.lenv: test_agent(itr, use_lenv=True)
 
-        if C.net == 'vae':
+        if 'vae' in C.net:
           test_batch = replay_buffer.sample_batch(8)
-          ac.preproc.evaluate(writer, test_batch['obs'], epoch)
+          ac.preproc.evaluate(writer, test_batch['obs'], itr)
         #test_agent(video=epoch % 1 == 0)
         # if replay_buffer.ptr > C.ep_len*4:
         #  eps = replay_buffer.get_last(4)
@@ -461,10 +485,10 @@ def sac(C):
       print('Epoch', epoch)
       logger['var_count'] = [sum_count]
       logger['dt'] = dt = time.time() - epoch_time
-      logger['env_interactions'] = env_interactions = t*C.num_envs
+      logger['env_interactions'] = env_interactions = itr*C.num_envs
       for key in logger:
         val = np.mean(logger[key])
-        writer.add_scalar(key, val, epoch)
+        writer.add_scalar(key, val, itr+1)
         print(key, val)
       writer.flush()
       print('TotalEnvInteracts', env_interactions)
@@ -481,12 +505,12 @@ def sac(C):
 
 _C = boxLCD.utils.AttrDict()
 _C.replay_size = int(1e6)
-_C.epochs = 100000
-_C.steps_per_epoch = 4000
+_C.total_steps = 1000000
+_C.test_n = 1
 _C.save_freq = 10
 _C.gamma = 0.99
-_C.learned_alpha = 0
-_C.alpha_lr = 5e-4  # for SAC w/ learned alpha
+_C.learned_alpha = 1
+_C.alpha_lr = 1e-4  # for SAC w/ learned alpha
 _C.alpha = 0.1  # for SAC w/o learned alpha
 _C.polyak = 0.995
 _C.num_test_episodes = 2
@@ -494,7 +518,6 @@ _C.update_every = 40
 _C.start_steps = 1000
 _C.update_after = 1000
 _C.use_done = 0
-_C.vae_rew = 0
 _C.net = 'mlp'
 _C.zdelta = 1
 _C.lenv = 0
@@ -507,6 +530,8 @@ _C.succ_reset = 1 # between lenv and normal env
 _C.state_key = 'pstate'
 _C.diff_delt = 0
 _C.goal_thresh = 0.010
+_C.preproc_rew = 0
+# TODO: allow changing default values.
 
 
 if __name__ == '__main__':

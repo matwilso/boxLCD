@@ -13,6 +13,9 @@ class CubeGoalEnv:
     self.idxs = [self._env.obs_keys.index(x) for x in self.keys]
     self.rootkeys = utils.filtlist(self._env.obs_keys, '.*root.*(x|y):p')
     self.root_idxs = [self._env.obs_keys.index(x) for x in self.rootkeys]
+    #self.obs_keys = self._env.obs_keys
+    #self.obs_idxs = self._env.obs_idxs
+
 
   @property
   def action_space(self):
@@ -47,6 +50,7 @@ class CubeGoalEnv:
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:pstate'] = np.array(self.goal['pstate'])
     obs['goal:full_state'] = np.array(self.goal['full_state'][..., self.idxs])
+    obs['goal:total'] = np.array(self.goal['full_state'])
     rew, _done = self.comp_rew_done(obs, info)
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()

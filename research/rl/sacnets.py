@@ -1,3 +1,4 @@
+from re import I
 from research import utils
 from datetime import datetime
 import PIL
@@ -147,11 +148,11 @@ class QFunction(nn.Module):
       x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key], act], -1)
       return self.base(x).squeeze(-1)
     elif self.C.net == 'bvae':
-      x = self.preproc.encode(obs)
+      x = self.preproc.encode(obs).detach()
       x = self.statie(x)
       if 'goal:pstate' in obs:
         goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
-        gx = self.preproc.encode(goals)
+        gx = self.preproc.encode(goals).detach()
         gx = self.goalie(gx)
         x = th.cat([x, gx], -1)
         #x = x + gx
@@ -197,13 +198,14 @@ class SquashedGaussianActor(nn.Module):
     if self.C.net == 'mlp':
       x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
     elif self.C.net == 'bvae':
-      x = self.preproc.encode(obs)
-      x = self.statie(x)
+      z = self.preproc.encode(obs).detach()
+      x = self.statie(z)
       if 'goal:pstate' in obs:
         goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
-        gx = self.preproc.encode(goals)
-        gx = self.goalie(gx)
+        gz = self.preproc.encode(goals).detach()
+        gx = self.goalie(gz)
         x = th.cat([x, gx], -1)
+        #1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
         #x = x + gx
     else:
       x = obs
@@ -237,22 +239,13 @@ class SquashedGaussianActor(nn.Module):
     return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
 
 class ActorCritic(nn.Module):
-  def __init__(self, env, C=None):
+  def __init__(self, obs_space, act_space, C=None):
     super().__init__()
-    obs_space = env.observation_space
-    act_space = env.action_space
     act_dim = act_space.shape[0]
 
     self.preproc = None
     if C.net == 'vae':
       self.preproc = VAE(C)
-      self.preproc.load(C.weightdir)
-      for p in self.preproc.parameters():
-        p.requires_grad = False
-      self.preproc.eval()
-    if C.net == 'bvae':
-      MC = th.load(C.weightdir / 'bvae.pt').pop('C')
-      self.preproc = BVAE(env, MC)
       self.preproc.load(C.weightdir)
       for p in self.preproc.parameters():
         p.requires_grad = False

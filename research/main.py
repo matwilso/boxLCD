@@ -92,17 +92,20 @@ if __name__ == '__main__':
     C.num_vars = utils.count_vars(model)
 
   if C.mode == 'train':
-    trainer = runners.Trainer(model, env, C)
-    trainer.run()
+    runner = runners.Trainer(model, env, C)
   elif C.mode == 'viz':
-    vizer = runners.Vizer(model, env, C)
-    if C.ipython_mode:
-      import IPython
-      from traitlets.config import Config
-      c = Config()
-      c.InteractiveShellApp.exec_lines = ['vizer.run()']
-      c.TerminalInteractiveShell.banner2 = '***Welcome to Quick Iter Mode***'
-      IPython.start_ipython(config=c, user_ns=locals())
-    vizer.run()
+    runner = runners.Vizer(model, env, C)
   elif C.mode == 'collect':
     data.collect(env_fn(C), C)
+  elif C.mode == 'fiddle':
+    runner = runners.Fiddler(model, env, C)
+
+  if C.ipython_mode:
+    import IPython
+    from traitlets.config import Config
+    c = Config()
+    c.InteractiveShellApp.exec_lines = ['runner.run()']
+    c.TerminalInteractiveShell.banner2 = '***Welcome to Quick Iter Mode***'
+    IPython.start_ipython(config=c, user_ns=locals())
+  else:
+    runner.run()
