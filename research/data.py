@@ -19,13 +19,13 @@ import time
 
 BARREL_SIZE = int(1e3)
 
-def collect(make_env, C):
-  C.logdir.mkdir(parents=True, exist_ok=True)
-  utils.dump_logger({}, None, 0, C)
+def collect(make_env, G):
+  G.logdir.mkdir(parents=True, exist_ok=True)
+  utils.dump_logger({}, None, 0, G)
   env = make_env()
-  assert C.train_barrels != -1 and C.test_barrels != -1, f'must set the number of barrels you want to fill. C.train_barrels=={C.train_barrels}'
-  fill_barrels(env, C.test_barrels, C.logdir/'test')
-  fill_barrels(env, C.train_barrels, C.logdir/'train')
+  assert G.train_barrels != -1 and G.test_barrels != -1, f'must set the number of barrels you want to fill. G.train_barrels=={G.train_barrels}'
+  fill_barrels(env, G.test_barrels, G.logdir/'test')
+  fill_barrels(env, G.train_barrels, G.logdir/'train')
 
 def fill_barrels(env, num_barrels, logdir):
   """Create files with:
@@ -39,13 +39,13 @@ def fill_barrels(env, num_barrels, logdir):
   barrel_bar = tqdm(total=BARREL_SIZE)
   total_bar.set_description(f'TOTAL PROGRESS (FPS=N/A)')
   for ti in range(num_barrels):
-    obses = {key: np.zeros([BARREL_SIZE, env.C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
-    acts = np.zeros([BARREL_SIZE, env.C.ep_len, env.action_space.shape[0]])
+    obses = {key: np.zeros([BARREL_SIZE, env.G.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
+    acts = np.zeros([BARREL_SIZE, env.G.ep_len, env.action_space.shape[0]])
     barrel_bar.reset()
     for bi in range(BARREL_SIZE):
       start = time.time()
       obs = env.reset()
-      for j in range(env.C.ep_len):
+      for j in range(env.G.ep_len):
         act = env.action_space.sample()
         for key in obses:
           obses[key][bi, j] = obs[key]
@@ -55,14 +55,14 @@ def fill_barrels(env, num_barrels, logdir):
         # env.render()
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       barrel_bar.update(1)
-      fps = env.C.ep_len / (time.time() - start)
+      fps = env.G.ep_len / (time.time() - start)
       barrel_bar.set_description(f'current barrel')
       # barrel_bar.set_description(f'fps: {} | current barrel')
-    if (env.C.logdir / 'pause.marker').exists():
+    if (env.G.logdir / 'pause.marker').exists():
       import ipdb; ipdb.set_trace()
 
     timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-    data = np.savez_compressed(logdir/f'{timestamp}-{env.C.ep_len}.barrel', acts=acts, **obses)
+    data = np.savez_compressed(logdir/f'{timestamp}-{env.G.ep_len}.barrel', acts=acts, **obses)
     total_bar.update(1)
     total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
 
@@ -110,9 +110,9 @@ class RolloutDataset(IterableDataset):
       if ct >= self.nbarrels-1 and not self.infinite:
         break
 
-def load_ds(C):
-  train_dset = RolloutDataset(C.datapath / 'train', C.window, refresh_data=C.refresh_data)
-  test_dset = RolloutDataset(C.datapath / 'test', C.window, infinite=False)
-  train_loader = DataLoader(train_dset, batch_size=C.bs, pin_memory=C.device == 'cuda', num_workers=8, drop_last=True)
-  test_loader = DataLoader(test_dset, batch_size=C.bs, pin_memory=C.device == 'cuda', num_workers=8, drop_last=True)
+def load_ds(G):
+  train_dset = RolloutDataset(G.datapath / 'train', G.window, refresh_data=G.refresh_data)
+  test_dset = RolloutDataset(G.datapath / 'test', G.window, infinite=False)
+  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=8, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=8, drop_last=True)
   return train_loader, test_loader

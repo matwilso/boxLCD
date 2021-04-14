@@ -10,6 +10,29 @@ import scipy
 import re
 import numpy as np
 
+# general dictionary and list utils
+def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
+def sortdict(x): return subdict(x, sorted(x))
+def subdlist(dict, subkeys): return [dict[key] for key in subkeys]
+# filter or negative filter
+def filtdict(dict, phrase, fkey=lambda x: x, fval=lambda x: x):
+  return {fkey(key): fval(dict[key]) for key in dict if re.match(phrase, key) is not None}
+def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
+def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]
+def nfiltlist(list, phrase): return [item for item in list if re.match(phrase, item) is None]
+# env specific stuff
+def get_angle(sin, cos): return np.arctan2(sin, cos)
+def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
+# map from -1,1 to bounds
+def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
+# map from bounds to -1,1
+def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
+def prefix_dict(name, dict): return {name+key: dict[key] for key in dict}
+
+class AttrDict(dict):
+  __setattr__ = dict.__setitem__
+  __getattr__ = dict.__getitem__
+
 def tileN(x, N): return th.tile(x[None], [N] + [1] * len(x.shape))
 
 def combined_shape(length, shape=None):
@@ -20,13 +43,7 @@ def combined_shape(length, shape=None):
 def count_vars(module):
   return sum([np.prod(p.shape) for p in module.parameters()])
 
-def zero_module(module):
-  """Zero out the parameters of a module and return it."""
-  for p in module.parameters():
-    p.detach().zero_()
-  return module
-
-def dump_logger(logger, writer, i, C):
+def dump_logger(logger, writer, i, G):
   print('=' * 30)
   print(i)
   for key in logger:
@@ -38,10 +55,10 @@ def dump_logger(logger, writer, i, C):
       # if 'loss' in key:
       #  writer.add_scalar('neg/'+key, -val, i)
     print(key, val)
-  print(C.full_cmd)
-  print(C.num_vars)
-  with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(C, f, width=1000)
+  print(G.full_cmd)
+  print(G.num_vars)
+  with open(pathlib.Path(G.logdir) / 'hps.yaml', 'w') as f:
+    yaml.dump(G, f, width=1000)
   print('=' * 30)
   return defaultdict(lambda: [])
 
@@ -168,30 +185,6 @@ def make_video(tensor, fps):
     logging.warning('The temporary file used by moviepy cannot be deleted.')
   return Summary.Image(height=h, width=w, colorspace=c, encoded_image_string=tensor_string)
 
-
-# general dictionary and list utils
-def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
-def sortdict(x): return subdict(x, sorted(x))
-def subdlist(dict, subkeys): return [dict[key] for key in subkeys]
-# filter or negative filter
-def filtdict(dict, phrase, fkey=lambda x: x, fval=lambda x: x):
-  return {fkey(key): fval(dict[key]) for key in dict if re.match(phrase, key) is not None}
-def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
-def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]
-def nfiltlist(list, phrase): return [item for item in list if re.match(phrase, item) is None]
-# env specific stuff
-def get_angle(sin, cos): return np.arctan2(sin, cos)
-def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
-# map from -1,1 to bounds
-def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
-# map from bounds to -1,1
-def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
-def prefix_dict(name, dict): return {name+key: dict[key] for key in dict}
-
-
-class AttrDict(dict):
-  __setattr__ = dict.__setitem__
-  __getattr__ = dict.__getitem__
 
 
 def compute_grad_norm(parameters):

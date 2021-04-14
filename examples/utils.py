@@ -7,32 +7,33 @@ from collections import defaultdict
 import subprocess
 import sys
 import pathlib
-from boxLCD import envs, env_map, ENV_DC
+from boxLCD import envs, env_map, ENV_DG
 from boxLCD.utils import args_type, AttrDict
 
 def config():
-  C = AttrDict()
+  # G as in confi(G), fla(G), settin(G), ar(G). G is a single letter that is not overloaded already ((F)unctional, (C)hannel, (H)eight, etc.)
+  G = AttrDict()
   # BASICS
-  C.logdir = pathlib.Path('./logs/')
-  C.datapath = pathlib.Path('.')
-  C.collect_n = 10000
-  C.env = 'Bounce'
+  G.logdir = pathlib.Path('./logs/')
+  G.datapath = pathlib.Path('.')
+  G.collect_n = 10000
+  G.env = 'Bounce'
   # training stuff
-  C.device = 'cuda'  # 'cuda', 'cpu'
-  C.num_epochs = 200
-  C.bs = 64
-  C.lr = 5e-4
-  C.n_layer = 2
-  C.n_embed = 128
-  C.n_head = 4
+  G.device = 'cuda'  # 'cuda', 'cpu'
+  G.num_epochs = 200
+  G.bs = 64
+  G.lr = 5e-4
+  G.n_layer = 2
+  G.n_embed = 128
+  G.n_head = 4
   # extra info that we set here for convenience and don't modify
-  C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
-  C.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
-  pastKeys = list(C.keys())
-  for key, val in ENV_DC.items():
+  G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
+  G.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
+  pastKeys = list(G.keys())
+  for key, val in ENV_DG.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
-    C[key] = val
-  return C
+    G[key] = val
+  return G
 
 def parse_args():
   parser = argparse.ArgumentParser()
@@ -40,13 +41,12 @@ def parse_args():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   tempC = parser.parse_args()
   Env = env_map[tempC.env]
-  parser.set_defaults(**Env.ENV_DC)
-  C = AttrDict(parser.parse_args().__dict__)
-  return C
-
+  parser.set_defaults(**Env.ENV_DG)
+  G = AttrDict(parser.parse_args().__dict__)
+  return G
 
 class RolloutDataset(Dataset):
-  def __init__(self, npzfile, train=True, C=None):
+  def __init__(self, npzfile, train=True, G=None):
     data = np.load(npzfile, allow_pickle=True)
     self.bufs = {key: th.as_tensor(data[key]) for key in data.keys()}
     cut = int(len(self.bufs['acts']) * 0.8)
@@ -63,14 +63,14 @@ class RolloutDataset(Dataset):
     elem['lcd'] /= 255.0
     return elem
 
-def load_ds(C):
-  train_dset = RolloutDataset(C.datapath, train=True, C=C)
-  test_dset = RolloutDataset(C.datapath, train=False, C=C)
-  train_loader = DataLoader(train_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
-  test_loader = DataLoader(test_dset, batch_size=C.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
+def load_ds(G):
+  train_dset = RolloutDataset(G.datapath, train=True, G=G)
+  test_dset = RolloutDataset(G.datapath, train=False, G=G)
+  train_loader = DataLoader(train_dset, batch_size=G.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=G.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   return train_loader, test_loader
 
-def dump_logger(logger, writer, i, C):
+def dump_logger(logger, writer, i, G):
   print('=' * 30)
   print(i)
   for key in logger:
@@ -78,11 +78,11 @@ def dump_logger(logger, writer, i, C):
     if writer is not None:
       writer.add_scalar(key, val, i)
     print(key, val)
-  print(C.full_cmd)
-  print(C.num_vars)
-  pathlib.Path(C.logdir).mkdir(parents=True, exist_ok=True)
-  with open(pathlib.Path(C.logdir) / 'hps.yaml', 'w') as f:
-    yaml.dump(dict(C), f, width=1000)
+  print(G.full_cmd)
+  print(G.num_vars)
+  pathlib.Path(G.logdir).mkdir(parents=True, exist_ok=True)
+  with open(pathlib.Path(G.logdir) / 'hps.yaml', 'w') as f:
+    yaml.dump(dict(G), f, width=1000)
   print('=' * 30)
   return defaultdict(lambda: [])
 

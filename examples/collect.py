@@ -22,21 +22,21 @@ import PIL.Image as Image
 from boxLCD.utils import A
 
 if __name__ == '__main__':
-  C = parse_args()
-  env = env_map[C.env](C)
-  N = C.collect_n
-  obses = {key: np.zeros([N, C.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
-  acts = np.zeros([N, C.ep_len, env.action_space.shape[0]])
+  G = parse_args()
+  env = env_map[G.env](G)
+  N = G.collect_n
+  obses = {key: np.zeros([N, G.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
+  acts = np.zeros([N, G.ep_len, env.action_space.shape[0]])
   pbar = tqdm(range(N))
   for i in pbar:
     start = time.time()
     obs = env.reset()
-    for j in range(C.ep_len):
+    for j in range(G.ep_len):
       act = env.action_space.sample()
       for key in obses:
         obses[key][i, j] = obs[key]
       acts[i, j] = act
       obs, rew, done, info = env.step(act)
-    pbar.set_description(f'fps: {C.ep_len/(time.time()-start)}')
+    pbar.set_description(f'fps: {G.ep_len/(time.time()-start)}')
   os.makedirs('rollouts', exist_ok=True)
-  np.savez_compressed(f'rollouts/{C.env}-{N}.npz', acts=acts, **obses)
+  np.savez_compressed(f'rollouts/{G.env}-{N}.npz', acts=acts, **obses)

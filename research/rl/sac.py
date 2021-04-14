@@ -31,38 +31,38 @@ from research import wrappers
 from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
 
-def sac(C):
-  print(C.full_cmd)
-  # th.manual_seed(C.seed)
-  # np.random.seed(C.seed)
+def sac(G):
+  print(G.full_cmd)
+  # th.manual_seed(G.seed)
+  # np.random.seed(G.seed)
 
   # Set up logger and save configuration
   logger = defaultdict(lambda: [])
-  writer = SummaryWriter(C.logdir)
-  tenv = env_fn(C, C.seed)()  # test env
+  writer = SummaryWriter(G.logdir)
+  tenv = env_fn(G, G.seed)()  # test env
   obs_space = tenv.observation_space
   act_space = tenv.action_space
   TN = 8
-  real_tvenv = wrappers.AsyncVectorEnv([env_fn(C) for _ in range(TN)])
-  if C.lenv:
-    MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
+  real_tvenv = wrappers.AsyncVectorEnv([env_fn(G) for _ in range(TN)])
+  if G.lenv:
+    MC = th.load(G.weightdir / 'flatev2.pt').pop('G')
     model = FlatEverything(tenv, MC)
-    env = wrappers.RewardLenv(wrappers.LearnedEnv(C.num_envs, model, C))
-    tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, C))
+    env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
+    tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
   else:
-    env = wrappers.AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
+    env = wrappers.AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
     tvenv = real_tvenv
-    if C.preproc:
-      MC = th.load(C.weightdir / 'bvae.pt').pop('C')
+    if G.preproc:
+      MC = th.load(G.weightdir / 'bvae.pt').pop('G')
       preproc = BVAE(tenv, MC)
-      preproc.load(C.weightdir)
+      preproc.load(G.weightdir)
       for p in preproc.parameters():
         p.requires_grad = False
       preproc.eval()
 
-      env = wrappers.PreprocVecEnv(preproc, env, C)
-      real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, C)
+      env = wrappers.PreprocVecEnv(preproc, env, G)
+      real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, G)
       obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
       #if 'goal:pstate' in obs_space.spaces:
       #  obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
@@ -71,7 +71,7 @@ def sac(C):
   epoch = -1
 
   # Create actor-critic module and target networks
-  ac = ActorCritic(obs_space, act_space, C=C).to(C.device)
+  ac = ActorCritic(obs_space, act_space, G=G).to(G.device)
   ac_targ = deepcopy(ac)
 
 
@@ -83,7 +83,7 @@ def sac(C):
   q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
 
   # Experience buffer
-  replay_buffer = ReplayBuffer(C, obs_space=obs_space, act_space=act_space)
+  replay_buffer = ReplayBuffer(G, obs_space=obs_space, act_space=act_space)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
   var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
@@ -93,9 +93,9 @@ def sac(C):
   # Set up function for computing SAC Q-losses
   def compute_loss_q(data):
     q_info = {}
-    alpha = C.alpha if not C.learned_alpha else th.exp(ac.log_alpha).detach()
+    alpha = G.alpha if not G.learned_alpha else th.exp(ac.log_alpha).detach()
     o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
-    if not C.use_done:
+    if not G.use_done:
       d = 0
     q1 = ac.q1(o, a)
     q2 = ac.q2(o, a)
@@ -109,7 +109,7 @@ def sac(C):
       q1_pi_targ = ac_targ.q1(o2, a2)
       q2_pi_targ = ac_targ.q2(o2, a2)
       q_pi_targ = th.min(q1_pi_targ, q2_pi_targ)
-      backup = r + C.gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
+      backup = r + G.gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
 
     # MSE loss against Bellman backup
     loss_q1 = ((q1 - backup)**2).mean()
@@ -131,7 +131,7 @@ def sac(C):
 
   # Set up function for computing SAC pi loss
   def compute_loss_pi(data):
-    alpha = C.alpha if not C.learned_alpha else th.exp(ac.log_alpha).detach()
+    alpha = G.alpha if not G.learned_alpha else th.exp(ac.log_alpha).detach()
     o = data['obs']
     pi, logp_pi, ainfo = ac.pi(o)
     q1_pi = ac.q1(o, pi)
@@ -144,7 +144,7 @@ def sac(C):
     # Useful info for logging
     pi_info = dict(LogPi=logp_pi.mean().detach().cpu(), action_abs=ainfo['mean'].abs().mean().detach().cpu(), action_std=ainfo['std'].mean().detach().cpu())
 
-    if C.learned_alpha:
+    if G.learned_alpha:
       loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
       #loss_alpha = -(ac.log_alpha * (logp_pi + ac.target_entropy).detach()).mean()
     else:
@@ -153,10 +153,10 @@ def sac(C):
     return loss_pi, loss_alpha, pi_info
 
   # Set up optimizers for policy and q-function
-  q_optimizer = Adam(q_params, lr=C.lr, betas=(0.9, 0.999), eps=1e-8)
-  pi_optimizer = Adam(ac.pi.parameters(), lr=C.lr, betas=(0.9, 0.999), eps=1e-8)
-  if C.learned_alpha:
-    alpha_optimizer = Adam([ac.log_alpha], lr=C.alpha_lr)
+  q_optimizer = Adam(q_params, lr=G.lr, betas=(0.9, 0.999), eps=1e-8)
+  pi_optimizer = Adam(ac.pi.parameters(), lr=G.lr, betas=(0.9, 0.999), eps=1e-8)
+  if G.learned_alpha:
+    alpha_optimizer = Adam([ac.log_alpha], lr=G.alpha_lr)
 
   def update(data):
     # TODO: optimize this by not requiring the items right away.
@@ -178,7 +178,7 @@ def sac(C):
     # computing gradients for them during the policy learning step.
     for p in q_params:
       p.requires_grad = False
-      if 'vae' in C.net:
+      if 'vae' in G.net:
         for p in ac.preproc.parameters():
           p.requires_grad = False
 
@@ -190,7 +190,7 @@ def sac(C):
     logger['Pi/grad_norm'] += [utils.compute_grad_norm(ac.pi.parameters()).detach().cpu()]
     pi_optimizer.step()
     # and optionally the alpha
-    if C.learned_alpha:
+    if G.learned_alpha:
       alpha_optimizer.zero_grad()
       loss_alpha.backward()
       alpha_optimizer.step()
@@ -211,22 +211,22 @@ def sac(C):
       for p, p_targ in zip(ac.parameters(), ac_targ.parameters()):
         # NB: We use an in-place operations "mul_", "add_" to update target
         # params, as opposed to "mul" and "add", which would make new tensors.
-        p_targ.data.mul_(C.polyak)
-        p_targ.data.add_((1 - C.polyak) * p.data)
+        p_targ.data.mul_(G.polyak)
+        p_targ.data.add_((1 - G.polyak) * p.data)
 
   def get_action(o, deterministic=False):
-    o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
+    o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(G.device) for key, val in o.items()}
     act = ac.act(o, deterministic)
-    if not C.lenv:
+    if not G.lenv:
       act = act.cpu().numpy()
     return act
 
   def get_action_val(o, deterministic=False):
     with th.no_grad():
-      o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(C.device) for key, val in o.items()}
+      o = {key: th.as_tensor(1.0*val, dtype=th.float32).to(G.device) for key, val in o.items()}
       a, _, ainfo = ac.pi(o, deterministic, False)
       q = ac.value(o, a)
-    if not C.lenv:
+    if not G.lenv:
       a = a.cpu().numpy()
     return a, q
 
@@ -236,7 +236,7 @@ def sac(C):
     if use_lenv:
       pf = th
       _env = learned_tvenv
-      o, ep_ret, ep_len = _env.reset(np.arange(TN)), th.zeros(TN).to(C.device), th.zeros(TN).to(C.device)
+      o, ep_ret, ep_len = _env.reset(np.arange(TN)), th.zeros(TN).to(G.device), th.zeros(TN).to(G.device)
     else:
       pf = np
       _env = real_tvenv
@@ -249,15 +249,15 @@ def sac(C):
     qs = []
     all_done = pf.zeros_like(ep_ret)
     success = pf.zeros_like(ep_ret)
-    for i in range(C.ep_len):
+    for i in range(G.ep_len):
       # Take deterministic actions at test time
       a, q = get_action_val(o)
-      if not use_lenv and C.lenv:
+      if not use_lenv and G.lenv:
         a = a.cpu().numpy()
         q = q.cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
-      if i != (C.ep_len - 1):
+      if i != (G.ep_len - 1):
         success = pf.logical_or(success, d)
       rs += [r]
       qs += [q]
@@ -285,9 +285,9 @@ def sac(C):
       else:
         frames = np.stack(frames)
       frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
-      frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, C.lcd_h*1*REP, TN*C.lcd_w*REP, 3])
+      frames = frames.transpose(0, 2, 1, 3, 4).reshape([-1, G.lcd_h*1*REP, TN*G.lcd_w*REP, 3])
       for k in range(TN):
-        frames[:,:,k*REP*C.lcd_w] = 0.0
+        frames[:,:,k*REP*G.lcd_w] = 0.0
 
       dframes = []
       yellow = (255, 255, 50)
@@ -300,30 +300,30 @@ def sac(C):
         fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
         for j in range(TN):
           if use_lenv:
-            color = yellow if dones[i][j].cpu().numpy() and i != C.ep_len-1 else white
-            draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
-            draw.text((C.lcd_w*REP*j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
+            color = yellow if dones[i][j].cpu().numpy() and i != G.ep_len-1 else white
+            draw.text((G.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+            draw.text((G.lcd_w*REP*j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
           else:
-            color = yellow if dones[i][j] and i != C.ep_len-1 else white
-            draw.text((C.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
-            draw.text((C.lcd_w*REP*j + 5, 5), f'{"*"*int(success[j])}', fill=yellow, fnt=fnt)
+            color = yellow if dones[i][j] and i != G.ep_len-1 else white
+            draw.text((G.lcd_w*REP*j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
+            draw.text((G.lcd_w*REP*j + 5, 5), f'{"*"*int(success[j])}', fill=yellow, fnt=fnt)
         dframes += [np.array(pframe)]
       dframes = np.stack(dframes)
       vid = dframes.transpose(0, -1, 1, 2)[None]
-      utils.add_video(writer, f'{prefix}_rollout', vid, itr+1, fps=C.fps)
+      utils.add_video(writer, f'{prefix}_rollout', vid, itr+1, fps=G.fps)
       print('wrote video', prefix)
     logger[f'{prefix}_test/EpRet'] += [proc(ep_ret).mean()]
     logger[f'{prefix}_test/EpLen'] += [proc(ep_len).mean()]
     logger[f'{prefix}_test/success_rate'] += [proc(success).mean()]
   test_agent(-1)
-  if C.lenv: test_agent(-1,use_lenv=True)
+  if G.lenv: test_agent(-1,use_lenv=True)
 
   # Prepare for interaction with environment
   epoch_time = start_time = time.time()
 
-  if C.lenv and C.lenv_cont_roll:
+  if G.lenv and G.lenv_cont_roll:
     # TODO: try this with backpropping through stuff
-    o = env.reset(np.arange(C.num_envs))
+    o = env.reset(np.arange(G.num_envs))
     for itr in itertools.count(1):
       a = get_action(o).detach()
       o2, rew, done, info = env.step(a)
@@ -336,11 +336,11 @@ def sac(C):
       #print(itr)
       if itr % 200 == 0:
         o = env.reset()
-      if itr % C.log_n == 0:
-        epoch = itr//C.log_n
-        if epoch % C.test_n == 0:
+      if itr % G.log_n == 0:
+        epoch = itr//G.log_n
+        if epoch % G.test_n == 0:
           test_agent(itr)
-          if C.lenv: test_agent(itr, use_lenv=True)
+          if G.lenv: test_agent(itr, use_lenv=True)
         # Log info about epoch
         print('=' * 30)
         print('Epoch', epoch)
@@ -353,32 +353,32 @@ def sac(C):
         writer.flush()
         print('Time', time.time() - start_time)
         print('dt', dt)
-        print(C.logdir)
-        print(C.full_cmd)
+        print(G.logdir)
+        print(G.full_cmd)
         print('=' * 30)
         logger = defaultdict(lambda: [])
         epoch_time = time.time()
-        with open(C.logdir / 'hps.yaml', 'w') as f:
-          yaml.dump(C, f, width=1000)
+        with open(G.logdir / 'hps.yaml', 'w') as f:
+          yaml.dump(G, f, width=1000)
 
 
 
-  if C.lenv:
-    o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), th.zeros(C.num_envs).to(C.device), th.zeros(C.num_envs).to(C.device)
-    success = th.zeros(C.num_envs).to(C.device)
-    time_to_succ = C.ep_len*th.ones(C.num_envs).to(C.device)
+  if G.lenv:
+    o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), th.zeros(G.num_envs).to(G.device), th.zeros(G.num_envs).to(G.device)
+    success = th.zeros(G.num_envs).to(G.device)
+    time_to_succ = G.ep_len*th.ones(G.num_envs).to(G.device)
     pf = th
   else:
-    o, ep_ret, ep_len = env.reset(np.arange(C.num_envs)), np.zeros(C.num_envs), np.zeros(C.num_envs)
-    success = np.zeros(C.num_envs, dtype=np.bool)
-    time_to_succ = C.ep_len*np.ones(C.num_envs)
+    o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), np.zeros(G.num_envs), np.zeros(G.num_envs)
+    success = np.zeros(G.num_envs, dtype=np.bool)
+    time_to_succ = G.ep_len*np.ones(G.num_envs)
     pf = np
   # Main loop: collect experience in venv and update/log each epoch
-  for itr in range(C.total_steps):
+  for itr in range(G.total_steps):
     # Until start_steps have elapsed, randomly sample actions
     # from a uniform distribution for better exploration. Afterwards,
     # use the learned policy.
-    if itr > C.start_steps:
+    if itr > G.start_steps:
       with utils.Timer(logger, 'action'):
         o = {key: val for key, val in o.items()}
         a = get_action(o)
@@ -393,9 +393,9 @@ def sac(C):
     # Ignore the "done" signal if it comes from hitting the time
     # horizon (that is, when it's an artificial terminal signal
     # that isn't based on the agent's state)
-    d[ep_len == C.ep_len] = False
+    d[ep_len == G.ep_len] = False
     success = pf.logical_or(success, d)
-    time_to_succ = pf.minimum(time_to_succ, C.ep_len * ~success + ep_len * success)
+    time_to_succ = pf.minimum(time_to_succ, G.ep_len * ~success + ep_len * success)
     #print(time_to_succ)
 
     # Store experience to replay buffer
@@ -411,16 +411,16 @@ def sac(C):
     o = o2
 
     # End of trajectory handling
-    if C.lenv:
-      done = th.logical_or(d, ep_len == C.ep_len)
+    if G.lenv:
+      done = th.logical_or(d, ep_len == G.ep_len)
       dixs = th.nonzero(done)
       proc = lambda x: x.cpu().float()
     else:
-      done = np.logical_or(d, ep_len == C.ep_len)
+      done = np.logical_or(d, ep_len == G.ep_len)
       dixs = np.nonzero(done)[0]
       proc = lambda x: x
-    if len(dixs) == C.num_envs or (not C.lenv and C.succ_reset):
-    #if not C.lenv or len(dixs) == C.num_envs:
+    if len(dixs) == G.num_envs or (not G.lenv and G.succ_reset):
+    #if not G.lenv or len(dixs) == G.num_envs:
       for idx in dixs:
         logger['EpRet'] += [proc(ep_ret[idx])]
         logger['EpLen'] += [proc(ep_len[idx])]
@@ -429,47 +429,47 @@ def sac(C):
         ep_ret[idx] = 0
         ep_len[idx] = 0
         success[idx] = 0
-        time_to_succ[idx] = C.ep_len
+        time_to_succ[idx] = G.ep_len
         #logger['success_rate'] += [proc(d[idx])]
-        #logger['success_rate_nenv'] += [proc(d[idx])**(1/C.num_envs)]
+        #logger['success_rate_nenv'] += [proc(d[idx])**(1/G.num_envs)]
       if len(dixs) != 0:
         o = env.reset(dixs)
-        if C.lenv:
-          assert len(dixs) == C.num_envs, "the learned env needs the envs to be in sync in terms of history.  you can't easily reset one without resetting the others. it's hard"
+        if G.lenv:
+          assert len(dixs) == G.num_envs, "the learned env needs the envs to be in sync in terms of history.  you can't easily reset one without resetting the others. it's hard"
         else:
           assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
         #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
     # Updte handling
-    if itr >= C.update_after and itr % C.update_every == 0:
-      for j in range(int(C.update_every*1.0)):
+    if itr >= G.update_after and itr % G.update_every == 0:
+      for j in range(int(G.update_every*1.0)):
         with utils.Timer(logger, 'sample_batch'):
-         batch = replay_buffer.sample_batch(C.bs)
+         batch = replay_buffer.sample_batch(G.bs)
         with utils.Timer(logger, 'updte'):
           update(data=batch)
 
     # End of epoch handling
-    if (itr + 1) % C.log_n == 0:
-      epoch = (itr + 1) // C.log_n
+    if (itr + 1) % G.log_n == 0:
+      epoch = (itr + 1) // G.log_n
 
       # Save model
-      if (epoch % C.save_freq == 0) or (itr == C.total_steps):
-        th.save(ac, C.logdir / 'weights.pt')
+      if (epoch % G.save_freq == 0) or (itr == G.total_steps):
+        th.save(ac, G.logdir / 'weights.pt')
 
-      if (C.logdir / 'pause.marker').exists():
+      if (G.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
 
       # Test the performance of the deterministic version of the agent.
-      if epoch % C.test_n == 0:
+      if epoch % G.test_n == 0:
         with utils.Timer(logger, 'test_agent'):
           test_agent(itr)
-          if C.lenv: test_agent(itr, use_lenv=True)
+          if G.lenv: test_agent(itr, use_lenv=True)
 
-        if 'vae' in C.net:
+        if 'vae' in G.net:
           test_batch = replay_buffer.sample_batch(8)
           ac.preproc.evaluate(writer, test_batch['obs'], itr)
         #test_agent(video=epoch % 1 == 0)
-        # if replay_buffer.ptr > C.ep_len*4:
+        # if replay_buffer.ptr > G.ep_len*4:
         #  eps = replay_buffer.get_last(4)
         #  goal = eps['obs']['goal:lcd']
         #  lcd = eps['obs']['lcd']
@@ -478,14 +478,14 @@ def sac(C):
         #  error = (goal - lcd + 1) / 2
         #  out = np.concatenate([goal, lcd, error], 2)
         #  out = utils.combine_imgs(out[:,:,None], row=1, col=4)[None,:,None]
-        #  utils.add_video(writer, 'samples', out, epoch, fps=C.fps)
+        #  utils.add_video(writer, 'samples', out, epoch, fps=G.fps)
 
       # Log info about epoch
       print('=' * 30)
       print('Epoch', epoch)
       logger['var_count'] = [sum_count]
       logger['dt'] = dt = time.time() - epoch_time
-      logger['env_interactions'] = env_interactions = itr*C.num_envs
+      logger['env_interactions'] = env_interactions = itr*G.num_envs
       for key in logger:
         val = np.mean(logger[key])
         writer.add_scalar(key, val, itr+1)
@@ -494,13 +494,13 @@ def sac(C):
       print('TotalEnvInteracts', env_interactions)
       print('Time', time.time() - start_time)
       print('dt', dt)
-      print(C.logdir)
-      print(C.full_cmd)
+      print(G.logdir)
+      print(G.full_cmd)
       print('=' * 30)
       logger = defaultdict(lambda: [])
       epoch_time = time.time()
-      with open(C.logdir / 'hps.yaml', 'w') as f:
-        yaml.dump(C, f, width=1000)
+      with open(G.logdir / 'hps.yaml', 'w') as f:
+        yaml.dump(G, f, width=1000)
 
 
 _C = boxLCD.utils.AttrDict()
@@ -545,11 +545,11 @@ if __name__ == '__main__':
   # grab defaults from the env
   if tempC.env in env_map:
     Env = env_map[tempC.env]
-    parser.set_defaults(**Env.ENV_DC)
+    parser.set_defaults(**Env.ENV_DG)
     parser.set_defaults(**{'goals': 1})
-  C = parser.parse_args()
-  C.lcd_w = int(C.wh_ratio * C.lcd_base)
-  C.lcd_h = C.lcd_base
-  C.imsize = C.lcd_w * C.lcd_h
+  G = parser.parse_args()
+  G.lcd_w = int(G.wh_ratio * G.lcd_base)
+  G.lcd_h = G.lcd_base
+  G.imsize = G.lcd_w * G.lcd_h
   # RUN
-  sac(C)
+  sac(G)

@@ -18,16 +18,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, friction
 from boxLCD import env_map
 import utils
 import runners
-from research.nets.flat_everything import FlatEverything
-from research.nets.flatimage import FlatImageTransformer
-from research.nets.statevq import SVAE
-from research.nets.multistep import Multistep
-from research.nets.vae import VAE
-from research.nets.combined import Combined
-from research.nets.bvae import BVAE
-from research.nets.vqvae import VQVAE
-from research.nets.flat_btoken import FlatBToken
-
+from research.nets import net_map
 import data
 
 if __name__ == '__main__':
@@ -37,7 +28,7 @@ if __name__ == '__main__':
   temp_cfg = parser.parse_args()
   # grab defaults from the env
   Env = env_map[temp_cfg.env]
-  parser.set_defaults(**Env.ENV_DC)
+  parser.set_defaults(**Env.ENV_DG)
   data_yaml = temp_cfg.datapath / 'hps.yaml'
   weight_yaml = temp_cfg.weightdir / 'hps.yaml'
   defaults = {
@@ -59,48 +50,30 @@ if __name__ == '__main__':
         continue
       defaults[key] = weight_cfg.__dict__[key]
   parser.set_defaults(**defaults)
-  C = parser.parse_args()
-  C.lcd_w = int(C.wh_ratio * C.lcd_base)
-  C.lcd_h = C.lcd_base
-  C.imsize = C.lcd_w * C.lcd_h
-  #assert C.lcd_w == data_cfg.lcd_w and C.lcd_h == data_cfg.lcd_w, "mismatch of env dims"
-  env = env_fn(C)()
-  if C.mode not in ['collect']:
-    if C.model == 'frame_token':
-      model = FlatImageTransformer(env, C)
-    if C.model == 'flatev':
-      model = FlatEverything(env, C)
-    if C.model == 'flatb':
-      model = FlatBToken(env, C)
-    elif C.model == 'single':
-      assert C.datamode == 'image'
-      model = Combined(env, C)
-    elif C.model == 'multistep':
-      assert C.vidstack < C.ep_len
-      model = Multistep(env, C)
-    elif C.model == 'vae':
-      model = VAE(C)
-    elif C.model == 'vqvae':
-      model = VQVAE(env, C)
-    elif C.model == 'statevq':
-      model = SVAE(env, C)
-    elif C.model == 'bvae':
-      model = BVAE(env, C)
+  G = parser.parse_args()
+  G.lcd_w = int(G.wh_ratio * G.lcd_base)
+  G.lcd_h = G.lcd_base
+  G.imsize = G.lcd_w * G.lcd_h
+  #assert G.lcd_w == data_cfg.lcd_w and G.lcd_h == data_cfg.lcd_w, "mismatch of env dims"
+  env = env_fn(G)()
+  if G.mode not in ['collect']:
+    if G.model in net_map:
+      model = net_map[G.model](env, G)
     else:
-      assert "we don't have that model", C.model
-    model.to(C.device)
-    C.num_vars = utils.count_vars(model)
+      assert False, f"we don't have that model, {G.model}"
+    model.to(G.device)
+    G.num_vars = utils.count_vars(model)
 
-  if C.mode == 'train':
-    runner = runners.Trainer(model, env, C)
-  elif C.mode == 'viz':
-    runner = runners.Vizer(model, env, C)
-  elif C.mode == 'collect':
-    data.collect(env_fn(C), C)
-  elif C.mode == 'fiddle':
-    runner = runners.Fiddler(model, env, C)
+  if G.mode == 'train':
+    runner = runners.Trainer(model, env, G)
+  elif G.mode == 'viz':
+    runner = runners.Vizer(model, env, G)
+  elif G.mode == 'collect':
+    data.collect(env_fn(G), G)
+  elif G.mode == 'fiddle':
+    runner = runners.Fiddler(model, env, G)
 
-  if C.ipython_mode:
+  if G.ipython_mode:
     import IPython
     from traitlets.config import Config
     c = Config()

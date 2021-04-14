@@ -15,15 +15,15 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 from boxLCD import utils
-from boxLCD import ENV_DC
+from boxLCD import ENV_DG
 from boxLCD import envs, env_map
 import pyglet
 KEY = pyglet.window.key
 A = utils.A
 
 if __name__ == '__main__':
-  C = parse_args()
-  env = env_map[C.env](C)
+  G = parse_args()
+  env = env_map[G.env](G)
   start = env.reset()
   env.render(mode='human')
   # monkey patch the env window to get keyboard input
@@ -38,7 +38,7 @@ if __name__ == '__main__':
   obs_log = False
   omax = 0.0
   ret = 0
-  delay = 1 / C.fps
+  delay = 1 / (2*G.fps)
 
   # KEY BINDINGS
   # 0 - reset env
@@ -79,7 +79,7 @@ if __name__ == '__main__':
       action = env.action_space.sample()
       #action = np.zeros_like(action)
       obs, rew, done, info = env.step(action)
-      print(obs)
+      print(obs['full_state'])
       nobs = utils.NamedArray(obs, env.obs_info, do_map=False)
       if obs_log:
         print(nobs.todict())

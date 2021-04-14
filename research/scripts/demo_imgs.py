@@ -14,28 +14,28 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 import boxLCD.utils
-from boxLCD import C
+from boxLCD import G
 from boxLCD import envs
 import pyglet
 KEY = pyglet.window.key
 A = boxLCD.utils.A
 
-def env_fn(C, seed=None):
+def env_fn(G, seed=None):
   def _make():
-    if C.env == 'dropbox':
-      env = envs.Dropbox(C)
-    elif C.env == 'bounce':
-      env = envs.Bounce(C)
-    elif C.env == 'boxor':
-      env = envs.BoxOrCircle(C)
-    elif C.env == 'urchin':
-      env = envs.Urchin(C)
-    elif C.env == 'urchin_ball':
-      env = envs.UrchinBall(C)
-    elif C.env == 'urchin_balls':
-      env = envs.UrchinBalls(C)
-    elif C.env == 'urchin_cubes':
-      env = envs.UrchinCubes(C)
+    if G.env == 'dropbox':
+      env = envs.Dropbox(G)
+    elif G.env == 'bounce':
+      env = envs.Bounce(G)
+    elif G.env == 'boxor':
+      env = envs.BoxOrCircle(G)
+    elif G.env == 'urchin':
+      env = envs.Urchin(G)
+    elif G.env == 'urchin_ball':
+      env = envs.UrchinBall(G)
+    elif G.env == 'urchin_balls':
+      env = envs.UrchinBalls(G)
+    elif G.env == 'urchin_cubes':
+      env = envs.UrchinCubes(G)
     env.seed(seed)
     return env
   return _make
@@ -52,11 +52,11 @@ def write_gif(name, frames, fps=30):
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
   parser = argparse.ArgumentParser()
-  for key, value in C.items():
+  for key, value in G.items():
     parser.add_argument(f'--{key}', type=boxLCD.utils.args_type(value), default=value)
   parser.add_argument(f'--env', type=str, default='urchin_ball')
-  C = parser.parse_args()
-  env = env_fn(C)()
+  G = parser.parse_args()
+  env = env_fn(G)()
   env.seed(7)
   np_random = np.random.RandomState(4)
   start = env.reset()
@@ -78,9 +78,9 @@ if __name__ == '__main__':
     imgs += [out]
 
     #else:
-    if i > env.C.ep_len:
+    if i > env.G.ep_len:
       print(i)
-      write_gif(f'{C.env}.gif', imgs, fps=env.C.fps)
+      write_gif(f'{G.env}.gif', imgs, fps=env.G.fps)
       break
 
     if KEY.ESCAPE in key_handler:

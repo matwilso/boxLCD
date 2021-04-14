@@ -21,11 +21,11 @@ from wrappers import AsyncVectorEnv
 from jax.tree_util import tree_multimap, tree_map
 
 class Fiddler:
-  def __init__(self, model, env, C):
+  def __init__(self, model, env, G):
     super().__init__()
     self.env = env
     self.model = model
-    self.C = C
+    self.G = G
 
   def run(self):
     all_obses = []
@@ -46,6 +46,6 @@ class Fiddler:
       print(i)
       obses = tree_multimap(lambda x, *y: np.stack([x, *y]), obses[0], *obses[1:])
       #obses = tree_map(lambda x: np.stack([*x], 0), obses)
-      obses = tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.C.device), obses)
+      obses = tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), obses)
       out = self.model.encode(obses)
       print(out.mean.var(0).topk(10)[1])

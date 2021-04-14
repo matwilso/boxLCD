@@ -1,10 +1,41 @@
+import matplotlib.pyplot as plt
+import torch as torchvision
+from torch.optim import Adam
+from itertools import chain, count
 import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
+#from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
+import torch as th
+from torch import distributions as thd
+from torch.optim import Adam
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import utils
+
+# TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
+# basically so that you can do multi-modal stuff in a single vector
+
+class BinaryQuantize(nn.Module):
+  def __init__(self, num_hiddens, n_embed):
+    super().__init__()
+    self.n_embed = n_embed
+    self.kld_scale = 0.1 
+    self.proj = nn.Linear(num_hiddens, n_embed)
+
+  def forward(self, z):
+    #logits = self.proj(z)
+    dist = thd.Bernoulli(logits=z)
+    z_q = dist.sample()
+    z_q += dist.probs - dist.probs.detach()
+    # + kl divergence to the prior loss (entropy bonus)
+    diff = self.kld_scale * dist.entropy().mean()
+    return z_q, diff, z_q
 
 class VectorQuantizer(nn.Module):
-  def __init__(self, K, D, beta, C):
+  def __init__(self, K, D, beta, G):
     super().__init__()
     self.K = K
     self.D = D

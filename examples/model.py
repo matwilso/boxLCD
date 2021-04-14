@@ -21,32 +21,32 @@ class CausalSelfAttention(nn.Module):
   explicit implementation here to show that there is nothing too scary here.
   """
 
-  def __init__(self, block_size, C):
+  def __init__(self, block_size, G):
     super().__init__()
     self.block_size = block_size
-    assert C.n_embed % C.n_head == 0
+    assert G.n_embed % G.n_head == 0
     # key, query, value projections for all heads
-    self.key = nn.Linear(C.n_embed, C.n_embed)
-    self.query = nn.Linear(C.n_embed, C.n_embed)
-    self.value = nn.Linear(C.n_embed, C.n_embed)
+    self.key = nn.Linear(G.n_embed, G.n_embed)
+    self.query = nn.Linear(G.n_embed, G.n_embed)
+    self.value = nn.Linear(G.n_embed, G.n_embed)
     # output projection
-    self.proj = nn.Linear(C.n_embed, C.n_embed)
+    self.proj = nn.Linear(G.n_embed, G.n_embed)
     # causal mask to ensure that attention is only applied to the left in the input sequence
     self.register_buffer("mask", th.tril(th.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
-    self.C = C
+    self.G = G
 
   def forward(self, x, layer_past=None):
-    B, T, C = x.size()
+    B, T, G = x.size()
     # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-    k = self.key(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    q = self.query(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    v = self.value(x).view(B, T, self.C.n_head, C // self.C.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    k = self.key(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    q = self.query(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    v = self.value(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
     # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
     att = (q @ k.transpose(-2, -1)) * (1.0 / np.sqrt(k.size(-1)))
     att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
     att = F.softmax(att, dim=-1)
     y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-    y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+    y = y.transpose(1, 2).contiguous().view(B, T, G)  # re-assemble all head outputs side by side
     # output projection
     y = self.proj(y)
     return y
@@ -54,15 +54,15 @@ class CausalSelfAttention(nn.Module):
 class Block(nn.Module):
   """ an unassuming Transformer block """
 
-  def __init__(self, block_size, C):
+  def __init__(self, block_size, G):
     super().__init__()
-    self.ln1 = nn.LayerNorm(C.n_embed)
-    self.ln2 = nn.LayerNorm(C.n_embed)
-    self.attn = CausalSelfAttention(block_size, C)
+    self.ln1 = nn.LayerNorm(G.n_embed)
+    self.ln2 = nn.LayerNorm(G.n_embed)
+    self.attn = CausalSelfAttention(block_size, G)
     self.mlp = nn.Sequential(
-        nn.Linear(C.n_embed, 4 * C.n_embed),
+        nn.Linear(G.n_embed, 4 * G.n_embed),
         nn.GELU(),
-        nn.Linear(4 * C.n_embed, C.n_embed),
+        nn.Linear(4 * G.n_embed, G.n_embed),
     )
 
   def forward(self, x):
@@ -71,22 +71,22 @@ class Block(nn.Module):
     return x
 
 class GPT(nn.Module):
-  def __init__(self, act_dim, C):
+  def __init__(self, act_dim, G):
     super().__init__()
-    self.C = C
-    self.imsize = self.C.lcd_h * self.C.lcd_w
-    self.block_size = self.C.ep_len
+    self.G = G
+    self.imsize = self.G.lcd_h * self.G.lcd_w
+    self.block_size = self.G.ep_len
     self.size = self.imsize
     # embedding
-    self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, C.n_embed))
-    self.act_condition = nn.Linear(act_dim, C.n_embed//2, bias=False)
-    self.embed = nn.Linear(self.size, C.n_embed//2, bias=False)
+    self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
+    self.act_condition = nn.Linear(act_dim, G.n_embed//2, bias=False)
+    self.embed = nn.Linear(self.size, G.n_embed//2, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(self.block_size, C) for _ in range(C.n_layer)])
+    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head distributipn
-    self.ln_f = nn.LayerNorm(C.n_embed)
-    self.dist_head = BinaryHead(C.n_embed, self.size, C)
-    self.to(C.device)
+    self.ln_f = nn.LayerNorm(G.n_embed)
+    self.dist_head = BinaryHead(G.n_embed, self.size, G)
+    self.to(G.device)
 
   def append_location(self, x):
     """add loc coords to every elem"""
@@ -100,7 +100,7 @@ class GPT(nn.Module):
     acts = batch['acts']
 
     # SHIFT RIGHT (add a padding on the left) so you can't see yourself 
-    x = th.cat([th.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
+    x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
     # forward the GPT model
     x = self.embed(x)
     cin = self.act_condition(acts)
@@ -126,8 +126,8 @@ class GPT(nn.Module):
       if acts is not None:
         n = acts.shape[0]
       batch = {}
-      batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.C.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.C.device)
+      batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
+      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
@@ -138,14 +138,14 @@ class GPT(nn.Module):
         batch['lcd'][:, i] = bindist.sample()[:, i]
         if i == self.block_size - 1:
           sample_loss = self.loss(batch)
-    batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
+    batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
     return batch, sample_loss.mean().cpu().detach()
 
 class BinaryHead(nn.Module):
   """take logits and produce a bernoulli distribution independently on each element of the token"""
-  def __init__(self, in_n, out_n, C):
+  def __init__(self, in_n, out_n, G):
     super().__init__()
-    self.C = C
+    self.G = G
     self.layer = nn.Linear(in_n, out_n)
 
   def forward(self, x, past_o=None):

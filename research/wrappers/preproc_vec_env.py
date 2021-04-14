@@ -12,11 +12,11 @@ class PreprocVecEnv:
   """
   Learned model that preprocesses observations and produces a `zstate`
   """
-  def __init__(self, model, env, C, device='cuda'):
+  def __init__(self, model, env, G, device='cuda'):
     self.model = model
     self._env = env
     self.SCALE = 2
-    self.C = C
+    self.G = G
     self.device = device
     self.model.to(device)
     self.model.eval()
@@ -61,7 +61,7 @@ class PreprocVecEnv:
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs = self._preproc_obs(obs)
-    if self.C.preproc_rew:
+    if self.G.preproc_rew:
       rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
     return obs, rew, done, info
 
@@ -80,30 +80,30 @@ if __name__ == '__main__':
   import time
   from research.nets.bvae import BVAE
   from boxLCD import envs, env_map
-  C = utils.AttrDict()
-  C.env = 'Urchin'
-  C.state_rew = 1
-  C.device = 'cpu'
-  C.lcd_h = 16
-  C.lcd_w = 32
-  C.wh_ratio = 2.0
-  C.lr = 1e-3
-  #C.lcd_base = 32
-  C.rew_scale = 1.0
-  C.diff_delt = 1 
-  C.fps = 10
-  C.hidden_size = 128
-  C.nfilter = 128
-  C.vqK = 128
-  C.vqD = 128
-  C.goal_thresh = 0.01
-  env = envs.Urchin(C)
-  C.fps = env.C.fps
-  model = BVAE(env, C)
-  def env_fn(C, seed=None):
+  G = utils.AttrDict()
+  G.env = 'Urchin'
+  G.state_rew = 1
+  G.device = 'cpu'
+  G.lcd_h = 16
+  G.lcd_w = 32
+  G.wh_ratio = 2.0
+  G.lr = 1e-3
+  #G.lcd_base = 32
+  G.rew_scale = 1.0
+  G.diff_delt = 1 
+  G.fps = 10
+  G.hidden_size = 128
+  G.nfilter = 128
+  G.vqK = 128
+  G.vqD = 128
+  G.goal_thresh = 0.01
+  env = envs.Urchin(G)
+  G.fps = env.G.fps
+  model = BVAE(env, G)
+  def env_fn(G, seed=None):
     def _make():
-      env = envs.Urchin(C)
-      env = BodyGoalEnv(env, C)
+      env = envs.Urchin(G)
+      env = BodyGoalEnv(env, G)
       return env
     return _make
 
@@ -111,8 +111,8 @@ if __name__ == '__main__':
     return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
 
   start = time.time()
-  env = AsyncVectorEnv([env_fn(C) for _ in range(8)])
-  env = PreprocVecEnv(model, env, C, device='cpu')
+  env = AsyncVectorEnv([env_fn(G) for _ in range(8)])
+  env = PreprocVecEnv(model, env, G, device='cpu')
   obs = env.reset(np.arange(8))
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
@@ -126,4 +126,4 @@ if __name__ == '__main__':
   glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
   lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
   print('dt', time.time() - start)
-  utils.write_gif('realtest.gif', outproc(lcds), fps=C.fps)
+  utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)

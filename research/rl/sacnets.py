@@ -30,38 +30,38 @@ def init_weights(m):
     m.bias.data.fill_(0.0)
 
 class BaseCNN(nn.Module):
-  def __init__(self, obs_space, out_size, C):
+  def __init__(self, obs_space, out_size, G):
     super().__init__()
-    size = (C.lcd_h * C.lcd_w) // 64
+    size = (G.lcd_h * G.lcd_w) // 64
     self.net = nn.Sequential(
-        nn.Conv2d(1, C.nfilter, 3, 2, padding=1),
+        nn.Conv2d(1, G.nfilter, 3, 2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(C.nfilter, C.nfilter, 3, 2, padding=1),
+        nn.Conv2d(G.nfilter, G.nfilter, 3, 2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(C.nfilter, C.nfilter, 3, 2, padding=1),
+        nn.Conv2d(G.nfilter, G.nfilter, 3, 2, padding=1),
         nn.Flatten(-3)
     )
-    mult = 1 if C.zdelta else 2
-    #self.linear = nn.Linear(mult * size * C.nfilter, out_size)
+    mult = 1 if G.zdelta else 2
+    #self.linear = nn.Linear(mult * size * G.nfilter, out_size)
     extra = 2 + obs_space['pstate'].shape[0]
     self.linear = nn.Sequential(
-        nn.Linear(mult * size * C.nfilter + extra, C.hidden_size),
+        nn.Linear(mult * size * G.nfilter + extra, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.Linear(G.hidden_size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, out_size),
+        nn.Linear(G.hidden_size, out_size),
     )
     # nn.init.zeros_(self.linear[-1].weight)
     nn.init.zeros_(self.linear[-1].bias)
     # self.net.apply(init_weights)
-    self.C = C
+    self.G = G
 
   def forward(self, obs):
     assert obs['lcd'].max().detach().cpu() <= 1.0
     s, g = obs['lcd'], obs['goal:lcd']
     s = self.net(s[:, None])
     g = self.net(g[:, None])
-    if self.C.zdelta:
+    if self.G.zdelta:
       #x = s
       x = g - s
     else:
@@ -71,25 +71,25 @@ class BaseCNN(nn.Module):
     return x
 
 class BaseCMLP(nn.Module):
-  def __init__(self, obs_space, out_size, C):
+  def __init__(self, obs_space, out_size, G):
     super().__init__()
-    size = C.lcd_h * C.lcd_w
+    size = G.lcd_h * G.lcd_w
     self.net = nn.Sequential(
-        nn.Linear(size, C.hidden_size),
+        nn.Linear(size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.Linear(G.hidden_size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.Linear(G.hidden_size, G.hidden_size),
     )
-    mult = 1 if C.zdelta else 2
-    self.linear = nn.Linear(mult * C.hidden_size, out_size)
-    self.C = C
+    mult = 1 if G.zdelta else 2
+    self.linear = nn.Linear(mult * G.hidden_size, out_size)
+    self.G = G
 
   def forward(self, obs):
     s, g = obs['lcd'], obs['goal:lcd']
     s = self.net(s.flatten(-2))
     g = self.net(g.flatten(-2))
-    if self.C.zdelta:
+    if self.G.zdelta:
       x = g - s
       #x = s
     else:
@@ -98,40 +98,40 @@ class BaseCMLP(nn.Module):
     return x
 
 class BaseMLP(nn.Module):
-  def __init__(self, in_size, out_size, C):
+  def __init__(self, in_size, out_size, G):
     super().__init__()
     self.net = nn.Sequential(
-        nn.Linear(in_size, C.hidden_size),
+        nn.Linear(in_size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.Linear(G.hidden_size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, C.hidden_size),
+        nn.Linear(G.hidden_size, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(C.hidden_size, out_size),
+        nn.Linear(G.hidden_size, out_size),
     )
 
   def forward(self, x):
     return self.net(x)
 
 class QFunction(nn.Module):
-  def __init__(self, obs_space, act_dim, C, preproc=None):
+  def __init__(self, obs_space, act_dim, G, preproc=None):
     super().__init__()
-    H = C.hidden_size
-    self.C = C
+    H = G.hidden_size
+    self.G = G
     gsize = obs_space['goal:pstate'].shape[0]
-    size = obs_space[self.C.state_key].shape[0] + gsize + act_dim
-    if self.C.net == 'mlp':
-      self.base = BaseMLP(size, 1, C)
-    elif self.C.net == 'cmlp':
-      self.base = BaseCMLP(obs_space, H, C)
-    elif self.C.net == 'cnn':
-      self.base = BaseCNN(obs_space, H, C)
+    size = obs_space[self.G.state_key].shape[0] + gsize + act_dim
+    if self.G.net == 'mlp':
+      self.base = BaseMLP(size, 1, G)
+    elif self.G.net == 'cmlp':
+      self.base = BaseCMLP(obs_space, H, G)
+    elif self.G.net == 'cnn':
+      self.base = BaseCNN(obs_space, H, G)
     self.actin = nn.Linear(act_dim, H)
 
-    if 'vae' in self.C.net:
+    if 'vae' in self.G.net:
       self.preproc = preproc
-      #self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      #self.goalie = nn.Linear(self.preproc.z_size, G.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, G.hidden_size)
       self.act_head = nn.Sequential(
           nn.Linear(H + gsize + H, H),
           nn.ReLU(),
@@ -149,10 +149,10 @@ class QFunction(nn.Module):
       )
 
   def forward(self, obs, act):
-    if self.C.net == 'mlp':
-      x = th.cat([obs[self.C.state_key], obs['goal:pstate'], act], -1)
+    if self.G.net == 'mlp':
+      x = th.cat([obs[self.G.state_key], obs['goal:pstate'], act], -1)
       return self.base(x).squeeze(-1)
-    elif self.C.net == 'bvae':
+    elif self.G.net == 'bvae':
       x = self.preproc.encode(obs).detach()
       x = self.statie(x)
       if 'goal:pstate' in obs:
@@ -173,37 +173,37 @@ class QFunction(nn.Module):
       return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
-  def __init__(self, obs_space, act_dim, C, preproc=None):
+  def __init__(self, obs_space, act_dim, G, preproc=None):
     super().__init__()
-    self.C = C
+    self.G = G
     gsize = obs_space['goal:pstate'].shape[0]
-    size = obs_space[self.C.state_key].shape[0] + gsize
+    size = obs_space[self.G.state_key].shape[0] + gsize
     self.size = size
-    if self.C.net == 'mlp':
-      self.net = BaseMLP(size, 2 * act_dim, C)
-    elif self.C.net == 'cmlp':
-      self.net = BaseCMLP(obs_space, 2 * act_dim, C)
-    elif self.C.net == 'cnn':
-      self.net = BaseCNN(obs_space, 2 * act_dim, C)
-    elif 'bvae' in self.C.net:
+    if self.G.net == 'mlp':
+      self.net = BaseMLP(size, 2 * act_dim, G)
+    elif self.G.net == 'cmlp':
+      self.net = BaseCMLP(obs_space, 2 * act_dim, G)
+    elif self.G.net == 'cnn':
+      self.net = BaseCNN(obs_space, 2 * act_dim, G)
+    elif 'bvae' in self.G.net:
       self.preproc = preproc
-      #self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
+      #self.goalie = nn.Linear(self.preproc.z_size, G.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, G.hidden_size)
       self.net = nn.Sequential(
-          nn.Linear(C.hidden_size+gsize, C.hidden_size),
+          nn.Linear(G.hidden_size+gsize, G.hidden_size),
           nn.ReLU(),
-          #nn.Linear(C.hidden_size, C.hidden_size),
+          #nn.Linear(G.hidden_size, G.hidden_size),
           #nn.ReLU(),
-          nn.Linear(C.hidden_size, C.hidden_size),
+          nn.Linear(G.hidden_size, G.hidden_size),
           nn.ReLU(),
-          nn.Linear(C.hidden_size, 2 * act_dim),
+          nn.Linear(G.hidden_size, 2 * act_dim),
       )
     self.act_dim = act_dim
 
   def forward(self, obs, deterministic=False, with_logprob=True):
-    if self.C.net == 'mlp':
-      x = th.cat([obs[self.C.state_key], obs['goal:pstate']], -1)
-    elif self.C.net == 'bvae':
+    if self.G.net == 'mlp':
+      x = th.cat([obs[self.G.state_key], obs['goal:pstate']], -1)
+    elif self.G.net == 'bvae':
       z = self.preproc.encode(obs).detach()
       x = self.statie(z)
       if 'goal:pstate' in obs:
@@ -235,7 +235,7 @@ class SquashedGaussianActor(nn.Module):
       # Compute logprob from Gaussian, and then apply correction for Tanh squashing.
       # NOTE: The correction formula is a little bit magic. To get an understanding
       # of where it comes from, check out the original SAC paper (arXiv 1801.01290)
-      # and look in appendix C. This is a more numerically-stable equivalent to Eq 21.
+      # and look in appendix G. This is a more numerically-stable equivalent to Eq 21.
       # Try deriving it yourself as a (very difficult) exercise. :)
       logp_pi = pi_distribution.log_prob(pi_action).sum(axis=-1)
       logp_pi -= (2 * (np.log(2) - pi_action - F.softplus(-2 * pi_action))).sum(axis=1)
@@ -246,26 +246,26 @@ class SquashedGaussianActor(nn.Module):
     return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
 
 class ActorCritic(nn.Module):
-  def __init__(self, obs_space, act_space, C=None):
+  def __init__(self, obs_space, act_space, G=None):
     super().__init__()
     act_dim = act_space.shape[0]
 
     self.preproc = None
-    if C.net == 'vae':
-      self.preproc = VAE(C)
-      self.preproc.load(C.weightdir)
+    if G.net == 'vae':
+      self.preproc = VAE(G)
+      self.preproc.load(G.weightdir)
       for p in self.preproc.parameters():
         p.requires_grad = False
       self.preproc.eval()
 
     # build policy and value functions
-    self.pi = SquashedGaussianActor(obs_space, act_dim, C=C, preproc=self.preproc)
-    self.q1 = QFunction(obs_space, act_dim, C=C, preproc=self.preproc)
-    self.q2 = QFunction(obs_space, act_dim, C=C, preproc=self.preproc)
-    if C.learned_alpha:
+    self.pi = SquashedGaussianActor(obs_space, act_dim, G=G, preproc=self.preproc)
+    self.q1 = QFunction(obs_space, act_dim, G=G, preproc=self.preproc)
+    self.q2 = QFunction(obs_space, act_dim, G=G, preproc=self.preproc)
+    if G.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
       self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))
-    self.C = C
+    self.G = G
 
   def act(self, obs, deterministic=False):
     with th.no_grad():

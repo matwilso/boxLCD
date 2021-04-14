@@ -13,10 +13,10 @@ from research import utils
 
 
 class BodyGoalEnv:
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     self._env = env
     self.SCALE = 2
-    self.C = C
+    self.G = G
 
   @property
   def action_space(self):
@@ -54,20 +54,20 @@ class BodyGoalEnv:
 
   def comp_rew_done(self, obs, info={}):
     done = False
-    if self.C.state_rew:
+    if self.G.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
       #keys = utils.filtlist(self._env.pobs_keys, '.*x:p')
       keys = utils.filtlist(self._env.pobs_keys, '.*(x|y):p')
       idxs = [self._env.pobs_keys.index(x) for x in keys]
       delta = delta[idxs].mean()
-      if self.C.diff_delt:
+      if self.G.diff_delt:
         last_delta = ((self.last_obs['goal:pstate'] - self.last_obs['pstate'])**2)[idxs].mean()
         rew = -0.05 + 10*(last_delta**0.5 - delta**0.5)
       else:
         rew = -delta**0.5
 
       info['delta'] = delta
-      if delta < self.C.goal_thresh:
+      if delta < self.G.goal_thresh:
         rew += 1.0
         #done = False
         info['success'] = True
@@ -91,7 +91,7 @@ class BodyGoalEnv:
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
-    rew = rew * self.C.rew_scale
+    rew = rew * self.G.rew_scale
     self.last_obs = copy.deepcopy(obs)
     return obs, rew, done, info
 
@@ -108,22 +108,22 @@ if __name__ == '__main__':
   import time
   import PIL
   from PIL import Image, ImageDraw, ImageFont
-  C = utils.AttrDict()
-  C.state_rew = 1
-  C.device = 'cpu'
-  C.lcd_h = 16
-  C.lcd_w = 32
-  C.wh_ratio = 2.0
-  C.lr = 1e-3
-  #C.lcd_base = 32
-  C.rew_scale = 1.0
-  C.diff_delt = 1
-  C.env = 'Luxo'
-  env = envs.Luxo(C)
-  #C.env = 'Urchin'
-  #env = envs.Urchin(C)
-  C.fps = env.C.fps
-  env = BodyGoalEnv(env, C)
+  G = utils.AttrDict()
+  G.state_rew = 1
+  G.device = 'cpu'
+  G.lcd_h = 16
+  G.lcd_w = 32
+  G.wh_ratio = 2.0
+  G.lr = 1e-3
+  #G.lcd_base = 32
+  G.rew_scale = 1.0
+  G.diff_delt = 1
+  G.env = 'Luxo'
+  env = envs.Luxo(G)
+  #G.env = 'Urchin'
+  #env = envs.Urchin(G)
+  G.fps = env.G.fps
+  env = BodyGoalEnv(env, G)
   print(env.observation_space, env.action_space)
   obs = env.reset()
   lcds = [obs['lcd']]
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
-    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
+    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(G.device) for key, val in obs.items()}
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     rews += [rew]
@@ -162,6 +162,6 @@ if __name__ == '__main__':
     draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fill=color, fnt=fnt)
     dframes += [np.array(pframe)]
   dframes = np.stack(dframes)
-  utils.write_video('mtest.mp4', dframes, fps=C.fps)
+  utils.write_video('mtest.mp4', dframes, fps=G.fps)
 
 

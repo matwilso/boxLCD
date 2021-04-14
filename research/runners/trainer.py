@@ -16,89 +16,30 @@ import utils
 from utils import Timer
 import data
 from define_config import env_fn
-import ignite
 from wrappers import AsyncVectorEnv
 
 class Trainer:
-  def __init__(self, model, env, C):
+  def __init__(self, model, env, G):
     super().__init__()
     print('wait dataload')
-    self.train_ds, self.test_ds = data.load_ds(C)
+    self.train_ds, self.test_ds = data.load_ds(G)
     print('dataloaded')
-    if C.phase == 2:
-      C.logdir = C.logdir / 'phase2'
-    self.writer = SummaryWriter(C.logdir)
+    if G.phase == 2:
+      G.logdir = G.logdir / 'phase2'
+    self.writer = SummaryWriter(G.logdir)
     #self.writer.add_hparams({
-    #    'lr': C.lr,
-    #    'bs': C.bs,
+    #    'lr': G.lr,
+    #    'bs': G.bs,
     #})
-    self.logger = utils.dump_logger({}, self.writer, 0, C)
+    self.logger = utils.dump_logger({}, self.writer, 0, G)
     self.env = env
     self.model = model
     self.num_vars = utils.count_vars(self.model)
     print('num_vars', self.num_vars)
-    self.C = C
-    self.b = lambda x: {key: val.to(C.device) for key, val in x.items()}
-    self.venv = AsyncVectorEnv([env_fn(C) for _ in range(self.C.num_envs)])
-    self.ssim = ignite.metrics.SSIM(1.0, device=self.C.device)
-    self.psnr = ignite.metrics.PSNR(1.0, device=self.C.device)
-    self.model.save(self.C.logdir)
-
-  def evaluate(self, batch, itr):
-    N = self.C.num_envs
-    # UNPROMPTED SAMPLE
-    acts = (th.rand(N, self.C.window, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
-    sample, sample_loss = self.model.sample(N, acts=acts)
-    if 'lcd' in sample:
-      lcd = sample['lcd']
-      lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-      #writer.add_video('lcd_samples', utils.force_shape(lcd), itr, fps=self.C.fps)
-      utils.add_video(self.writer, 'unprompted/lcd', utils.force_shape(lcd), itr, fps=self.C.fps)
-    if 'pstate' in sample:
-      # TODO: add support for pstate
-      import ipdb; ipdb.set_trace()
-
-    # PROMPTED SAMPLE
-    prompted_samples, prompt_loss = self.model.sample(N, acts=batch['acts'], prompts=batch, prompt_n=10)
-    pred_lcd = prompted_samples['lcd']
-    real_lcd = batch['lcd'][:,:,None]
-    # metrics 
-    self.ssim.update((pred_lcd.flatten(0,1), real_lcd.flatten(0,1)))
-    ssim = self.ssim.compute().cpu().detach()
-    self.logger['eval/ssim'] += [ssim]
-    # TODO: try not flat
-    self.psnr.update((pred_lcd.flatten(0,1), real_lcd.flatten(0,1)))
-    psnr = self.psnr.compute().cpu().detach()
-    self.logger['eval/psnr'] += [psnr]
-
-    if 'pstate' in prompted_samples:
-      import ipdb; ipdb.set_trace()
-      pstate_samp = prompted_samples['pstate'].cpu().numpy()
-      imgs = []
-      shape = pstate_samp.shape
-      for ii in range(shape[0]):
-        col = []
-        for jj in range(shape[1]):
-          col += [self.env.reset(pstate=pstate_samp[ii, jj])['lcd']]
-        imgs += [col]
-      pstate_img = 1.0 * np.array(imgs)[:, :, None]
-      error = (pstate_img - real_lcd + 1.0) / 2.0
-      blank = np.zeros_like(real_lcd)[..., :1, :]
-      out = np.concatenate([real_lcd, blank, pstate_img, blank, error], 3)
-      out = out.repeat(4, -1).repeat(4, -2)
-      utils.add_video(writer, 'prompted_state', utils.force_shape(out), epoch, fps=self.C.fps)
-
-
-    # visualization
-    pred_lcd = pred_lcd[:8].cpu().detach().numpy()
-    real_lcd = real_lcd[:8].cpu().detach().numpy()
-    error = (pred_lcd - real_lcd + 1.0) / 2.0
-    blank = np.zeros_like(real_lcd)[..., :1, :]
-    out = np.concatenate([real_lcd, blank, pred_lcd, blank, error], 3)
-    out = out.repeat(4, -1).repeat(4, -2)
-    #writer.add_video('prompted_lcd', utils.force_shape(out), itr, fps=self.C.fps)
-    utils.add_video(self.writer, 'prompted_lcd', utils.force_shape(out), itr, fps=self.C.fps)
-    return prompted_samples['lcd']
+    self.G = G
+    self.b = lambda x: {key: val.to(G.device) for key, val in x.items()}
+    self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.num_envs)])
+    self.model.save(self.G.logdir)
 
   def run(self):
     total_time = time.time()
@@ -114,10 +55,10 @@ class Trainer:
         for key in metrics:
           self.logger[key] += [metrics[key].detach().cpu()]
 
-      if (self.C.logdir / 'pause.marker').exists():
+      if (self.G.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
 
-      if itr % self.C.log_n == 0 or self.C.skip_train:
+      if itr % self.G.log_n == 0 or self.G.skip_train:
         self.model.eval()
         with th.no_grad():
           with Timer(self.logger, 'test'):
@@ -129,7 +70,6 @@ class Trainer:
               break
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            #samples = self.evaluate(self.b(test_batch), itr)
             self.model.evaluate(self.writer, self.b(test_batch), itr)
         self.model.train()
 
@@ -138,10 +78,10 @@ class Trainer:
         self.logger['dt/epoch'] = time.time() - epoch_time
         epoch_time = time.time()
         self.logger['num_vars'] = self.num_vars
-        self.logger = utils.dump_logger(self.logger, self.writer, itr, self.C)
+        self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
         self.writer.flush()
-        if time.time() - last_save >= 300 or itr % (self.C.log_n * self.C.save_n) == 0:
-          self.model.save(self.C.logdir)
+        if time.time() - last_save >= 300 or itr % (self.G.log_n * self.G.save_n) == 0:
+          self.model.save(self.G.logdir)
           last_save = time.time()
-      if itr >= self.C.total_itr:
+      if itr >= self.G.total_itr:
         break

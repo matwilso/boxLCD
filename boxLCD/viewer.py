@@ -3,17 +3,17 @@ import pyglet
 
 class Viewer:
   """use pyglet to render images that have already been generated, to show to user live"""
-  def __init__(self, width, height, C):
+  def __init__(self, width, height, G):
     self.window = pyglet.window.Window(2*width, height)
     self.width = width
     self.height = height
-    self.C = C
-    self.lcd_w = int(self.C.lcd_base*self.C.wh_ratio)
-    self.lcd_h = self.C.lcd_base
+    self.G = G
+    self.lcd_w = int(self.G.lcd_base*self.G.wh_ratio)
+    self.lcd_h = self.G.lcd_base
 
   def render(self, image, return_rgb_array=False):
     """
-    image (np.ndarray): shape (H,W,C) in RGB 0-255 uint8 format
+    image (np.ndarray): shape (H,W,G) in RGB 0-255 uint8 format
     return_rgb_array (bool): if you want the pyglet buffer back
     """
     self.window.clear()
@@ -21,7 +21,7 @@ class Viewer:
     self.window.dispatch_events()
     img = pyglet.image.ImageData(image.shape[1], image.shape[0], 'RGB', image.tobytes(), pitch=image.shape[1] * -3)
     img.blit(0, 0)
-    if self.C.debug:
+    if self.G.debug:
       label1 = pyglet.text.HTMLLabel(f'<font face="Helvetica Bold" size=10">{self.height}x{self.width}x3</font>', x=self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')
       label1.draw()
       label2 = pyglet.text.HTMLLabel(f'<font face="Helvetica Bold" size=10">{self.lcd_h}x{self.lcd_w}</font>', x=3*self.width/2, y=7*self.height/8, anchor_x='center', anchor_y='center')

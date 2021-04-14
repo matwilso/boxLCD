@@ -76,7 +76,7 @@ def register(name):
 # could have a roomba with a gripper or something like that. or a reacher arm.
 
 @register('urchin')
-def make_urchin(robot, C):
+def make_urchin(robot, G):
   LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
   SHAPES = {}
   SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
@@ -95,7 +95,7 @@ def make_urchin(robot, C):
   return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.25)
 
 @register('luxo')
-def make_luxo(robot, C):
+def make_luxo(robot, G):
   VERT = 10 / SCALE
   SIDE = 5 / SCALE
   LEG_W, LEG_H = 8 / SCALE, 24 / SCALE
@@ -127,7 +127,7 @@ def make_luxo(robot, C):
 # TODO: try a bird shape. waddle with legs and has long wings. kind of like a penguin
 
 @register('quad')
-def make_quad(robot, C):
+def make_quad(robot, G):
   LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
   SHAPES = {}
   SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
@@ -147,7 +147,7 @@ def make_quad(robot, C):
 
 
 @register('legs')
-def make_legs(robot, C):
+def make_legs(robot, G):
   LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
   SHAPES = {}
   SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
@@ -166,7 +166,7 @@ def make_legs(robot, C):
 
 
 @register('crab')
-def make_crab(robot, C):
+def make_crab(robot, G):
   SPEEDS = defaultdict(lambda: 8)
   MOTORS_TORQUE = defaultdict(lambda: 150)
   SPEEDS = defaultdict(lambda: 6)
@@ -250,7 +250,7 @@ def make_crab(robot, C):
 
 # TODO: make armed walker
 @register('walker')
-def make_walker(robot, C):
+def make_walker(robot, G):
   LEG_DOWN = -6 / SCALE
   LEG_W, LEG_H = 10 / SCALE, 24 / SCALE
   ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
@@ -302,7 +302,7 @@ def make_walker(robot, C):
 
 
 @register('gingy')
-def make_gingy(robot, C):
+def make_gingy(robot, G):
   # TODO: make armless crab version.
   VERT = 10 / SCALE
   SIDE = 2 / SCALE
@@ -337,7 +337,7 @@ def make_gingy(robot, C):
   return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=0.01), bodies=bodies, joints=joints)
 
 @register('octo')
-def make_octo(robot, C):
+def make_octo(robot, G):
   LEG_W, LEG_H = 8 / SCALE, 25 / SCALE
   SHAPES = {}
   SHAPES['root'] = circleShape(radius=1.5 * LEG_W)
@@ -368,7 +368,7 @@ def make_octo(robot, C):
 
 
 @register('spider')
-def make_spider(robot, C):
+def make_spider(robot, G):
   SPEEDS = defaultdict(lambda: 8)
   MOTORS_TORQUE = defaultdict(lambda: 150)
   SPEEDS = defaultdict(lambda: 6)

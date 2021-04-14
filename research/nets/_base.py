@@ -2,18 +2,14 @@ import torch as th
 from torch import nn
 from torch.optim import Adam
 
-# TODO: something to autoregister all nets
 class Net(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, G):
     super().__init__()
-    self.C = C
-    self.env = env
-    self.imsize = self.C.lcd_h * self.C.lcd_w
-    self.act_n = env.action_space.shape[0]
+    self.G = G
+    self.name = self.__class__.__name__
 
   def _init(self):
-    self.optimizer = Adam(self.parameters(), lr=C.lr)
-    self.to(self.C.device)
+    self.optimizer = Adam(self.parameters(), lr=self.G.lr)
 
   def train_step(self, batch, dry=False):
     self.optimizer.zero_grad()
@@ -26,10 +22,14 @@ class Net(nn.Module):
   def save(self, dir):
     print("SAVED MODEL", dir)
     path = dir / f'{self.name}.pt'
-    th.save(self.state_dict(), path)
+    sd = self.state_dict()
+    sd['G'] = self.G
+    th.save(sd, path)
     print(path)
 
-  def load(self, path):
-    path = path / f'{self.name}.pt'
-    self.load_state_dict(th.load(path))
+  def load(self, dir):
+    path = dir / f'{self.name}.pt'
+    sd = th.load(path)
+    G = sd.pop('G')
+    self.load_state_dict(sd)
     print(f'LOADED {path}')

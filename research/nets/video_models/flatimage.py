@@ -16,34 +16,34 @@ import utils
 import ignite
 
 class FlatImageTransformer(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     super().__init__()
-    self.C = C
+    self.G = G
     self.env = env
-    self.imsize = self.C.lcd_h * self.C.lcd_w
+    self.imsize = self.G.lcd_h * self.G.lcd_w
     self.act_n = env.action_space.shape[0]
-    self.block_size = self.C.window
+    self.block_size = self.G.window
 
     self.size = self.imsize
     self.gpt_size = self.imsize
-    self.dist = self.C.decode
-    self.block_size = self.C.window
+    self.dist = self.G.decode
+    self.block_size = self.G.window
 
-    self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, C.n_embed))
-    self.cond_in = nn.Linear(self.act_n, C.n_embed // 2, bias=False)
+    self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
+    self.cond_in = nn.Linear(self.act_n, G.n_embed // 2, bias=False)
     # input embedding stem
-    self.embed = nn.Linear(self.gpt_size, C.n_embed // 2, bias=False)
+    self.embed = nn.Linear(self.gpt_size, G.n_embed // 2, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(self.block_size, C) for _ in range(C.n_layer)])
+    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
-    self.ln_f = nn.LayerNorm(C.n_embed)
-    if self.C.conv_io:
-      self.dist_head = ConvBinHead(C.n_embed, self.gpt_size, C)
-      self.custom_embed = ConvEmbed(self.imsize, C.n_embed // 2, C)
+    self.ln_f = nn.LayerNorm(G.n_embed)
+    if self.G.conv_io:
+      self.dist_head = ConvBinHead(G.n_embed, self.gpt_size, G)
+      self.custom_embed = ConvEmbed(self.imsize, G.n_embed // 2, G)
     else:
-      self.dist_head = BinaryHead(C.n_embed, self.gpt_size, C)
-    self.optimizer = Adam(self.parameters(), lr=C.lr)
-    self.to(C.device)
+      self.dist_head = BinaryHead(G.n_embed, self.gpt_size, G)
+    self.optimizer = Adam(self.parameters(), lr=G.lr)
+    self.to(G.device)
 
   def save(self, dir):
     print("SAVED MODEL", dir)
@@ -63,10 +63,10 @@ class FlatImageTransformer(nn.Module):
     x = lcd
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
-    x = th.cat([th.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
-    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.C.device), acts[:,:-1]], dim=1)
+    x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.G.device), acts[:,:-1]], dim=1)
     # forward the GPT model
-    if self.C.conv_io:
+    if self.G.conv_io:
       x = self.custom_embed(x)
     x = self.embed(x)
     cin = self.cond_in(acts)
@@ -109,8 +109,8 @@ class FlatImageTransformer(nn.Module):
       if acts is not None:
         n = acts.shape[0]
       batch = {}
-      batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.C.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.C.device)
+      batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
+      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
@@ -124,5 +124,5 @@ class FlatImageTransformer(nn.Module):
         batch['lcd'][:, i] = dist.sample()[:, i]
         if i == self.block_size - 1:
           sample_loss = self.loss(batch)[0]
-    batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
+    batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
     return batch, sample_loss.mean().cpu().detach()

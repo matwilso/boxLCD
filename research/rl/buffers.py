@@ -11,9 +11,9 @@ class OGRB:
   """
   A simple FIFO experience replay buffer for SAC agents.
   """
-  def __init__(self, C, obs_space, act_space):
-    self.C = C
-    size = C.replay_size
+  def __init__(self, G, obs_space, act_space):
+    self.G = G
+    size = G.replay_size
     self.bufs = {}
     for x in ['o:', 'o2:']:
       for key in obs_space.spaces:
@@ -34,7 +34,7 @@ class OGRB:
     self.size = min(self.size + 1, self.max_size)
 
   #def get_last(self, n):
-  #  assert self.C.ep_len*n <= self.ptr
+  #  assert self.G.ep_len*n <= self.ptr
   #  batch = tree_map(lambda x: x[self.ptrs[-2]:self.ptrs[-1]], self.bufs)
   #  batch = tree_multimap(lambda x, y: np.concatenate([x, y[self.ptrs[-3]:self.ptrs[-2]]]), batch, self.bufs)
   #  batch = tree_multimap(lambda x, y: np.concatenate([x, y[self.ptrs[-4]:self.ptrs[-3]]]), batch, self.bufs)
@@ -56,15 +56,15 @@ class OGRB:
     batch['obs'] = o
     batch['obs2'] = o2
     assert np.isclose(np.mean((o['goal:pstate'] - o2['goal:pstate'])**2), 0.0), "AHH"
-    return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.C.device), batch)
+    return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch)
 
 class ReplayBuffer:
   """
   A simple FIFO experience replay buffer for SAC agents.
   """
-  def __init__(self, C, obs_space, act_space):
-    self.C = C
-    size = C.replay_size
+  def __init__(self, G, obs_space, act_space):
+    self.G = G
+    size = G.replay_size
     self.bufs = {}
     for o in ['o', 'o2']:
       for key in obs_space.spaces:
@@ -73,13 +73,13 @@ class ReplayBuffer:
     self.bufs['rew'] = np.zeros(size, dtype=np.float32)
     self.bufs['done'] = np.zeros(size, dtype=np.float32)
     self.ptr, self.size, self.max_size = 0, 0, size
-    if C.lenv:
+    if G.lenv:
       self.proc = lambda x: x.cpu().numpy()
     else:
       self.proc = lambda x: x 
 
   def store_n(self, ntrans):
-    shape = self.C.num_envs
+    shape = self.G.num_envs
     end_idx = self.ptr + shape
     if end_idx <= self.max_size:  # normal operation
       for key in self.bufs:
@@ -106,4 +106,4 @@ class ReplayBuffer:
     batch['obs'] = o
     batch['obs2'] = o2
     assert np.isclose(np.mean((o['goal:pstate'] - o2['goal:pstate'])**2), 0.0), "AHH"
-    return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.C.device), batch)
+    return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch)

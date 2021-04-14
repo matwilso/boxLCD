@@ -22,18 +22,19 @@ import torch.nn.functional as F
 import numpy as np
 from .vq import VectorQuantizer
 import utils
+from research.nets.common import ResBlock
 
 class VQVAE(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     super().__init__()
-    H = C.hidden_size
+    H = G.hidden_size
     # encoder -> VQ -> decoder
-    self.encoder = Encoder(env, C)
-    self.vq = VectorQuantizer(C.vqK, C.vqD, C.beta, C)
-    self.decoder = Decoder(env, C)
-    self.optimizer = Adam(self.parameters(), C.lr)
+    self.encoder = Encoder(env, G)
+    self.vq = VectorQuantizer(G.vqK, G.vqD, G.beta, G)
+    self.decoder = Decoder(env, G)
+    self.optimizer = Adam(self.parameters(), G.lr)
     self.env = env
-    self.C = C
+    self.G = G
 
   def train_step(self, batch, dry=False):
     if dry:
@@ -95,9 +96,9 @@ class VQVAE(nn.Module):
     return embed_loss, decoded, perplexity, idxs
 
 class Encoder(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     super().__init__()
-    H = C.hidden_size
+    H = G.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     act_n = env.action_space.shape[0]
 
@@ -140,20 +141,20 @@ class Upsample(nn.Module):
     return x
 
 class Decoder(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     super().__init__()
-    H = C.hidden_size
+    H = G.hidden_size
     state_n = env.observation_space.spaces['pstate'].shape[0]
     self.state_net = nn.Sequential(
       nn.Flatten(-3),
-      nn.Linear(C.vqD*4*8, H),
+      nn.Linear(G.vqD*4*8, H),
       nn.ReLU(),
       nn.Linear(H, H),
       nn.ReLU(),
       nn.Linear(H, state_n),
     )
     self.net = nn.Sequential(
-        Upsample(C.vqD, H),
+        Upsample(G.vqD, H),
         nn.ReLU(),
         Upsample(H, H),
         nn.ReLU(),
@@ -165,35 +166,3 @@ class Decoder(nn.Module):
     lcd_dist = thd.Bernoulli(logits=self.net(x))
     state_dist = thd.Normal(self.state_net(x), 1)
     return {'lcd': lcd_dist, 'pstate': state_dist}
-
-class ResBlock(nn.Module):
-  def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0):
-    super().__init__()
-    self.out_channels = out_channels or channels
-
-    self.in_layers = nn.Sequential(
-        nn.GroupNorm(32, channels),
-        nn.SiLU(),
-        nn.Conv2d(channels, self.out_channels, 3, padding=1)
-    )
-    self.emb_layers = nn.Sequential(
-        nn.SiLU(),
-        nn.Linear(emb_channels, self.out_channels)
-    )
-    self.out_layers = nn.Sequential(
-        nn.GroupNorm(32, self.out_channels),
-        nn.SiLU(),
-        nn.Dropout(p=dropout),
-        utils.zero_module(nn.Conv2d(self.out_channels, self.out_channels, 3, padding=1))
-    )
-    if self.out_channels == channels:
-      self.skip_connection = nn.Identity()
-    else:
-      self.skip_connection = nn.Conv2d(channels, self.out_channels, 1)  # step down size
-
-  def forward(self, x, emb):
-    h = self.in_layers(x)
-    emb_out = self.emb_layers(emb)[..., None, None]
-    h = h + emb_out
-    h = self.out_layers(h)
-    return self.skip_connection(x) + h

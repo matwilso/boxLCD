@@ -5,10 +5,10 @@ from gym.utils import seeding, EzPickle
 from research import utils
 
 class CubeGoalEnv:
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     self._env = env
     self.SCALE = 2
-    self.C = C
+    self.G = G
     self.keys = utils.filtlist(self._env.obs_keys, 'object.*(x|y):p')
     self.idxs = [self._env.obs_keys.index(x) for x in self.keys]
     self.rootkeys = utils.filtlist(self._env.obs_keys, '.*root.*(x|y):p')
@@ -54,15 +54,15 @@ class CubeGoalEnv:
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
-    rew = rew * self.C.rew_scale
+    rew = rew * self.G.rew_scale
     self.last_obs = copy.deepcopy(obs)
     return obs, rew, done, info
 
   def comp_rew_done(self, obs, info={}):
     done = False
-    if self.C.state_rew:
+    if self.G.state_rew:
       delta = ((obs['goal:pstate'] - obs['full_state'][..., self.idxs])**2).mean()
-      if self.C.diff_delt:
+      if self.G.diff_delt:
         last_delta = ((obs['goal:pstate'] - self.last_obs['full_state'][..., self.idxs])**2).mean()
         # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
         # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
@@ -102,21 +102,21 @@ if __name__ == '__main__':
   import torch as th
   import pathlib
   import time
-  C = utils.AttrDict()
-  C.env = 'UrchinCube'
-  C.state_rew = 1
-  C.device = 'cpu'
-  C.lcd_h = 16
-  C.lcd_w = 32
-  C.wh_ratio = 1.5
-  C.lr = 1e-3
-  #C.lcd_base = 32
-  C.rew_scale = 1.0
-  C.diff_delt = 1 
-  C.fps = 10
-  env = envs.UrchinCube(C)
-  C.fps = env.C.fps
-  env = CubeGoalEnv(env, C)
+  G = utils.AttrDict()
+  G.env = 'UrchinCube'
+  G.state_rew = 1
+  G.device = 'cpu'
+  G.lcd_h = 16
+  G.lcd_w = 32
+  G.wh_ratio = 1.5
+  G.lr = 1e-3
+  #G.lcd_base = 32
+  G.rew_scale = 1.0
+  G.diff_delt = 1 
+  G.fps = 10
+  env = envs.UrchinCube(G)
+  G.fps = env.G.fps
+  env = CubeGoalEnv(env, G)
   print(env.observation_space, env.action_space)
   obs = env.reset()
   lcds = [obs['lcd']]
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
-    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
+    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(G.device) for key, val in obs.items()}
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     rews += [rew]
@@ -154,5 +154,5 @@ if __name__ == '__main__':
     draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fill=color, fnt=fnt)
     dframes += [np.array(pframe)]
   dframes = np.stack(dframes)
-  utils.write_video('mtest.mp4', dframes, fps=C.fps)
-  #utils.write_gif('test.gif', dframes, fps=C.fps)
+  utils.write_video('mtest.mp4', dframes, fps=G.fps)
+  #utils.write_gif('test.gif', dframes, fps=G.fps)

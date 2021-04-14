@@ -7,105 +7,102 @@ import sys
 import pathlib
 import boxLCD.utils
 from boxLCD import envs, env_map
-from boxLCD import ENV_DC
+from boxLCD import ENV_DG
 from boxLCD.utils import args_type
 
 
-def env_fn(C, seed=None):
+def env_fn(G, seed=None):
   def _make():
-    if C.env in env_map:
-      env = env_map[C.env](C)
+    if G.env in env_map:
+      env = env_map[G.env](G)
       env.seed(seed)
-      if C.goals:
-        if 'Cube' not in C.env:
-          env = wrappers.BodyGoalEnv(env, C)
+      if G.goals:
+        if 'Cube' not in G.env:
+          env = wrappers.BodyGoalEnv(env, G)
         else:
-          env = wrappers.CubeGoalEnv(env, C)
-      #if C.preproc:
-      #  assert C.env == 'Luxo'
-      #  env = wrappers.PreprocEnv(env, C)
+          env = wrappers.CubeGoalEnv(env, G)
     else:
-      env = gym.make(C.env)
-      env = wrappers.WrappedGym(env, C)
+      env = gym.make(G.env)
+      env = wrappers.WrappedGym(env, G)
       env.seed(seed)
     return env
   return _make
 
 def config():
-  C = boxLCD.utils.AttrDict()
+  G = boxLCD.utils.AttrDict()
   # BASICS
-  C.logdir = pathlib.Path('./logs/trash')
-  C.weightdir = pathlib.Path('.')
-  C.buffdir = pathlib.Path('.')
-  C.datapath = pathlib.Path('.')
-  C.device = 'cuda' # 'cuda', 'cpu'
-  C.mode = 'train'
-  C.model = 'frame_token'
-  C.datamode = 'video'
-  C.ipython_mode = 0
+  G.logdir = pathlib.Path('./logs/trash')
+  G.weightdir = pathlib.Path('.')
+  G.buffdir = pathlib.Path('.')
+  G.datapath = pathlib.Path('.')
+  G.device = 'cuda' # 'cuda', 'cpu'
+  G.mode = 'train'
+  G.model = 'frame_token'
+  G.datamode = 'video'
+  G.ipython_mode = 0
 
-  #C.data_mode = 'image'
-  C.amp = 0
-  C.total_itr = int(1e9)
-  C.log_n = int(1e4)
-  C.save_n = 5
-  C.refresh_data = 0
+  #G.data_mode = 'image'
+  G.amp = 0
+  G.total_itr = int(1e9)
+  G.log_n = int(1e4)
+  G.save_n = 5
+  G.refresh_data = 0
 
-  C.decode = 'multi'
-  C.conv_io = 0
-  C.train_barrels = -1  # -1 means all. any other number is how many to use
-  C.test_barrels = 1 
-  C.grad_clip = 10.0
+  G.decode = 'multi'
+  G.conv_io = 0
+  G.train_barrels = -1  # -1 means all. any other number is how many to use
+  G.test_barrels = 1 
+  G.grad_clip = 10.0
 
-  C.bs = 64
-  C.lr = 1e-4
-  C.n_layer = 2
-  C.n_head = 4
-  C.n_embed = 128
-  C.hidden_size = 128
-  C.nfilter = 128
-  C.vidstack = -1
-  C.stacks_per_block = 32
+  G.bs = 64
+  G.lr = 1e-4
+  G.n_layer = 2
+  G.n_head = 4
+  G.n_embed = 128
+  G.hidden_size = 128
+  G.nfilter = 128
+  G.vidstack = -1
+  G.stacks_per_block = 32
 
-  C.vqD = 128
-  C.vqK = 128
-  C.beta = 0.25
+  G.vqD = 128
+  G.vqK = 128
+  G.beta = 0.25
 
 
-  C.min_std = 1e-4
-  C.data_frac = 1.0
-  C.vanished = 1
-  C.num_envs = 8
+  G.min_std = 1e-4
+  G.data_frac = 1.0
+  G.vanished = 1
+  G.num_envs = 8
 
-  C.mdn_k = 5
-  C.dist_delta = 0
-  C.sample_sample = 0
-  C.skip_train = 0
+  G.mdn_k = 5
+  G.dist_delta = 0
+  G.sample_sample = 0
+  G.skip_train = 0
 
-  C.phase = 1
-  C.window = 200
-  C.seed = 0
-  C.end2end = 0
+  G.phase = 1
+  G.window = 200
+  G.seed = 0
+  G.end2end = 0
 
-  C.env = 'Dropbox'
-  C.goals = 0
-  C.preproc = 0
-  C.state_rew = 1
-  C.rew_scale = 1.0
+  G.env = 'Dropbox'
+  G.goals = 0
+  G.preproc = 0
+  G.state_rew = 1
+  G.rew_scale = 1.0
 
   # extra info that we set here for convenience and don't modify 
-  C.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
-  C.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
+  G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
+  G.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
 
   # values set by the code
-  C.num_vars = 0
+  G.num_vars = 0
 
-  pastKeys = list(C.keys())
-  for key, val in ENV_DC.items():
+  pastKeys = list(G.keys())
+  for key, val in ENV_DG.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
-    C[key] = val
+    G[key] = val
 
   
 
 
-  return C
+  return G

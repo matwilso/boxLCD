@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 class WrappedGym:
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     self._env = env
 
   @property

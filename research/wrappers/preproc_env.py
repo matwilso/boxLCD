@@ -14,25 +14,25 @@ class PreprocEnv:
   """
   Learned model that preprocesses observations and produces a `zstate`
   """
-  def __init__(self, env, C, device='cpu'):
+  def __init__(self, env, G, device='cpu'):
     #weightdir = pathlib.Path('./logs/qvae/binary_vqd32_save5_64_again')
-    #MC = th.load(weightdir / 'bvae.pt').pop('C')
+    #MC = th.load(weightdir / 'bvae.pt').pop('G')
     #self.model = BVAE(env, MC)
     #self.model.load(weightdir)
 
     weightdir = pathlib.Path('./logs/qvae/urchincube/justvae_64_2/')
-    MC = th.load(weightdir / 'vae.pt').pop('C')
+    MC = th.load(weightdir / 'vae.pt').pop('G')
     self.model = VAE(MC)
     self.model.load(weightdir)
 
     self._env = env
     self.SCALE = 2
-    self.C = C
+    self.G = G
     self.device = device
     self.model.to(device)
     self.model.eval()
-    self.e2 = envs.UrchinCube(C)
-    self.e2 = CubeGoalEnv(self.e2, C)
+    self.e2 = envs.UrchinCube(G)
+    self.e2 = CubeGoalEnv(self.e2, G)
 
   @property
   def action_space(self):
@@ -47,7 +47,7 @@ class PreprocEnv:
     return base_space
 
   def _preproc_obs(self, obs):
-    batch_obs = {key: th.as_tensor(1.0 * val[None]).float().to(self.C.device) for key, val in obs.items()}
+    batch_obs = {key: th.as_tensor(1.0 * val[None]).float().to(self.G.device) for key, val in obs.items()}
     zstate = self.model.encode(batch_obs)
     obs['zstate'] = zstate.detach().cpu().numpy()
     if 'goal:pstate' in batch_obs:
@@ -103,34 +103,34 @@ if __name__ == '__main__':
   import pathlib
   import time
   from research.nets.bvae import BVAE
-  C = utils.AttrDict()
-  C.env = 'UrchinCube'
-  #C.env = 'Luxo'
-  C.state_rew = 1
-  C.device = 'cpu'
-  C.lcd_h = 16
-  C.lcd_w = 32
-  C.wh_ratio = 2.0
-  C.lr = 1e-3
-  #C.lcd_base = 32
-  C.rew_scale = 1.0
-  C.diff_delt = 1 
-  C.fps = 10
-  C.hidden_size = 128
-  C.nfilter = 128
-  C.vqK = 128
-  C.vqD = 128
-  C.goal_thresh = 0.01
-  #env = envs.Luxo(C)
+  G = utils.AttrDict()
+  G.env = 'UrchinCube'
+  #G.env = 'Luxo'
+  G.state_rew = 1
+  G.device = 'cpu'
+  G.lcd_h = 16
+  G.lcd_w = 32
+  G.wh_ratio = 2.0
+  G.lr = 1e-3
+  #G.lcd_base = 32
+  G.rew_scale = 1.0
+  G.diff_delt = 1 
+  G.fps = 10
+  G.hidden_size = 128
+  G.nfilter = 128
+  G.vqK = 128
+  G.vqD = 128
+  G.goal_thresh = 0.01
+  #env = envs.Luxo(G)
   #weightdir = pathlib.Path('./logs/qvae/binary_vqd32_save5_64_again')
-  #MC = th.load(weightdir / 'bvae.pt').pop('C')
+  #MC = th.load(weightdir / 'bvae.pt').pop('G')
   #model = BVAE(env, MC)
   #model.load(weightdir)
-  env = envs.UrchinCube(C)
-  C.fps = env.C.fps
-  env = CubeGoalEnv(env, C)
-  #env = BodyGoalEnv(env, C)
-  env = PreprocEnv(env, C, device='cpu')
+  env = envs.UrchinCube(G)
+  G.fps = env.G.fps
+  env = CubeGoalEnv(env, G)
+  #env = BodyGoalEnv(env, G)
+  env = PreprocEnv(env, G, device='cpu')
   print(env.observation_space, env.action_space)
   start = time.time()
   obs = env.reset()
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     #env.render(mode='human')
     act = env.action_space.sample()
     obs, rew, done, info = env.step(act)
-    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(C.device) for key, val in obs.items()}
+    #o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(G.device) for key, val in obs.items()}
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     rews += [rew]
@@ -171,5 +171,5 @@ if __name__ == '__main__':
     draw.text((10, 10), f't: {i} r: {rews[i]:.3f}\nd: {deltas[i]:.3f}', fill=color, fnt=fnt)
     dframes += [np.array(pframe)]
   dframes = np.stack(dframes)
-  utils.write_video('preproc.mp4', dframes, fps=C.fps)
-  #utils.write_gif('test.gif', dframes, fps=C.fps)
+  utils.write_video('preproc.mp4', dframes, fps=G.fps)
+  #utils.write_gif('test.gif', dframes, fps=G.fps)

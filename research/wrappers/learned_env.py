@@ -23,12 +23,12 @@ class RewardLenv:
   def __init__(self, env):
     self.lenv = env
     self.SCALE = 2
-    self.C = env.C
-    #self.real_env = env_fn(self.C)()._env
+    self.G = env.G
+    #self.real_env = env_fn(self.G)()._env
     self.real_env = self.lenv.real_env
     self.pobs_keys = self.lenv.pobs_keys
     self.obs_keys = self.lenv.obs_keys
-    self.goal = {key: th.zeros(space.shape).to(self.C.device).float() for key, space in self.observation_space.spaces.items() if 'goal' in key}
+    self.goal = {key: th.zeros(space.shape).to(self.G.device).float() for key, space in self.observation_space.spaces.items() if 'goal' in key}
 
   @property
   def action_space(self):
@@ -47,16 +47,16 @@ class RewardLenv:
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
     rew, _done = self.comp_rew_done(obs, info)
     done = th.logical_or(done, _done)
-    rew = rew * self.C.rew_scale
+    rew = rew * self.G.rew_scale
     return obs, rew, done, info
 
   def _reset_goals(self, mask):
     mask = mask.bool()
-    if not self.C.lenv_goals:
+    if not self.G.lenv_goals:
       new_goal = [utils.filtdict(self.real_env.reset(), 'goal:') for _ in np.arange(self.lenv.num_envs)]
-      new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device).float(), new_goal[0], *new_goal[1:])
+      new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), new_goal[0], *new_goal[1:])
     else:
-      #assert not self.C.reset_prompt, 'we dont want to use prompts for this because its slow'
+      #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
       new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
     def tileup(x, y):
       while x.ndim != y.ndim:
@@ -65,7 +65,7 @@ class RewardLenv:
     self.goal = tree_multimap(lambda x, y: x*tileup(x,mask) + y*~tileup(y,mask), new_goal, self.goal)
 
   def reset(self, *args, **kwargs):
-    self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.C.device))
+    self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device))
     obs = self.lenv.reset(*args, **kwargs)
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
     obs['goal:pstate'] = self.goal['goal:pstate'].detach().clone()
@@ -75,8 +75,8 @@ class RewardLenv:
     self.lenv.render(*args, **kwargs)
 
   def comp_rew_done(self, obs, info={}):
-    done = th.zeros(obs['lcd'].shape[0]).to(self.C.device)
-    if self.C.state_rew:
+    done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
+    if self.G.state_rew:
       delta = ((obs['goal:pstate'] - obs['pstate'])**2)
       keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
       idxs = [self.pobs_keys.index(x) for x in keys]
@@ -84,7 +84,7 @@ class RewardLenv:
       rew = -delta**0.5
       info['simi'] = delta
       #rew[delta < 0.010] = 0
-      done[delta < self.C.goal_thresh] = 1
+      done[delta < self.G.goal_thresh] = 1
       info['success'] = done
     else:
       import ipdb; ipdb.set_trace()
@@ -101,22 +101,22 @@ class RewardLenv:
 # TODO: add back this wrapper probably, since it makes things a bit cleaner.
 # i was wrong about something when i removed it.
 class LearnedEnv:
-  def __init__(self, num_envs, model, C):
+  def __init__(self, num_envs, model, G):
     self.num_envs = num_envs
     self.window_batch = None
-    self.C = C
+    self.G = G
     self.model = model
-    self.real_env = env_fn(C)()
+    self.real_env = env_fn(G)()
     self.obs_keys = self.real_env._env.obs_keys
     self.pobs_keys = self.real_env._env.pobs_keys
-    self.model.load(C.weightdir)
+    self.model.load(G.weightdir)
     self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
     self.model.eval()
     for p in self.model.parameters():
       p.requires_grad = False
 
     def act_sample():
-      return 2.0 * th.rand(self.action_space.shape).to(C.device) - 1.0
+      return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
     self.action_space.sample = act_sample
 
     spaces = {}
@@ -128,21 +128,21 @@ class LearnedEnv:
 
   def reset(self, *args, update_window_batch=True, **kwargs):
     prompts = [self.real_env.reset() for _ in range(self.num_envs)]
-    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.C.device), prompts[0], *prompts[1:])
-    window_batch = {key: th.zeros([self.C.window, *val.shape], dtype=th.float32).to(self.C.device) for key, val in self.observation_space.spaces.items()}
-    window_batch['acts'] = th.zeros([self.C.window, *self.action_space.shape]).to(self.C.device)
+    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
+    window_batch = {key: th.zeros([self.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
+    window_batch['acts'] = th.zeros([self.G.window, *self.action_space.shape]).to(self.G.device)
     window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
     for key in self.keys:
       window_batch[key][:, 0] = prompts[key]
-    if self.C.reset_prompt:
+    if self.G.reset_prompt:
       #with th.no_grad():
-      #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
+      #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
       self.ptr = 1
     else:
-      window_batch['acts'] += 2.0 * th.rand(window_batch['acts'].shape).to(self.C.device) - 1.0
+      window_batch['acts'] += 2.0 * th.rand(window_batch['acts'].shape).to(self.G.device) - 1.0
       with th.no_grad():
        for self.ptr in range(10):
-         window_batch = self.model.onestep(window_batch, self.ptr, temp=self.C.lenv_temp)
+         window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
        window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
        self.ptr = 4
       
@@ -153,14 +153,14 @@ class LearnedEnv:
 
   def step(self, act):
     with th.no_grad():
-      self.window_batch['acts'][:, self.ptr - 1] = th.as_tensor(act).to(self.C.device)
-      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.C.lenv_temp)
+      self.window_batch['acts'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
+      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
       obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
-      self.ptr = min(1 + self.ptr, self.C.window - 1)
-      if self.ptr == self.C.window - 1:
+      self.ptr = min(1 + self.ptr, self.G.window - 1)
+      if self.ptr == self.G.window - 1:
         self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
         self.ptr -= 1
-    rew, done = th.zeros(self.num_envs).to(self.C.device), th.zeros(self.num_envs).to(self.C.device)
+    rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
     return obs, rew, done, {}
 
 
@@ -177,22 +177,22 @@ if __name__ == '__main__':
   tempC, _ = parser.parse_known_args()
   # grab defaults from the env
   Env = env_map[tempC.env]
-  parser.set_defaults(**Env.ENV_DC)
+  parser.set_defaults(**Env.ENV_DG)
   parser.set_defaults(**{'goals': 1})
-  C, _ = parser.parse_known_args()
-  C.lcd_w = int(C.wh_ratio * C.lcd_base)
-  C.lcd_h = C.lcd_base
-  C.imsize = C.lcd_w * C.lcd_h
-  C.lenv_temp = 2.0
-  C.reset_prompt = 0
-  C.diff_delt = 0
-  C.goal_thresh = 0.01
+  G, _ = parser.parse_known_args()
+  G.lcd_w = int(G.wh_ratio * G.lcd_base)
+  G.lcd_h = G.lcd_base
+  G.imsize = G.lcd_w * G.lcd_h
+  G.lenv_temp = 2.0
+  G.reset_prompt = 0
+  G.diff_delt = 0
+  G.goal_thresh = 0.01
 
-  env = env_fn(C)()
+  env = env_fn(G)()
 
-  MC = th.load(C.weightdir / 'flatev2.pt').pop('C')
+  MC = th.load(G.weightdir / 'flatev2.pt').pop('G')
   model = FlatEverything(env, MC)
-  lenv = RewardLenv(LearnedEnv(C.num_envs, model, C))
+  lenv = RewardLenv(LearnedEnv(G.num_envs, model, G))
   obs = lenv.reset()
   start = time.time()
   lcds = [obs['lcd']]
@@ -209,8 +209,8 @@ if __name__ == '__main__':
   glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()
   #lcds = (lcds - glcds + 1.0) / 2.0
   print('1', time.time() - start)
-  utils.write_gif('test.gif', outproc(lcds), fps=C.fps)
-  utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=C.fps)
+  utils.write_gif('test.gif', outproc(lcds), fps=G.fps)
+  utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=G.fps)
 
   obs = env.reset()
   ostart = time.time()
@@ -220,8 +220,8 @@ if __name__ == '__main__':
   print('2', time.time() - ostart)
 
   vstart = time.time()
-  venv = AsyncVectorEnv([env_fn(C) for _ in range(C.num_envs)])
-  obs = venv.reset(np.arange(C.num_envs))
+  venv = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
+  obs = venv.reset(np.arange(G.num_envs))
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
   for i in range(200):
@@ -235,5 +235,5 @@ if __name__ == '__main__':
   glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
   lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
   print('1', time.time() - start)
-  utils.write_gif('realtest.gif', outproc(lcds), fps=C.fps)
+  utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)
 

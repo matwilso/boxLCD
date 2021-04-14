@@ -14,7 +14,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
 import boxLCD.utils
-from boxLCD import C
+from boxLCD import G
 from boxLCD import envs
 import pyglet
 KEY = pyglet.window.key
@@ -31,10 +31,10 @@ def write_gif(name, frames, fps=30):
 if __name__ == '__main__':
   import matplotlib.pyplot as plt
   parser = argparse.ArgumentParser()
-  for key, value in C.items():
+  for key, value in G.items():
     parser.add_argument(f'--{key}', type=boxLCD.utils.args_type(value), default=value)
-  C = parser.parse_args()
-  env = envs.UrchinBall(C)
+  G = parser.parse_args()
+  env = envs.UrchinBall(G)
   env.seed(7)
   np_random = np.random.RandomState(4)
   start = env.reset()

@@ -24,16 +24,16 @@ from .gpt import GPT
 import utils
 
 class Combined(nn.Module):
-  def __init__(self, env, C):
+  def __init__(self, env, G):
     super().__init__()
-    self.vqvae = VQVAE(env, C)
-    self.state_vqvae = State_VQVAE(env, C)
-    self.gpt = GPT(C.vqK, 8 + 24, C=C)
-    self.image_optimizer = Adam(self.vqvae.parameters(), lr=C.lr)
-    self.state_optimizer = Adam(self.state_vqvae.parameters(), lr=C.lr)
+    self.vqvae = VQVAE(env, G)
+    self.state_vqvae = State_VQVAE(env, G)
+    self.gpt = GPT(G.vqK, 8 + 24, G=G)
+    self.image_optimizer = Adam(self.vqvae.parameters(), lr=G.lr)
+    self.state_optimizer = Adam(self.state_vqvae.parameters(), lr=G.lr)
     self.gpt_optimizer = Adam(self.gpt.parameters(), lr=1e-3)#, betas=(0.5, 0.999))
     self.env = env
-    self.C = C
+    self.G = G
 
   def forward(self, batch):
     import ipdb; ipdb.set_trace()
@@ -55,7 +55,7 @@ class Combined(nn.Module):
     state_idxs = smetrics.pop('idxs')
     image_idxs = imetrics.pop('idxs')
     idxs = th.cat([state_idxs, image_idxs.flatten(-2)], -1)
-    code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
+    code_idxs = F.one_hot(idxs.detach(), self.G.vqK).float()
     import ipdb; ipdb.set_trace()
     gpt_dist = self.gpt.forward(code_idxs)
     prior_loss = -gpt_dist.log_prob(code_idxs).mean()
@@ -99,13 +99,13 @@ class Combined(nn.Module):
     state_idxs = smetrics.pop('idxs')
     state_idxs[4:] = state_idxs[4:5,:] # make the last 4 be all the same
     idxs = th.cat([state_idxs, th.zeros_like(image_idxs.flatten(-2))], -1)
-    code_idxs = F.one_hot(idxs.detach(), self.C.vqK).float()
+    code_idxs = F.one_hot(idxs.detach(), self.G.vqK).float()
     for i in range(8, self.gpt.block_size):
       dist = self.gpt.forward(code_idxs)
       code_idxs[:, i] = dist.sample()[:, i]
     sample_image_idxs = code_idxs[:, 8:]
-    prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).reshape([-1, 4, 6, self.C.vqD]).permute(0, 3, 1, 2)
-    #prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).permute(0,2,1).reshape([-1, self.C.vqD, 4, 6])
+    prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).reshape([-1, 4, 6, self.G.vqD]).permute(0, 3, 1, 2)
+    #prior_enc = self.vqvae.vq.idx_to_encoding(sample_image_idxs).permute(0,2,1).reshape([-1, self.G.vqD, 4, 6])
     decoded = self.vqvae.decoder(prior_enc)[:8]
     sample_lcd = 1.0 * (decoded.exp() > 0.5)
     lcd[4:] = lcd[4:5] # make the last 4 be all the same
