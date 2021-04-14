@@ -87,15 +87,14 @@ class BVAE(nn.Module):
     stack = np.concatenate([truths, preds, error], -2)[:, None]
     writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
-
   def loss(self, batch, eval=False, return_idxs=False):
     embed_loss, decoded, idxs = self.forward(batch)
     recon_losses = {}
-    recon_losses['recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
-    recon_losses['recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:,None]).mean()
+    recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:,None]).mean()
     recon_loss = sum(recon_losses.values())
-    loss = recon_loss + 0.0*embed_loss
-    metrics = {'vq_vae_loss': loss, 'embed_loss': embed_loss, **recon_losses, 'recon_loss': recon_loss}
+    loss = recon_loss + -embed_loss
+    metrics = {'vq_vae_loss': loss, 'embed_loss': embed_loss, **recon_losses, 'loss/recon_total': recon_loss}
     if eval: metrics['decoded'] = decoded
     if return_idxs: metrics['idxs'] = idxs
     return loss, metrics
@@ -225,7 +224,7 @@ class Quantize(nn.Module):
   def __init__(self, num_hiddens, n_embed):
     super().__init__()
     self.n_embed = n_embed
-    self.kld_scale = 5e-4
+    self.kld_scale = 0.1 
     self.proj = nn.Linear(num_hiddens, n_embed)
 
   def forward(self, z):

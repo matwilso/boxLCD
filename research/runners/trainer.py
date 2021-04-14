@@ -42,6 +42,7 @@ class Trainer:
     self.venv = AsyncVectorEnv([env_fn(C) for _ in range(self.C.num_envs)])
     self.ssim = ignite.metrics.SSIM(1.0, device=self.C.device)
     self.psnr = ignite.metrics.PSNR(1.0, device=self.C.device)
+    self.model.save(self.C.logdir)
 
   def evaluate(self, batch, itr):
     N = self.C.num_envs

@@ -23,15 +23,16 @@ class FlatBToken(nn.Module):
     self.pstate_n = env.observation_space.spaces['pstate'].shape[0]
     self.block_size = self.C.window
 
-    # LOAD SVAE
+    # LOAD BVAE
     sd = th.load(C.weightdir/'bvae.pt')
-    svaeC = sd.pop('C')
-    self.bvae = BVAE(env, svaeC)
+    bvaeC = sd.pop('C')
+    self.bvae = BVAE(env, bvaeC)
     self.bvae.load(C.weightdir)
-    for p in self.bvae.parameters():
-      p.requires_grad = False
-    self.bvae.eval()
-    # </LOAD SVAE>
+    if not C.end2end:
+      for p in self.bvae.parameters():
+        p.requires_grad = False
+      self.bvae.eval()
+    # </LOAD BVAE>
 
     self.size = self.bvae.C.vqD * 4 * 8
     self.gpt_size = self.size
@@ -52,7 +53,7 @@ class FlatBToken(nn.Module):
 
   def save(self, dir):
     print("SAVED MODEL", dir)
-    path = dir / 'bvae.pt'
+    path = dir / 'btoken.pt'
     sd = self.state_dict()
     sd['C'] = self.C
     th.save(sd, path)
@@ -60,19 +61,23 @@ class FlatBToken(nn.Module):
     self.bvae.save(dir)
 
   def load(self, dir):
-    path = dir / 'bvae.pt'
+    path = dir / 'btoken.pt'
     sd = th.load(path)
     C = sd.pop('C')
     self.load_state_dict(sd)
     self.bvae.load(dir)
     print(f'LOADED {path}')
 
-  def forward(self, batch):
+  def encode(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
-    acts = batch['acts']
     flatter_batch = {key: val.flatten(0, 1) for key, val in batch.items()}
-    z_q = self.bvae.encode(flatter_batch)
+    z_e = self.bvae.encoder(flatter_batch)
+    z_q, embed_loss, idxs = self.bvae.vq(z_e)
     z_q = z_q.reshape([BS, EPL, -1])
+    assert z_q.shape[-1] == self.bvae.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
+    return z_q, embed_loss
+
+  def forward(self, z_q, acts):
     x = self.embed(z_q)
     # forward the GPT model
     BS, T, E = x.shape
@@ -95,23 +100,40 @@ class FlatBToken(nn.Module):
     if not dry:
       loss.backward()
       self.optimizer.step()
+
+    if self.C.end2end:
+      bvae_metrics = self.bvae.train_step(batch, dry=dry)
+      metrics.update(**bvae_metrics)
     return metrics
 
   def loss(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     metrics = {}
-    logits = self.forward(batch)
+    z_q, embed_loss = self.encode(batch)
+    logits = self.forward(z_q, batch['acts'])
     dist = self.dist_head(logits)
-    z_q = self.bvae.encode({key: val.flatten(0, 1) for key, val in batch.items()})
-    z_q = z_q.reshape([BS, EPL, -1]).detach()
     loss = -dist.log_prob(z_q).mean()
+
+    if self.C.end2end:
+      # reconstruction
+      metrics['loss/forward'] = loss
+      z_q = z_q.reshape([BS*EPL, self.bvae.C.vqD, 4, 8])
+      decoded = self.bvae.decoder(z_q)
+      recon_losses = {}
+      recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate'].flatten(0,1)).mean()
+      recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'].flatten(0,1)[:,None]).mean()
+      recon_loss = sum(recon_losses.values()) + 0.0*-embed_loss
+      metrics['loss/recon_total'] = recon_loss
+      loss += recon_loss
+
     metrics['loss/total'] = loss
     return loss, metrics
 
   def onestep(self, batch, i, temp=1.0):
+    import ipdb; ipdb.set_trace()
+    # TODO: switch to encode, fwd, decode
     logits = self.forward(batch)
     dist = self.dist_head(logits / temp)
-    import ipdb; ipdb.set_trace()
     sample = dist.sample()
     batch['lcd'][:, i] = sample[:, i, :self.C.imsize].reshape(batch['lcd'][:,i].shape)
     pstate_code = sample[:, i, self.C.imsize:]
@@ -119,43 +141,46 @@ class FlatBToken(nn.Module):
     batch['pstate'][:, i] = pstate
     return batch
 
+  #def prompt(self, n, acts, prompts, prompt_n):
+  #  pass
+
   def sample(self, n, acts=None, prompts=None, prompt_n=10):
     # TODO: feed act_n
     with th.no_grad():
-      if acts is not None:
+      if acts is None:
+        acts = (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.C.device)
+      else:
         n = acts.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.C.lcd_h, self.C.lcd_w).to(self.C.device)
       batch['pstate'] = th.zeros(n, self.block_size, self.pstate_n).to(self.C.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.C.device)
       start = 0
       if prompts is not None:
-        batch['lcd'][:, :10] = prompts['lcd'][:, :prompt_n]
-        batch['pstate'][:, :10] = prompts['pstate'][:, :prompt_n]
+        batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
+        batch['pstate'][:, :prompt_n] = prompts['pstate'][:, :prompt_n]
         start = prompt_n
 
+      z_q = self.encode(batch)[0]
+      latent_samples = th.zeros(n, self.block_size, self.bvae.C.vqD*4*8).to(self.C.device)
+      latent_samples[:, :prompt_n] = z_q[:, :prompt_n]
+
       for i in range(start, self.block_size):
-        # TODO: check this setting since we have modified things
-        logits = self.forward(batch)
+        logits = self.forward(latent_samples, acts)
         dist = self.dist_head(logits)
-        sample = dist.sample()
-        sample_ze = sample.reshape([n*self.block_size, self.bvae.C.vqD, 4, 8])
-        dist = self.bvae.decoder(sample_ze)
-        # grab the modes since we don't want to sample in the end space, just latent
-        sample_lcd = (1.0*(dist['lcd'].probs > 0.5)).reshape([n, self.block_size, self.C.lcd_h, self.C.lcd_w])
-        sample_pstate = (dist['pstate'].mean).reshape([n, self.block_size, -1])
-        batch['lcd'][:, i] = sample_lcd[:, i]
-        batch['pstate'][:, i] = sample_pstate[:, i]
-        if i == self.block_size - 1:
-          sample_loss = self.loss(batch)[0]
-    batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.C.lcd_h, self.C.lcd_w)
-    return batch, sample_loss.mean().cpu().detach()
+        latent_samples[:,i] = dist.sample()[:,i]
+
+      sample_zq = latent_samples.reshape([n*self.block_size, self.bvae.C.vqD, 4, 8])
+      dist = self.bvae.decoder(sample_zq)
+      # grab the modes since we don't want to sample in the end space, just latent
+      batch['lcd'] = (1.0*(dist['lcd'].probs > 0.5)).reshape([n, self.block_size, 1, self.C.lcd_h, self.C.lcd_w])
+      batch['pstate'] = (dist['pstate'].mean).reshape([n, self.block_size, -1])
+    return batch
 
   def evaluate(self, writer, batch, epoch):
     N = self.C.num_envs
     # unpropted
     acts = (th.rand(N, self.C.window, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
-    sample, sample_loss = self.sample(N, acts=acts)
+    sample = self.sample(N, acts=acts)
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
     #writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.C.fps)
@@ -191,7 +216,7 @@ class FlatBToken(nn.Module):
     # for key in prompts:
     #  prompts[key][4:] = prompts[key][4:5]
     acts[4:] = acts[4:5]
-    prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
+    prompted_samples = self.sample(N, acts=acts, prompts=prompts)
     real_lcd = obses['lcd'][:, :, None]
     lcd_psamp = prompted_samples['lcd']
     lcd_psamp = lcd_psamp.cpu().detach().numpy()

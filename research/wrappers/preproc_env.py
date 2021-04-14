@@ -74,20 +74,18 @@ class PreprocEnv:
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs = self._preproc_obs(obs)
-
-    full_state = copy.deepcopy(obs['full_state'])
-    full_state[self._env.idxs] = 100
-    o2 = self.e2.reset(full_state=full_state)
-
-    gstate = copy.deepcopy(obs['goal:total'])
-    gstate[self._env.idxs] = 100
-    g2 = self.e2.reset(full_state=gstate)
-    o2['goal:lcd'] = g2['lcd']
-    o2 = self._preproc_obs(o2)
-    z = obs['zstate'] - o2['zstate']
-    gz = obs['goal:zstate'] - o2['goal:zstate']
-    #rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
-    rew = self.comp_rew(z, gz)
+    #full_state = copy.deepcopy(obs['full_state'])
+    #full_state[self._env.idxs] = 100
+    #o2 = self.e2.reset(full_state=full_state)
+    #gstate = copy.deepcopy(obs['goal:full_state'])
+    #gstate[self._env.idxs] = 100
+    #g2 = self.e2.reset(full_state=gstate)
+    #o2['goal:lcd'] = g2['lcd']
+    #o2 = self._preproc_obs(o2)
+    #z = obs['zstate'] - o2['zstate']
+    #gz = obs['goal:zstate'] - o2['goal:zstate']
+    ##rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+    #rew = self.comp_rew(z, gz)
     return obs, rew, done, info
 
   def close(self):

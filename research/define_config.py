@@ -85,6 +85,7 @@ def config():
   C.phase = 1
   C.window = 200
   C.seed = 0
+  C.end2end = 0
 
   C.env = 'Dropbox'
   C.goals = 0

@@ -26,8 +26,8 @@ class CubeGoalEnv:
     base_space = self._env.observation_space
     base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
     base_space.spaces['goal:pstate'] = copy.deepcopy(base_space.spaces['pstate'])
+    base_space.spaces['goal:pstate'].shape = (2,)
     base_space.spaces['goal:full_state'] = copy.deepcopy(base_space.spaces['full_state'])
-    base_space.spaces['goal:full_state'].shape = (2,)
     return base_space
 
   def reset(self, *args, **kwargs):
@@ -37,8 +37,8 @@ class CubeGoalEnv:
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
-    obs['goal:pstate'] = np.array(self.goal['pstate'])
-    obs['goal:full_state'] = np.array(self.goal['full_state'][..., self.idxs])
+    obs['goal:full_state'] = np.array(self.goal['full_state'])
+    obs['goal:pstate'] = np.array(self.goal['full_state'][..., self.idxs])
     self.last_obs = copy.deepcopy(obs)
     return obs
 
@@ -48,9 +48,8 @@ class CubeGoalEnv:
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
-    obs['goal:pstate'] = np.array(self.goal['pstate'])
-    obs['goal:full_state'] = np.array(self.goal['full_state'][..., self.idxs])
-    obs['goal:total'] = np.array(self.goal['full_state'])
+    obs['goal:full_state'] = np.array(self.goal['full_state'])
+    obs['goal:pstate'] = np.array(self.goal['full_state'][..., self.idxs])
     rew, _done = self.comp_rew_done(obs, info)
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
@@ -62,9 +61,9 @@ class CubeGoalEnv:
   def comp_rew_done(self, obs, info={}):
     done = False
     if self.C.state_rew:
-      delta = ((obs['goal:full_state'] - obs['full_state'][..., self.idxs])**2).mean()
+      delta = ((obs['goal:pstate'] - obs['full_state'][..., self.idxs])**2).mean()
       if self.C.diff_delt:
-        last_delta = ((obs['goal:full_state'] - self.last_obs['full_state'][..., self.idxs])**2).mean()
+        last_delta = ((obs['goal:pstate'] - self.last_obs['full_state'][..., self.idxs])**2).mean()
         # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
         # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
         #print(last_delta**0.5 - delta**0.5)

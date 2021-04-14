@@ -43,8 +43,11 @@ class BaseCNN(nn.Module):
     )
     mult = 1 if C.zdelta else 2
     #self.linear = nn.Linear(mult * size * C.nfilter, out_size)
+    extra = 2 + obs_space['pstate'].shape[0]
     self.linear = nn.Sequential(
-        nn.Linear(mult * size * C.nfilter, C.hidden_size),
+        nn.Linear(mult * size * C.nfilter + extra, C.hidden_size),
+        nn.ReLU(),
+        nn.Linear(C.hidden_size, C.hidden_size),
         nn.ReLU(),
         nn.Linear(C.hidden_size, out_size),
     )
@@ -63,6 +66,7 @@ class BaseCNN(nn.Module):
       x = g - s
     else:
       x = th.cat([s, g], -1)
+    x = th.cat([x, obs['goal:pstate'], obs['pstate']], -1)
     x = self.linear(x)
     return x
 
@@ -114,7 +118,8 @@ class QFunction(nn.Module):
     super().__init__()
     H = C.hidden_size
     self.C = C
-    size = obs_space[self.C.state_key].shape[0] + obs_space['goal:' + self.C.state_key].shape[0] + act_dim
+    gsize = obs_space['goal:pstate'].shape[0]
+    size = obs_space[self.C.state_key].shape[0] + gsize + act_dim
     if self.C.net == 'mlp':
       self.base = BaseMLP(size, 1, C)
     elif self.C.net == 'cmlp':
@@ -125,10 +130,10 @@ class QFunction(nn.Module):
 
     if 'vae' in self.C.net:
       self.preproc = preproc
-      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      #self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
       self.act_head = nn.Sequential(
-          nn.Linear(H + H, H),
+          nn.Linear(H + gsize + H, H),
           nn.ReLU(),
           #nn.Linear(H, H),
           #nn.ReLU(),
@@ -145,16 +150,16 @@ class QFunction(nn.Module):
 
   def forward(self, obs, act):
     if self.C.net == 'mlp':
-      x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key], act], -1)
+      x = th.cat([obs[self.C.state_key], obs['goal:pstate'], act], -1)
       return self.base(x).squeeze(-1)
     elif self.C.net == 'bvae':
       x = self.preproc.encode(obs).detach()
       x = self.statie(x)
       if 'goal:pstate' in obs:
-        goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
-        gx = self.preproc.encode(goals).detach()
-        gx = self.goalie(gx)
-        x = th.cat([x, gx], -1)
+        #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
+        #gx = self.preproc.encode(goals).detach()
+        #gx = self.goalie(gx)
+        x = th.cat([x, obs['goal:pstate']], -1)
         #x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
@@ -171,7 +176,8 @@ class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, C, preproc=None):
     super().__init__()
     self.C = C
-    size = obs_space[self.C.state_key].shape[0] + obs_space['goal:' + self.C.state_key].shape[0]
+    gsize = obs_space['goal:pstate'].shape[0]
+    size = obs_space[self.C.state_key].shape[0] + gsize
     self.size = size
     if self.C.net == 'mlp':
       self.net = BaseMLP(size, 2 * act_dim, C)
@@ -181,10 +187,10 @@ class SquashedGaussianActor(nn.Module):
       self.net = BaseCNN(obs_space, 2 * act_dim, C)
     elif 'bvae' in self.C.net:
       self.preproc = preproc
-      self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
-      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      #self.goalie = nn.Linear(self.preproc.z_size, C.hidden_size//2)
+      self.statie = nn.Linear(self.preproc.z_size, C.hidden_size)
       self.net = nn.Sequential(
-          nn.Linear(C.hidden_size, C.hidden_size),
+          nn.Linear(C.hidden_size+gsize, C.hidden_size),
           nn.ReLU(),
           #nn.Linear(C.hidden_size, C.hidden_size),
           #nn.ReLU(),
@@ -196,15 +202,16 @@ class SquashedGaussianActor(nn.Module):
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.C.net == 'mlp':
-      x = th.cat([obs[self.C.state_key], obs['goal:' + self.C.state_key]], -1)
+      x = th.cat([obs[self.C.state_key], obs['goal:pstate']], -1)
     elif self.C.net == 'bvae':
       z = self.preproc.encode(obs).detach()
       x = self.statie(z)
       if 'goal:pstate' in obs:
-        goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
-        gz = self.preproc.encode(goals).detach()
-        gx = self.goalie(gz)
-        x = th.cat([x, gx], -1)
+        #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
+        #gz = self.preproc.encode(goals).detach()
+        #gx = self.goalie(gz)
+        #x = th.cat([x, gx], -1)
+        x = th.cat([x, obs['goal:pstate']], -1)
         #1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
         #x = x + gx
     else:

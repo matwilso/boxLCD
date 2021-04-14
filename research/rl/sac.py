@@ -64,8 +64,8 @@ def sac(C):
       env = wrappers.PreprocVecEnv(preproc, env, C)
       real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, C)
       obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
-      if 'goal:pstate' in obs_space.spaces:
-        obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
+      #if 'goal:pstate' in obs_space.spaces:
+      #  obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
 
   #tenv.reset()
   epoch = -1
