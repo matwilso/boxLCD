@@ -33,7 +33,7 @@ class WorldEnv(gym.Env, EzPickle):
   ENV_DC.base_dim = 5  # base size of box2D physics world
   ENV_DC.lcd_base = 16  # base size of lcd rendered image. this represents the height. width = wh_ratio*height
   ENV_DC.wh_ratio = 2.0  # width:height ratio of the world and images
-  ENV_DC.ep_len = 200  # length to run episode before done timeout
+  ENV_DC.ep_len = 100  # length to run episode before done timeout
   # settings for different obs and action spaces
   ENV_DC.angular_offset = 0  # compute joint angular offsets from robot roots
   ENV_DC.root_offset = 0  # compute position offsets from root
@@ -273,11 +273,7 @@ class WorldEnv(gym.Env, EzPickle):
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
       shape = obj_shapes[shape_name]
-      if obj.restitution is None:
-        restitution = 0 if shape_name == 'box' else 0.7
-      else:
-        restitution = obj.restitution
-      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=restitution)
+      fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=obj.restitution)
       # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
       if obj.rangex is None:
         rangex = 1 - (2 * obj_size / self.WIDTH)
@@ -446,8 +442,12 @@ class WorldEnv(gym.Env, EzPickle):
           self.joints[name].motorSpeed = float(joint.speed * np.sign(action[name + ':torque']))
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
     # RUN SIM STEP
-    self.b2_world.Step(1.0 / (self.FPS*2), 6 * 30, 2 * 30)
-    self.b2_world.Step(1.0 / (self.FPS*2), 6 * 30, 2 * 30)
+    if self.FPS < 30:
+      self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
+      self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
+      self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
+    else:
+      self.b2_world.Step(1.0 / self.FPS, 6 * 30, 2 * 30)
     if not self.C.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
     reward = 0.0  # no reward swag

@@ -16,7 +16,7 @@ class Object(NamedTuple):
   angularDamping: float = 0.0
   density: float = 1.0
   friction: float = 0.5
-  restitution: float = None
+  restitution: float = 0.0
   categoryBits: int = 0x0110
   rand_angle: int = 1
   rangex: Tuple[float, float] = None

@@ -13,45 +13,39 @@ def cc(**kwargs):
     return CustomWorldEnv
   return decorator
 
-# BASIC TIER
-@cc(ep_len=50, wh_ratio=1.0)
+# BASIC ENVS
+@cc(ep_len=25, wh_ratio=1.0)
 class Dropbox(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[], objects=[Object('object0', shape='box', size=0.7, density=0.1)])
     super().__init__(w, C)
 
-@cc(ep_len=100, wh_ratio=1.0)
+@cc(ep_len=50, wh_ratio=1.0)
 class Bounce(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
+    w = WorldDef(robots=[], objects=[Object('object0', shape='circle', size=0.7, density=0.1, restitution=0.8)])
     super().__init__(w, C)
 
-@cc(ep_len=100, wh_ratio=1.0)
-class BoxOrCircle(WorldEnv):
-  def __init__(self, C={}):
-    w = WorldDef(robots=[], objects=[Object('object0', shape='random', size=0.7, density=0.1, rand_angle=0)])
-    super().__init__(w, C)
-
-@cc(wh_ratio=1.0)
+@cc(ep_len=75, wh_ratio=1.0)
 class Bounce2(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1, restitution=0.9) for i in range(2)])
+    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1, restitution=0.8) for i in range(2)])
     super().__init__(w, C)
 
-@cc(wh_ratio=1.0)
-class Bounce3(WorldEnv):
+@cc(ep_len=75, wh_ratio=1.0)
+class Object3(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1, restitution=0.9) for i in range(3)])
+    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.7, density=0.1, restitution=0.8) for i in range(3)])
     super().__init__(w, C)
-
 
 # SIMPLE ROBOTS
-
+@cc(ep_len=100)
 class Urchin(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[])
     super().__init__(w, C)
 
+@cc(ep_len=100)
 class Luxo(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[])
@@ -59,28 +53,44 @@ class Luxo(WorldEnv):
 
 # SIMPLE ROBOT OBJECT MANIPULATION
 #srom_obj_settings = dict(shape='box', size=0.4, density=0.25, linearDamping=1.0, angularDamping=0.2)
-srom_obj_settings = dict(shape='box', size=0.4, density=0.25, linearDamping=1.0, angularDamping=0.2)
+srom_obj_settings = dict(shape='box', size=0.4, density=0.5, linearDamping=1.0, angularDamping=0.2)
 #srom_obj_settings = dict(shape='box', size=0.4, density=0.1, linearDamping=5.0, angularDamping=1.0)
+ball_settings = dict(shape='circle', size=0.5, density=0.2, restitution=0.8)
 
+@cc(ep_len=150, wh_ratio=1.5)
 class UrchinCube(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', **srom_obj_settings) for i in range(1)])
     super().__init__(w, C)
 
+@cc(ep_len=150, wh_ratio=1.5)
 class LuxoCube(WorldEnv):
   def __init__(self, C={}):
     w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **srom_obj_settings) for i in range(1)])
     super().__init__(w, C)
 
 # just for learning model. harder to define a task with these
+@cc(ep_len=150, wh_ratio=1.5)
 class UrchinBall(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object('object0', **ball_settings)])
+    #w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object('object0', shape='circle', size=0.4, density=0.2, restitution=0.8)])
+    super().__init__(w, C)
+
+@cc(ep_len=150, wh_ratio=1.5)
+class LuxoBall(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object('object0', **ball_settings)])
     super().__init__(w, C)
 
 class UrchinBalls(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.7, density=0.1) for i in range(3)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
+    super().__init__(w, C)
+
+class LuxoBalls(WorldEnv):
+  def __init__(self, C={}):
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', shape='circle', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
     super().__init__(w, C)
 
 class UrchinCubes(WorldEnv):
@@ -88,10 +98,11 @@ class UrchinCubes(WorldEnv):
     w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
     super().__init__(w, C)
 
-class LuxoBall(WorldEnv):
+class LuxoCubes(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object('object0', shape='circle', size=0.7, density=0.1)])
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
     super().__init__(w, C)
+
 
 # MORE ADVANCED
 
