@@ -69,6 +69,12 @@ def register(name):
     return _thunk
   return _reg
 
+# urchin and luxo are pretty good.
+# the rest need some work.
+# it's actually a bit hard to design a robot that can do interesting things in 2D space.
+# i guess i maybe oughta have some top down views, but then how do you control with joints?
+# could have a roomba with a gripper or something like that. or a reacher arm.
+
 @register('urchin')
 def make_urchin(robot, C):
   LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
@@ -86,7 +92,39 @@ def make_urchin(robot, C):
       'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
       'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.5)
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.25)
+
+@register('luxo')
+def make_luxo(robot, C):
+  VERT = 10 / SCALE
+  SIDE = 5 / SCALE
+  LEG_W, LEG_H = 8 / SCALE, 24 / SCALE
+  LL_H = 20 / SCALE
+  LUXO_POLY = A[(-15, +15), (+20, +25), (+20, -25), (-15, -15)] * 0.8
+  SHAPES = {}
+  SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY])
+  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
+  SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W / 2))
+  return Robot(
+      type=robot.type,
+      name=robot.name,
+      root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
+      bodies={
+          'lhip': Body(SHAPES['hip'], maskBits=0x011),
+          'lknee': Body(SHAPES['knee'], maskBits=0x011),
+          'lfoot': Body(SHAPES['foot'], maskBits=0x011),
+      },
+      joints={
+          'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-0.1, 0.1]),
+          'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
+          'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
+      },
+      bound=2.0
+      )
+
+
+# TODO: try a bird shape. waddle with legs and has long wings. kind of like a penguin
 
 @register('quad')
 def make_quad(robot, C):
@@ -126,10 +164,6 @@ def make_legs(robot, C):
   return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5)
 
 
-# urchin is the best robot. the rest need some work.
-# it's actually a bit hard to design a robot that can do interesting things in 2D space.
-# i guess i maybe oughta have some top down views, but then how do you control with joints?
-# could have a roomba with a gripper or something like that. or a reacher arm.
 
 @register('crab')
 def make_crab(robot, C):
@@ -265,35 +299,6 @@ def make_walker(robot, C):
       bodies=bodies,
       joints=joints,
   )
-
-@register('luxo')
-def make_luxo(robot, C):
-  VERT = 10 / SCALE
-  SIDE = 5 / SCALE
-  LEG_W, LEG_H = 8 / SCALE, 24 / SCALE
-  LL_H = 20 / SCALE
-  LUXO_POLY = A[(-15, +15), (+20, +25), (+20, -25), (-15, -15)] * 0.8
-  SHAPES = {}
-  SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY])
-  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
-  SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W / 2))
-  return Robot(
-      type=robot.type,
-      name=robot.name,
-      root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
-      bodies={
-          'lhip': Body(SHAPES['hip'], maskBits=0x011),
-          'lknee': Body(SHAPES['knee'], maskBits=0x011),
-          'lfoot': Body(SHAPES['foot'], maskBits=0x011),
-      },
-      joints={
-          'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-0.1, 0.1]),
-          'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
-          'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
-      },
-      bound=2.0
-      )
 
 
 @register('gingy')

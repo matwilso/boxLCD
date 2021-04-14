@@ -13,7 +13,7 @@ def cc(**kwargs):
     return CustomWorldEnv
   return decorator
 
-# BASIC ENVS
+# BASIC PASSIVE ENVS
 @cc(ep_len=25, wh_ratio=1.0)
 class Dropbox(WorldEnv):
   def __init__(self, C={}):
@@ -53,20 +53,20 @@ class Luxo(WorldEnv):
 
 # SIMPLE ROBOT OBJECT MANIPULATION
 #srom_obj_settings = dict(shape='box', size=0.4, density=0.25, linearDamping=1.0, angularDamping=0.2)
-srom_obj_settings = dict(shape='box', size=0.4, density=0.5, linearDamping=1.0, angularDamping=0.2)
 #srom_obj_settings = dict(shape='box', size=0.4, density=0.1, linearDamping=5.0, angularDamping=1.0)
+cube_settings = dict(shape='box', size=0.4, density=0.5, linearDamping=1.0, angularDamping=0.2)
 ball_settings = dict(shape='circle', size=0.5, density=0.2, restitution=0.8)
 
 @cc(ep_len=150, wh_ratio=1.5)
 class UrchinCube(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', **srom_obj_settings) for i in range(1)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', **cube_settings) for i in range(1)])
     super().__init__(w, C)
 
 @cc(ep_len=150, wh_ratio=1.5)
 class LuxoCube(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **srom_obj_settings) for i in range(1)])
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **cube_settings) for i in range(1)])
     super().__init__(w, C)
 
 # just for learning model. harder to define a task with these
@@ -85,26 +85,27 @@ class LuxoBall(WorldEnv):
 
 class UrchinBalls(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='circle', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', **ball_settings) for i in range(3)])
     super().__init__(w, C)
 
 class LuxoBalls(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', shape='circle', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **ball_settings) for i in range(3)])
     super().__init__(w, C)
 
 class UrchinCubes(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
+    w = WorldDef(robots=[Robot(type='urchin', name='urchin0')], objects=[Object(f'object{i}', **cube_settings) for i in range(3)])
     super().__init__(w, C)
 
 class LuxoCubes(WorldEnv):
   def __init__(self, C={}):
-    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=0.1) for i in range(3)])
+    w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **cube_settings) for i in range(3)])
     super().__init__(w, C)
 
 
 # MORE ADVANCED
+# (still being designed. and you might want to run these at higher FPS/Hz)
 
 class Crab(WorldEnv):
   def __init__(self, C={}):
