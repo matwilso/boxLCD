@@ -51,6 +51,7 @@ def dump_logger(logger, writer, i, G):
     check = logger[key][0] if isinstance(logger[key], list) else logger[key]
     if th.is_tensor(check):
       assert check.device.type == 'cpu', f'all metrics should be on the cpu before logging. {key} is on {check.device}'
+    print(key)
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
@@ -215,3 +216,4 @@ def compute_fid(x, y):
   assert pcov.shape[0] == x.shape[-1]
   # compute FID equation
   fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))
+  return fid
