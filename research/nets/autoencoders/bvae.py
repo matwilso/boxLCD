@@ -18,6 +18,10 @@ class BVAE(Autoencoder):
     self.z_size = 4 * 8 * G.vqD
     self._init()
 
+  def sample_z(self, n):
+    z = th.bernoulli(0.5*th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, 4, 8])
+    return z
+
   def loss(self, batch):
     # autoencode
     z_e = self.encoder(batch)
@@ -48,7 +52,7 @@ class BVAE(Autoencoder):
     #  return z_q.reshape([*shape[:2], z_q.shape[1:]])
     return z_q
 
-  def decode(self, z_q):
+  def _decode(self, z_q):
     decoded = self.decoder(z_q)
     return decoded
 

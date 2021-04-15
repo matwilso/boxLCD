@@ -24,8 +24,8 @@ class Trainer:
     print('wait dataload')
     self.train_ds, self.test_ds = data.load_ds(G)
     print('dataloaded')
-    if G.phase == 2:
-      G.logdir = G.logdir / 'phase2'
+    #if G.phase == 2:
+    #  G.logdir = G.logdir / 'phase2'
     self.writer = SummaryWriter(G.logdir)
     #self.writer.add_hparams({
     #    'lr': G.lr,
@@ -39,7 +39,15 @@ class Trainer:
     self.G = G
     self.b = lambda x: {key: val.to(G.device) for key, val in x.items()}
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.num_envs)])
-    self.model.save(self.G.logdir)
+
+    #import ipdb; ipdb.set_trace()
+    arbiter_path = G.arbiterdir / 'ArbiterAE.pt'
+    if arbiter_path.exists():
+      self.arbiter = th.jit.load(str(arbiter_path))
+      self.arbiter.eval()
+      print('LOADED ARBITER')
+    else:
+      self.arbiter = None
 
   def run(self):
     total_time = time.time()
@@ -70,7 +78,7 @@ class Trainer:
               break
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            eval_metrics = self.model.evaluate(self.writer, self.b(test_batch), itr)
+            eval_metrics = self.model.evaluate(itr, self.writer, self.b(test_batch), arbiter=self.arbiter)
             for key in eval_metrics: self.logger[key] += [eval_metrics[key]]
         self.model.train()
 
@@ -82,7 +90,10 @@ class Trainer:
         self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
         self.writer.flush()
         if time.time() - last_save >= 300 or itr % (self.G.log_n * self.G.save_n) == 0:
-          self.model.save(self.G.logdir)
+          if 'Arbiter' in self.G.model:
+            self.model.save(self.G.logdir, self.b(test_batch))
+          else:
+            self.model.save(self.G.logdir)
           last_save = time.time()
       if itr >= self.G.total_itr:
         break

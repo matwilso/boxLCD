@@ -34,6 +34,7 @@ def config():
   G.weightdir = pathlib.Path('.')
   G.buffdir = pathlib.Path('.')
   G.datapath = pathlib.Path('.')
+  G.arbiterdir = pathlib.Path('.')
   G.device = 'cuda' # 'cuda', 'cpu'
   G.mode = 'train'
   G.model = 'frame_token'

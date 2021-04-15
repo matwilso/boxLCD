@@ -1,3 +1,5 @@
+import inspect
+from os import pipe, stat
 from re import I
 import numpy as np
 import torch as th
@@ -5,10 +7,11 @@ from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from research import utils
-from ._base import Autoencoder
 from research.nets.common import ResBlock
+from torch.optim import Adam
+from ._base import Autoencoder
 
-class VAE(Autoencoder):
+class ArbiterAE(Autoencoder):
   def __init__(self, env, G):
     super().__init__(env, G)
     self.z_size = 128
@@ -17,31 +20,30 @@ class VAE(Autoencoder):
     self.decoder = Decoder(state_n, self.z_size, G)
     self._init()
 
-  def sample_z(self, n):
-    z = th.randn(n, self.G.z_size).to(self.G.device)
-    return z
+  def unprompted_eval(self, writer=None, itr=None, arbiter=None):
+    return {}
+
+  def save(self, dir, batch):
+    print("SAVED MODEL", dir)
+    path = dir / f'{self.name}.pt'
+    jit_enc = th.jit.trace(self.encoder, self._flat_batch(batch))
+    th.jit.save(jit_enc, str(path))
+    print(path)
 
   def loss(self, batch):
-    z_post = self.encoder(batch)
-    decoded = self.decoder(z_post.rsample())
-    # recon
+    z = self.encoder(batch)
+    decoded = self.decoder(z)
     recon_losses = {}
     recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
-    # kl div constraint
-    z_prior = thd.Normal(0, 1)
-    kl_loss = thd.kl_divergence(z_post, z_prior).mean(-1)
-    # full loss and metrics
-    loss = (recon_loss + self.G.beta * kl_loss).mean()
-    metrics = {'loss/vae_loss': loss, 'loss/kl': kl_loss.mean(), 'loss/recon_total': recon_loss, **recon_losses}
-    return loss, metrics
+    metrics = {'loss/recon_total': recon_loss, **recon_losses}
+    return recon_loss, metrics
 
   def encode(self, batch, flatten=None):
-    z_post = self.encoder(batch).mean
-    return z_post
+    return self.encoder(batch)
 
-  def _decode(self, z):
+  def decode(self, z):
     return self.decoder(z)
 
 class Encoder(nn.Module):
@@ -65,14 +67,9 @@ class Encoder(nn.Module):
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Flatten(-3),
-        nn.Linear(size * nf, 2*out_size),
+        nn.Linear(size * nf, out_size),
 
     ])
-
-  def get_dist(self, x):
-    mu, log_std = x.chunk(2, -1)
-    std = F.softplus(log_std) + 1e-4
-    return thd.Normal(mu, std)
 
   def forward(self, batch):
     state = batch['pstate']
@@ -84,7 +81,7 @@ class Encoder(nn.Module):
         x = layer(x, emb)
       else:
         x = layer(x)
-    return self.get_dist(x)
+    return x
 
 class Decoder(nn.Module):
   def __init__(self, state_n, in_size, G):

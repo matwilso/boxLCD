@@ -1,3 +1,4 @@
+from os import pipe
 from tqdm import tqdm
 import yaml
 import time
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     if G.model in net_map:
       model = net_map[G.model](env, G)
     else:
-      assert False, f"we don't have that model, {G.model}"
+      assert False, f"we don't have that model, {G.model} {net_map}"
     model.to(G.device)
     G.num_vars = utils.count_vars(model)
 
@@ -72,7 +73,6 @@ if __name__ == '__main__':
     data.collect(env_fn(G), G)
   elif G.mode == 'fiddle':
     runner = runners.Fiddler(model, env, G)
-
   if G.ipython_mode:
     import IPython
     from traitlets.config import Config

@@ -1,12 +1,16 @@
 import torch as th
 from torch import nn
 from torch.optim import Adam
+import ignite
 
 class Net(nn.Module):
   def __init__(self, G):
     super().__init__()
     self.G = G
     self.name = self.__class__.__name__
+    self.ssim = ignite.metrics.SSIM(1.0, device=self.G.device)
+    self.psnr = ignite.metrics.PSNR(1.0, device=self.G.device)
+    self.cossim = nn.CosineSimilarity(dim=-1)
 
   def _init(self):
     self.optimizer = Adam(self.parameters(), lr=self.G.lr)
