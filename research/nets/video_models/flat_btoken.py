@@ -1,3 +1,4 @@
+from re import I
 import yaml
 import sys
 from collections import defaultdict
@@ -102,13 +103,12 @@ class FlatBToken(VideoModel):
         batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
         batch['pstate'][:, :prompt_n] = prompts['pstate'][:, :prompt_n]
         start = prompt_n
-      z = self.encode(batch)
+      z = self.bvae.encode(batch)
       z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * 8).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
-      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, 8])
-
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, acts, start)
+      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, 8])
 
       # DECODE
       dist = self.bvae.decoder(z_sample)

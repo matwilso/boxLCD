@@ -9,6 +9,7 @@ import torch as th
 import scipy
 import re
 import numpy as np
+from scipy.linalg import fractional_matrix_power
 
 # general dictionary and list utils
 def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
@@ -188,8 +189,6 @@ def make_video(tensor, fps):
     logging.warning('The temporary file used by moviepy cannot be deleted.')
   return Summary.Image(height=h, width=w, colorspace=c, encoded_image_string=tensor_string)
 
-
-
 def compute_grad_norm(parameters):
   if isinstance(parameters, th.Tensor):
     parameters = [parameters]
@@ -199,3 +198,20 @@ def compute_grad_norm(parameters):
   device = parameters[0].grad.device
   total_norm = th.norm(th.stack([th.norm(p.grad.detach()).to(device) for p in parameters]))
   return total_norm
+
+
+def compute_fid(x, y):
+  """
+  FID / Wasserstein Computation
+  https://en.wikipedia.org/wiki/Wasserstein_metric#Normal_distributions
+  https://en.wikipedia.org/wiki/Fr%C3%A9chet_inception_distance
+  """
+  assert x.ndim == 2 and y.ndim == 2
+  # aggregate stats from this batch
+  pmu = np.mean(x, 0)
+  pcov = np.cov(x, rowvar=False)
+  tmu = np.mean(y, 0)
+  tcov = np.cov(y, rowvar=False)
+  assert pcov.shape[0] == x.shape[-1]
+  # compute FID equation
+  fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))

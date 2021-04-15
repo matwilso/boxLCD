@@ -37,9 +37,9 @@ class BVAE(Autoencoder):
     return loss, metrics
 
   def encode(self, batch, flatten=True):
-    shape = batch['lcd']
+    shape = batch['lcd'].shape
     if len(shape) == 4:
-      batch = {key: val.clone().flatten(0, 1) for key, val in batch.keys()}
+      batch = {key: val.clone().flatten(0, 1) for key, val in batch.items()}
     batch['lcd'].reshape
     z_e = self.encoder(batch)
     # return z_e.flatten(-3)
@@ -47,9 +47,8 @@ class BVAE(Autoencoder):
     if flatten:
       z_q = z_q.flatten(-3)
       assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
-    # if len(shape) == 4:
-    #  import ipdb; ipdb.set_trace()
-    #  return z_q.reshape([*shape[:2], z_q.shape[1:]])
+    if len(shape) == 4:
+      return z_q.reshape([*shape[:2], *z_q.shape[1:]])
     return z_q
 
   def _decode(self, z_q):

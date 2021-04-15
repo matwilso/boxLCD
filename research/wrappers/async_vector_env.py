@@ -1,3 +1,4 @@
+from re import I
 import numpy as np
 import multiprocessing as mp
 import time
@@ -126,7 +127,7 @@ class AsyncVectorEnv(VectorEnv):
     _, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
     self._raise_if_errors(successes)
 
-  def reset(self, idxs, phis=None):
+  def reset(self, idxs, **kwargs):
     r"""Reset all sub-environments and return a batch of initial observations.
 
     Returns
@@ -134,19 +135,23 @@ class AsyncVectorEnv(VectorEnv):
     observations : sample from `observation_space`
         A batch of observations from the vectorized environment.
     """
-    self.reset_async(idxs, phis)
+    self.reset_async(idxs, **kwargs)
     return self.reset_wait(idxs)
 
-  def reset_async(self, idxs, phis=None):
+  def reset_async(self, idxs, **kwargs):
     self._assert_is_running()
     if self._state != AsyncState.DEFAULT:
       raise AlreadyPendingCallError('Calling `reset_async` while waiting for a pending call to `{0}` to complete'.format(self._state.value), self._state.value)
 
     pps = [self.parent_pipes[i] for i in idxs]
-    if phis is None:
-      phis = [None] * len(pps)
-    for pipe, phi in zip(pps, phis):
-      pipe.send(('reset', phi))
+    kws = []
+    for key in kwargs:
+      for arr in [*kwargs[key]]:
+        kws += [{key: arr}]
+    if kwargs is None:
+      kws = [{}] * len(pps)
+    for pipe, kw in zip(pps, kws):
+      pipe.send(('reset', kw))
     self._state = AsyncState.WAITING_RESET
 
   def reset_wait(self, idxs, timeout=None):
@@ -331,7 +336,7 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
     while True:
       command, data = pipe.recv()
       if command == 'reset':
-        observation = env.reset(data)
+        observation = env.reset(**data)
         pipe.send((observation, True))
       elif command == 'step':
         observation, reward, done, info = env.step(data)
@@ -364,7 +369,7 @@ def _worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_memory, error
     while True:
       command, data = pipe.recv()
       if command == 'reset':
-        observation = env.reset(data)
+        observation = env.reset(**data)
         write_to_shared_memory(index, observation, shared_memory, observation_space)
         pipe.send((None, True))
       elif command == 'step':
