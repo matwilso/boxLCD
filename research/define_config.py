@@ -66,7 +66,7 @@ def config():
   G.vqD = 128
   G.vqK = 128
   G.beta = 0.25
-  G.entropy_bonus = 0.1
+  G.entropy_bonus = 1e-4 
 
 
   G.min_std = 1e-4

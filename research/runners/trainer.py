@@ -70,7 +70,8 @@ class Trainer:
               break
           with Timer(self.logger, 'evaluate'):
             # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-            self.model.evaluate(self.writer, self.b(test_batch), itr)
+            eval_metrics = self.model.evaluate(self.writer, self.b(test_batch), itr)
+            for key in eval_metrics: self.logger[key] += [eval_metrics[key]]
         self.model.train()
 
         # LOGGING

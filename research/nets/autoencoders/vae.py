@@ -20,7 +20,7 @@ class VAE(Autoencoder):
     x = x.reshape([-1, 1, self.G.lcd_h, self.G.lcd_w])
     z_post = self.encoder(x)
     decoded = self.decoder(z_post.rsample())
-    recon_loss = -decoded.log_prob(x).mean((1, 2, 3))
+    recon_loss = -decoded['lcd'].log_prob(x).mean((1, 2, 3))
     # kl div constraint
     z_prior = thd.Normal(0, 1)
     kl_loss = thd.kl_divergence(z_post, z_prior).mean(-1)
@@ -29,7 +29,7 @@ class VAE(Autoencoder):
     metrics = {'vae_loss': loss, 'loss/recon_lcd': recon_loss.mean(), 'loss/kl': kl_loss.mean()}
     return loss, metrics
 
-  def encode(self, batch):
+  def encode(self, batch, flatten=None):
     x = batch['lcd'][:,None]
     z_post = self.encoder(x).mean
     return z_post

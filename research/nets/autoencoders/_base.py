@@ -5,11 +5,14 @@ from torch.optim import Adam
 import torch.nn as nn
 from research.nets._base import Net
 from research import utils
+import ignite
 
 class Autoencoder(Net):
   def __init__(self, env, G):
     super().__init__(G)
     self.env = env
+    self.ssim = ignite.metrics.SSIM(1.0, device=self.G.device)
+    self.psnr = ignite.metrics.PSNR(1.0, device=self.G.device)
 
   def _flat_batch(self, batch):
     return {key: val.flatten(0, 1) for key, val in batch.items()}
@@ -33,6 +36,7 @@ class Autoencoder(Net):
     raise NotImplementedError
 
   def evaluate(self, writer, batch, epoch):
+    metrics = {}
     # run the examples through encoder and decoder
     slice_batch = {key: val[:8, 0] for key, val in batch.items()}
     z = self.encode(slice_batch, flatten=False)
@@ -45,7 +49,15 @@ class Autoencoder(Net):
       lcd = slice_batch['lcd'][:8,None]
       error = (pred_lcd - lcd + 1.0) / 2.0
       stack = th.cat([lcd, pred_lcd, error], -2)
-      writer.add_image('reconstruction/image', utils.combine_imgs(stack, 1, 8)[None], epoch)
+      writer.add_image('recon_image', utils.combine_imgs(stack, 1, 8)[None], epoch)
+      self.ssim.update((pred_lcd, lcd))
+      ssim = self.ssim.compute().cpu().detach()
+      metrics['eval/ssim'] = ssim
+      # TODO: try not flat
+      self.psnr.update((pred_lcd, lcd))
+      psnr = self.psnr.compute().cpu().detach()
+      metrics['eval/psnr'] = psnr
+
     # visualize state reconstructions
     if 'pstate' in decoded:
       pred_state = decoded['pstate'].mean.detach().cpu()
@@ -60,4 +72,6 @@ class Autoencoder(Net):
       truths = 1.0 * np.stack(truths)
       error = (preds - truths + 1.0) / 2.0
       stack = np.concatenate([truths, preds, error], -2)[:, None]
-      writer.add_image('reconstruction/pstate', utils.combine_imgs(stack, 1, 8)[None], epoch)
+      writer.add_image('recon_pstate', utils.combine_imgs(stack, 1, 8)[None], epoch)
+
+    return metrics
