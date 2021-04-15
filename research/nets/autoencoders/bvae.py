@@ -18,31 +18,34 @@ class BVAE(Autoencoder):
     self.z_size = 4 * 8 * G.vqD
     self._init()
 
-  def loss(self, batch, eval=False, return_idxs=False):
+  def loss(self, batch):
     # autoencode
     z_e = self.encoder(batch)
-    z_q, embed_loss, idxs = self.vq(z_e)
+    z_q, entropy, probs = self.vq(z_e)
     decoded = self.decoder(z_q)
     # compute losses
     recon_losses = {}
     recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
-    loss = recon_loss + -embed_loss
-    metrics = {'loss/total': loss, 'embed_loss': embed_loss, **recon_losses, 'loss/recon_total': recon_loss}
-    if eval:
-      metrics['decoded'] = decoded
-    if return_idxs:
-      metrics['idxs'] = idxs
+    loss = recon_loss - self.G.entropy_bonus*entropy
+    metrics = {'loss/total': loss, 'loss/entropy': entropy, **recon_losses, 'loss/recon_total': recon_loss, 'bvae_abs_probs': th.abs(probs-0.5).mean()}
     return loss, metrics
 
-  def encode(self, batch):
-    import ipdb; ipdb.set_trace() # find shape and then reconstruct it to same shape on output
+  def encode(self, batch, flatten=True):
+    shape = batch['lcd']
+    if len(shape) == 4:
+      batch = {key: val.clone().flatten(0, 1) for key, val in batch.keys()}
+    batch['lcd'].reshape
     z_e = self.encoder(batch)
     # return z_e.flatten(-3)
-    z_q, embed_loss, idxs = self.vq(z_e)
-    z_q = z_q.flatten(-3)
-    assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
+    z_q, entropy, probs = self.vq(z_e)
+    if flatten:
+      z_q = z_q.flatten(-3)
+      assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
+    # if len(shape) == 4:
+    #  import ipdb; ipdb.set_trace()
+    #  return z_q.reshape([*shape[:2], z_q.shape[1:]])
     return z_q
 
   def decode(self, z_q):
@@ -122,7 +125,6 @@ class Decoder(nn.Module):
     lcd_dist = thd.Bernoulli(logits=self.net(x))
     state_dist = thd.Normal(self.state_net(x), 1)
     return {'lcd': lcd_dist, 'pstate': state_dist}
-
 
 class StateEncoder(nn.Module):
   def __init__(self, env, G):

@@ -10,7 +10,6 @@ from boxLCD import envs, env_map
 from boxLCD import ENV_DG
 from boxLCD.utils import args_type
 
-
 def env_fn(G, seed=None):
   def _make():
     if G.env in env_map:
@@ -67,6 +66,7 @@ def config():
   G.vqD = 128
   G.vqK = 128
   G.beta = 0.25
+  G.entropy_bonus = 0.1
 
 
   G.min_std = 1e-4

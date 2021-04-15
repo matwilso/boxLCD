@@ -9,9 +9,9 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import Block, BinaryHead
+from nets.common import TransformerBlock, BinaryHead
 import utils
-from nets.statevq import SVAE
+#from nets.statevq import SVAE
 
 class FlatEverything(nn.Module):
   def __init__(self, env, G):
@@ -44,7 +44,7 @@ class FlatEverything(nn.Module):
     # input embedding stem
     self.embed = nn.Linear(self.gpt_size, G.n_embed // 2, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
+    self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
     self.dist_head = BinaryHead(G.n_embed, self.gpt_size, G)

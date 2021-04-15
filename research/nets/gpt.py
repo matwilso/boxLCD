@@ -16,7 +16,7 @@ class GPT(nn.Module):
     self.in_size = in_size
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed)) # learned position embedding
     self.embed = nn.Linear(self.in_size, G.n_embed, bias=False)
-    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
+    self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     self.ln_f = nn.LayerNorm(G.n_embed)
     if head == 'bin':
       self.dist_head = BinaryHead(G.n_embed, self.in_size, G)
@@ -93,7 +93,7 @@ class CausalSelfAttention(nn.Module):
     y = self.proj(y)
     return y
 
-class Block(nn.Module):
+class TransformerBlock(nn.Module):
   """ an unassuming Transformer block """
   def __init__(self, block_size, G):
     super().__init__()

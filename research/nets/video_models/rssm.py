@@ -11,7 +11,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
 import utils
 from ._base import Net
 

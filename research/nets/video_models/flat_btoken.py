@@ -10,7 +10,7 @@ from torch import nn
 import torch.nn.functional as F
 from nets.common import TransformerBlock, BinaryHead
 import utils
-from nets.bvae import BVAE
+from research.nets.autoencoders.bvae import BVAE
 from ._base import VideoModel
 
 class FlatBToken(VideoModel):

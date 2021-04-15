@@ -15,7 +15,7 @@ class Autoencoder(Net):
     return {key: val.flatten(0, 1) for key, val in batch.items()}
 
   def train_step(self, batch, dry=False):
-    super().train_step(self._flat_batch(batch), dry)
+    return super().train_step(self._flat_batch(batch), dry)
 
   # TODO: add support for different types of encoders. like the distribution. and sampling or taking the mode. or doing the logits.
   # TODO: same for decoder
@@ -35,8 +35,9 @@ class Autoencoder(Net):
   def evaluate(self, writer, batch, epoch):
     # run the examples through encoder and decoder
     slice_batch = {key: val[:8, 0] for key, val in batch.items()}
-    z = self.encode(slice_batch)
-    decoded = self.decode(z, mode='mode')
+    z = self.encode(slice_batch, flatten=False)
+    decoded = self.decode(z)
+    #decoded = self.decode(z, mode='mode')
 
     # visualize lcd reconstructions
     if 'lcd' in decoded:

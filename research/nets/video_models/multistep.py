@@ -14,15 +14,15 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
 from torch import distributions as thd
 from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from .multi_enc import MultiEnc
-from .gpt import GPT
+#from .multi_enc import MultiEnc
+#from .gpt import GPT
 import utils
 
 class Multistep(nn.Module):

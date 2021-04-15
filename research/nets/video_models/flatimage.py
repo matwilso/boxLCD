@@ -11,7 +11,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
+from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
 import utils
 import ignite
 
@@ -34,7 +34,7 @@ class FlatImageTransformer(nn.Module):
     # input embedding stem
     self.embed = nn.Linear(self.gpt_size, G.n_embed // 2, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
+    self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
     if self.G.conv_io:

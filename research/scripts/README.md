@@ -38,7 +38,7 @@ args="--window=4 --bs=256"
 
 ```bash
 model=VAE
-python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model  --window=4 --bs=256 --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small $args
+python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model  --window=4 --bs=256 --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small 
 ```
 
 #### Binary VAE 

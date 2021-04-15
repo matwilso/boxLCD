@@ -6,7 +6,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-#from nets.common import GaussHead, MDNHead, CausalSelfAttention, Block, BinaryHead, aggregate, MultiHead, ConvEmbed
+#from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
 from torch import distributions as thd
 from torch.optim import Adam
@@ -22,7 +22,6 @@ class BinaryQuantize(nn.Module):
   def __init__(self, num_hiddens, n_embed):
     super().__init__()
     self.n_embed = n_embed
-    self.kld_scale = 0.1 
     self.proj = nn.Linear(num_hiddens, n_embed)
 
   def forward(self, z):
@@ -30,9 +29,8 @@ class BinaryQuantize(nn.Module):
     dist = thd.Bernoulli(logits=z)
     z_q = dist.sample()
     z_q += dist.probs - dist.probs.detach()
-    # + kl divergence to the prior loss (entropy bonus)
-    diff = self.kld_scale * dist.entropy().mean()
-    return z_q, diff, z_q
+    entropy = dist.entropy().mean()
+    return z_q, entropy, dist.probs
 
 class VectorQuantizer(nn.Module):
   def __init__(self, K, D, beta, G):
