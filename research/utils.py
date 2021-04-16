@@ -51,7 +51,6 @@ def dump_logger(logger, writer, i, G):
     check = logger[key][0] if isinstance(logger[key], list) else logger[key]
     if th.is_tensor(check):
       assert check.device.type == 'cpu', f'all metrics should be on the cpu before logging. {key} is on {check.device}'
-    print(key)
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)

@@ -18,11 +18,48 @@ import utils
 # TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
 # basically so that you can do multi-modal stuff in a single vector
 
-class BinaryQuantize(nn.Module):
-  def __init__(self, num_hiddens, n_embed):
+class CatQuantize(nn.Module):
+  def __init__(self, num_cat):
     super().__init__()
-    self.n_embed = n_embed
-    self.proj = nn.Linear(num_hiddens, n_embed)
+    self.num_cat = num_cat
+
+  def forward(self, z):
+    z = th.tanh(z)
+    #new_z = th.zeros_like(z)
+
+    #r0 = (z < -0.5)
+    #p0 = 2 * (z + 1)
+    #d0 = (-0.75 + 0.5*thd.Bernoulli(probs=p0 * r0).sample()) * r0
+    #p1 = 2 * (z + 0.5)
+    #r1a = th.logical_and(z >= -0.5, z < -0.25)
+    #r1b = th.logical_and(z >= -0.5, z < 0.0)
+    #import ipdb; ipdb.set_trace()
+    #d1a = (-0.75 + 0.5*thd.Bernoulli(probs=p1 * r1a).sample()) * r1a
+    #d1b = (-0.25 + 0.5*thd.Bernoulli(probs=p1 * r1b).sample()) * r1b
+    #d1b = thd.Bernoulli(probs=2 * (z + 1) * r1b).sample() * r1b
+    #z_q = dist.sample()
+    #zn = z + 0.1 * (2 * th.rand(z.shape).to(z.device) - 1)
+    if self.training:
+      zn = z + 0.25 * (2 * th.rand(z.shape).to(z.device) - 1)
+    else:
+      zn = z
+
+    z_q = -0.75 * (zn < -0.5) + \
+        -0.25 * (th.logical_and(zn >= -0.5, zn < 0.0)) + \
+        0.25 * (th.logical_and(zn >= 0.0, zn < 0.5)) + \
+        0.75 * (zn >= 0.5)
+    #z_q += zn - zn.detach()
+    z_q += z - z.detach()
+
+    idxs = 0 * (zn < -0.5) + \
+        1 * (th.logical_and(zn >= -0.5, zn < 0.0)) + \
+        2 * (th.logical_and(zn >= 0.0, zn < 0.5)) + \
+        3 * (zn >= 0.5)
+    return z_q, idxs
+
+class BinaryQuantize(nn.Module):
+  def __init__(self):
+    super().__init__()
 
   def forward(self, z):
     #logits = self.proj(z)
@@ -30,7 +67,10 @@ class BinaryQuantize(nn.Module):
     z_q = dist.sample()
     z_q += dist.probs - dist.probs.detach()
     entropy = dist.entropy().mean()
-    return z_q, entropy, dist.probs
+    if self.training:
+      return z_q, entropy, dist.probs
+    else:
+      return 1.0 * (dist.probs > 0.5), entropy, dist.probs  # deterministic mode
 
 class VectorQuantizer(nn.Module):
   def __init__(self, K, D, beta, G):

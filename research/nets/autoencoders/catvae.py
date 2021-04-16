@@ -5,15 +5,15 @@ from torch import nn
 import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
-from .quantize import BinaryQuantize
+from .quantize import BinaryQuantize, CatQuantize
 from ._base import Autoencoder
 
-class BVAE(Autoencoder):
+class CatVAE(Autoencoder):
   def __init__(self, env, G):
     super().__init__(env, G)
     # encoder -> binary -> decoder
     self.encoder = Encoder(env, G)
-    self.vq = BinaryQuantize()
+    self.vq = CatQuantize(4)
     self.decoder = Decoder(env, G)
     self.z_size = 4 * 8 * G.vqD
     self._init()
@@ -25,15 +25,20 @@ class BVAE(Autoencoder):
   def loss(self, batch):
     # autoencode
     z_e = self.encoder(batch)
-    z_q, entropy, probs = self.vq(z_e)
+    z_q, idxs = self.vq(z_e)
     decoded = self.decoder(z_q)
     # compute losses
     recon_losses = {}
     recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
-    loss = recon_loss - self.G.entropy_bonus*entropy
-    metrics = {'loss/total': loss, 'loss/entropy': entropy, **recon_losses, 'loss/recon_total': recon_loss, 'bvae_abs_probs': th.abs(probs-0.5).mean()}
+    loss = recon_loss
+    metrics = {'loss/total': loss, **recon_losses, 'loss/recon_total': recon_loss, 
+    'idx0': th.mean(1.0*(idxs ==0)),
+    'idx1': th.mean(1.0*(idxs==1)),
+    'idx2': th.mean(1.0*(idxs==2)), 
+    'idx3': th.mean(1.0*(idxs==3))
+    }
     return loss, metrics
 
   def encode(self, batch, flatten=True):
@@ -43,7 +48,7 @@ class BVAE(Autoencoder):
     batch['lcd'].reshape
     z_e = self.encoder(batch)
     # return z_e.flatten(-3)
-    z_q, entropy, probs = self.vq(z_e)
+    z_q, idxs = self.vq(z_e)
     if flatten:
       z_q = z_q.flatten(-3)
       assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
