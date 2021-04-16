@@ -5,15 +5,16 @@ from torch import nn
 import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
-from .quantize import BinaryQuantize, CatQuantize
+from .quantize import BinaryQuantize, RNLD
 from ._base import Autoencoder
 
-class CatVAE(Autoencoder):
+class RNLDA(Autoencoder):
+  """RNLDA. a ronald autoencoder"""
   def __init__(self, env, G):
     super().__init__(env, G)
     # encoder -> binary -> decoder
     self.encoder = Encoder(env, G)
-    self.vq = CatQuantize(4)
+    self.vq = RNLD(4)
     self.decoder = Decoder(env, G)
     self.z_size = 4 * 8 * G.vqD
     self._init()

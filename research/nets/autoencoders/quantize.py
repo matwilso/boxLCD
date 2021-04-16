@@ -18,27 +18,23 @@ import utils
 # TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
 # basically so that you can do multi-modal stuff in a single vector
 
-class CatQuantize(nn.Module):
+class RNLD(nn.Module):
+  """
+  Real Number Line Discretization (RNLD)
+  it's pronounced ronald
+
+  Chunk up the number line into 4 bins.
+  Assign all values in each bin to the mean of that bin.
+
+  -1          -0.5            0             0.5         1.0
+  | ------------|-------------|--------------|------------|
+  """
   def __init__(self, num_cat):
     super().__init__()
     self.num_cat = num_cat
 
   def forward(self, z):
     z = th.tanh(z)
-    #new_z = th.zeros_like(z)
-
-    #r0 = (z < -0.5)
-    #p0 = 2 * (z + 1)
-    #d0 = (-0.75 + 0.5*thd.Bernoulli(probs=p0 * r0).sample()) * r0
-    #p1 = 2 * (z + 0.5)
-    #r1a = th.logical_and(z >= -0.5, z < -0.25)
-    #r1b = th.logical_and(z >= -0.5, z < 0.0)
-    #import ipdb; ipdb.set_trace()
-    #d1a = (-0.75 + 0.5*thd.Bernoulli(probs=p1 * r1a).sample()) * r1a
-    #d1b = (-0.25 + 0.5*thd.Bernoulli(probs=p1 * r1b).sample()) * r1b
-    #d1b = thd.Bernoulli(probs=2 * (z + 1) * r1b).sample() * r1b
-    #z_q = dist.sample()
-    #zn = z + 0.1 * (2 * th.rand(z.shape).to(z.device) - 1)
     if self.training:
       zn = z + 0.25 * (2 * th.rand(z.shape).to(z.device) - 1)
     else:

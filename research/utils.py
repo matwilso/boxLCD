@@ -51,6 +51,7 @@ def dump_logger(logger, writer, i, G):
     check = logger[key][0] if isinstance(logger[key], list) else logger[key]
     if th.is_tensor(check):
       assert check.device.type == 'cpu', f'all metrics should be on the cpu before logging. {key} is on {check.device}'
+    print(key, end=' ')
     val = np.mean(logger[key])
     if writer is not None:
       writer.add_scalar(key, val, i)
@@ -58,7 +59,7 @@ def dump_logger(logger, writer, i, G):
         writer.add_scalar('logx/' + key, val, int(np.log(1e5 * i)))
       # if 'loss' in key:
       #  writer.add_scalar('neg/'+key, -val, i)
-    print(key, val)
+    print(val)
   print(G.full_cmd)
   print(G.num_vars)
   with open(pathlib.Path(G.logdir) / 'hps.yaml', 'w') as f:
@@ -215,4 +216,5 @@ def compute_fid(x, y):
   assert pcov.shape[0] == x.shape[-1]
   # compute FID equation
   fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))
-  return fid
+  # TODO: this is somewhat concerning i got an imaginary number before.
+  return fid.real
