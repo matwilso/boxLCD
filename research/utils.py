@@ -218,3 +218,6 @@ def compute_fid(x, y):
   fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))
   # TODO: this is somewhat concerning i got an imaginary number before.
   return fid.real
+
+def flat_batch(batch):
+  return {key: val.flatten(0, 1) for key, val in batch.items()}

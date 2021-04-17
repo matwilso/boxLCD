@@ -1,5 +1,4 @@
 from re import I
-from research.wrappers import preproc_vec_env
 import yaml
 import sys
 from collections import defaultdict
@@ -10,25 +9,25 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import TransformerBlock, BinaryHead
+from nets.common import TransformerBlock, BinaryHead, MDNHead, GaussHead
 import utils
-from research.nets.autoencoders.bvae import BVAE
+from research.nets.autoencoders.tanha import Tanha
 from ._base import VideoModel
 
-class FlatBToken(VideoModel):
+class FlatTanha(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
-    # <LOAD BVAE>
-    sd = th.load(G.weightdir / 'BVAE.pt')
-    bvaeC = sd.pop('G')
-    self.bvae = BVAE(env, bvaeC)
-    self.bvae.load(G.weightdir)
-    for p in self.bvae.parameters():
+    # <LOAD tanha>
+    sd = th.load(G.weightdir / 'Tanha.pt')
+    tanhaG = sd.pop('G')
+    self.tanha = Tanha(env, tanhaG)
+    self.tanha.load(G.weightdir)
+    for p in self.tanha.parameters():
       p.requires_grad = False
-    self.bvae.eval()
-    # </LOAD BVAE>
+    self.tanha.eval()
+    # </LOAD tanha>
 
-    self.size = self.bvae.G.vqD * 4 * 8
+    self.size = self.tanha.G.vqD * 4 * 8
     self.block_size = self.G.window
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
@@ -39,7 +38,7 @@ class FlatBToken(VideoModel):
     self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
-    self.dist_head = BinaryHead(G.n_embed, self.size, G)
+    self.dist_head = GaussHead(G.n_embed, self.size, G)
     self._init()
 
   def forward(self, z, acts):
@@ -60,29 +59,25 @@ class FlatBToken(VideoModel):
     return logits
 
   def loss(self, batch):
-    z = self.bvae.encode(batch).detach()
+    z = self.tanha.encode(batch, noise=False).detach()
     logits = self.forward(z, batch['acts'])
     dist = self.dist_head(logits)
     loss = -dist.log_prob(z).mean()
-    import ipdb; ipdb.set_trace()
-
-
     return loss, {'loss/total': loss}
 
   def onestep(self, batch, i, temp=1.0):
-    import ipdb; ipdb.set_trace()
     logits = self.forward(batch)
-    dist = self.dist_head(logits / temp)
+    import ipdb; ipdb.set_trace()
     sample = dist.sample()
     batch['lcd'][:, i] = sample[:, i, :self.G.imsize].reshape(batch['lcd'][:, i].shape)
     proprio_code = sample[:, i, self.G.imsize:]
-    proprio = self.bvae.decoder(proprio_code).mean
+    proprio = self.tanha.decoder(proprio_code).mean
     batch['proprio'][:, i] = proprio
     return batch
 
   def latent_onestep(self, z, a, i, temp=1.0):
     logits = self.forward(z, a)
-    dist = self.dist_head(logits / temp)
+    dist = self.dist_head(logits)
     z[:, i] = dist.sample()[:, i]
     return z
 
@@ -107,15 +102,15 @@ class FlatBToken(VideoModel):
         batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
-      z = self.bvae.encode(batch)
-      z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * 8).to(self.G.device)
+      z = self.tanha.encode(batch, noise=False)
+      z_sample = th.zeros(n, self.block_size, self.tanha.G.vqD * 4 * 8).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, acts, start)
-      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, 8])
+      z_sample = z_sample.reshape([n * self.block_size, self.tanha.G.vqD, 4, 8])
 
       # DECODE
-      dist = self.bvae.decoder(z_sample)
+      dist = self.tanha.decoder(z_sample)
       batch['lcd'] = (1.0 * (dist['lcd'].probs > 0.5)).reshape([n, self.block_size, 1, self.G.lcd_h, self.G.lcd_w])
       batch['proprio'] = (dist['proprio'].mean).reshape([n, self.block_size, -1])
     return batch

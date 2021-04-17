@@ -33,7 +33,7 @@ class AutoEnv:
     obses = {key: [] for key in self.env.observation_space.spaces}
     obs = self.env.reset()
     self.goal_lcd = obs['goal:lcd']
-    self.goal_pstate = obs['goal:pstate']
+    self.goal_proprio = obs['goal:proprio']
     for key, val in obs.items():
       obses[key] += [val]
     acts = []
@@ -72,8 +72,8 @@ class AutoEnv:
       #val = self.window_batch['lcd']
       #self.window_batch['lcd'] = np.concatenate([val[:,1:], val[:,:1]], axis=1)
     self.count = min(1 + self.count, self.G.window - 2)
-    pstate = out['pstate'][:,self.count-1][0]
-    lrew, done= self.env.comp_rew_done({'pstate': pstate.cpu().numpy(), 'goal:pstate': self.goal_pstate})
+    proprio = out['proprio'][:,self.count-1][0]
+    lrew, done= self.env.comp_rew_done({'proprio': proprio.cpu().numpy(), 'goal:proprio': self.goal_proprio})
     return outproc(truth), outproc(pred), rew, lrew, outproc(self.goal_lcd)
 
   def make_prompt(self):

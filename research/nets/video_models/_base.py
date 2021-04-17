@@ -15,7 +15,7 @@ class VideoModel(Net):
     self.act_n = env.action_space.shape[0]
     self.observation_space = env.observation_space
     self.action_space = env.action_space
-    self.pstate_n = env.observation_space.spaces['pstate'].shape[0]
+    self.proprio_n = env.observation_space.spaces['proprio'].shape[0]
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(8)])
 
   def onestep(self):
@@ -37,13 +37,14 @@ class VideoModel(Net):
 
     if 'lcd' in sample:
       self._lcd_video(epoch, writer, sample['lcd'])
-    if 'pstate' in sample:
-      self._pstate_video(epoch, writer, sample['pstate'])
+    if 'proprio' in sample:
+      self._proprio_video(epoch, writer, sample['proprio'])
 
     if arbiter is not None:
+      import ipdb; ipdb.set_trace() # only do from step 10 onwards. allow some burn in.
       sample['lcd'] = sample['lcd'][:,:,0]
-      paz = arbiter.forward(self.bvae._flat_batch(sample)).cpu().numpy()
-      taz = arbiter.forward(self.bvae._flat_batch(batch)).cpu().numpy()
+      paz = arbiter.forward(utils.flat_batch(sample)).cpu().numpy()
+      taz = arbiter.forward(utils.flat_batch(batch)).cpu().numpy()
       fid = utils.compute_fid(paz, taz)
       metrics['eval/fid'] = fid
 
@@ -65,17 +66,17 @@ class VideoModel(Net):
       # visualize reconstruction
       self._lcd_video(epoch, writer, pred_lcd, true_lcd)
 
-    if 'pstate' in sample:
-      pred_pstate = sample['pstate']
-      true_pstate = batch['pstate']
-      metrics['eval/pstate_log_mse'] = ((true_pstate - pred_pstate)**2).mean().log().cpu()
+    if 'proprio' in sample:
+      pred_proprio = sample['proprio']
+      true_proprio = batch['proprio']
+      metrics['eval/proprio_log_mse'] = ((true_proprio - pred_proprio)**2).mean().log().cpu()
       # visualize reconstruction
-      self._pstate_video(epoch, writer, pred_pstate, true_pstate)
+      self._proprio_video(epoch, writer, pred_proprio, true_proprio)
 
     if arbiter is not None:
       sample['lcd'] = sample['lcd'][:,:,0]
-      paz = arbiter.forward(self.bvae._flat_batch(sample))
-      taz = arbiter.forward(self.bvae._flat_batch(batch))
+      paz = arbiter.forward(utils.flat_batch(sample))
+      taz = arbiter.forward(utils.flat_batch(batch))
       cosdist = 1 - self.cossim(paz, taz).mean().cpu()
       metrics['eval/cosdist'] = cosdist
 
@@ -95,28 +96,28 @@ class VideoModel(Net):
     out = out.repeat(4, -1).repeat(4, -2)
     utils.add_video(writer, name, utils.force_shape(out), epoch, fps=self.G.fps)
 
-  def _pstate_video(self, epoch, writer, pred, truth=None):
-    """visualize pstate reconstructions"""
-    pred_pstate = pred[:8].cpu().detach().numpy()
+  def _proprio_video(self, epoch, writer, pred, truth=None):
+    """visualize proprio reconstructions"""
+    pred_proprio = pred[:8].cpu().detach().numpy()
     pred_lcds = []
-    for i in range(pred_pstate.shape[1]):
-      lcd = self.venv.reset(np.arange(8), pstate=pred_pstate[:, i])['lcd']
+    for i in range(pred_proprio.shape[1]):
+      lcd = self.venv.reset(np.arange(8), proprio=pred_proprio[:, i])['lcd']
       pred_lcds += [lcd]
     pred_lcds = 1.0 * np.stack(pred_lcds, 1)[:, :, None]
 
     if truth is not None:
-      true_pstate = truth[:8].cpu().detach().numpy()
+      true_proprio = truth[:8].cpu().detach().numpy()
       true_lcds = []
-      for i in range(true_pstate.shape[1]):
-        lcd = self.venv.reset(np.arange(8), pstate=true_pstate[:, i])['lcd']
+      for i in range(true_proprio.shape[1]):
+        lcd = self.venv.reset(np.arange(8), proprio=true_proprio[:, i])['lcd']
         true_lcds += [lcd]
       true_lcds = 1.0 * np.stack(true_lcds, 1)[:, :, None]
       error = (pred_lcds - true_lcds + 1.0) / 2.0
       blank = np.zeros_like(true_lcds)[..., :1, :]
       out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], 3)
-      name = 'prompted_pstate'
+      name = 'prompted_proprio'
     else:
-      name = 'unprompted_pstate'
+      name = 'unprompted_proprio'
       out = pred_lcds
     out = out.repeat(4, -1).repeat(4, -2)
     utils.add_video(writer, name, utils.force_shape(out), epoch, fps=self.G.fps)

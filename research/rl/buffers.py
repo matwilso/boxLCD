@@ -55,7 +55,7 @@ class OGRB:
     batch = utils.nfiltdict(batch, '(o:|o2:)')
     batch['obs'] = o
     batch['obs2'] = o2
-    assert np.isclose(np.mean((o['goal:pstate'] - o2['goal:pstate'])**2), 0.0), "AHH"
+    assert np.isclose(np.mean((o['goal:proprio'] - o2['goal:proprio'])**2), 0.0), "AHH"
     return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch)
 
 class ReplayBuffer:
@@ -105,5 +105,5 @@ class ReplayBuffer:
     batch = utils.nfiltdict(batch, '(o:|o2:)')
     batch['obs'] = o
     batch['obs2'] = o2
-    assert np.isclose(np.mean((o['goal:pstate'] - o2['goal:pstate'])**2), 0.0), "AHH"
+    assert np.isclose(np.mean((o['goal:proprio'] - o2['goal:proprio'])**2), 0.0), "AHH"
     return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch)

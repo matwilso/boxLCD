@@ -64,7 +64,7 @@ def sac(G):
       env = wrappers.PreprocVecEnv(preproc, env, G)
       real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, G)
       obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
-      #if 'goal:pstate' in obs_space.spaces:
+      #if 'goal:proprio' in obs_space.spaces:
       #  obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
 
   #tenv.reset()
@@ -527,7 +527,7 @@ _C.lenv_cont_roll = 0
 _C.lenv_goals = 0
 _C.reset_prompt = 0 
 _C.succ_reset = 1 # between lenv and normal env 
-_C.state_key = 'pstate'
+_C.state_key = 'proprio'
 _C.diff_delt = 0
 _C.goal_thresh = 0.010
 _C.preproc_rew = 0

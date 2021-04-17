@@ -72,7 +72,7 @@ class Multistep(nn.Module):
 
   def train_step(self, batch, dry=False):
     """dry means don't update"""
-    bs = batch['pstate'].shape[0]
+    bs = batch['proprio'].shape[0]
     if self.G.phase == 1:
       #import ipdb; ipdb.set_trace()
       #ebatch = self.flatbatch(batch)
@@ -114,7 +114,7 @@ class Multistep(nn.Module):
     return metrics
 
   def evaluate(self, writer, batch, epoch):
-    bs = batch['pstate'].shape[0]
+    bs = batch['proprio'].shape[0]
     #ebatch = self.flatbatch(batch)
     if self.G.phase == 1:
       ebatch = batch
@@ -127,19 +127,19 @@ class Multistep(nn.Module):
     stack = th.cat([lcd, pred_lcd, error], -2)[0][:, None]
     writer.add_image('image/decode', utils.combine_imgs(stack, 1, self.G.vidstack)[None], epoch)
 
-    pred_state = decoded['pstate'].mean[0].detach().cpu()
-    true_state = ebatch['pstate'][0].cpu()
+    pred_state = decoded['proprio'].mean[0].detach().cpu()
+    true_state = ebatch['proprio'][0].cpu()
     preds = []
     for s in pred_state:
-      preds += [self.env.reset(pstate=s)['lcd']]
+      preds += [self.env.reset(proprio=s)['lcd']]
     truths = []
     for s in true_state:
-      truths += [self.env.reset(pstate=s)['lcd']]
+      truths += [self.env.reset(proprio=s)['lcd']]
     preds = 1.0 * np.stack(preds)
     truths = 1.0 * np.stack(truths)
     error = (preds - truths + 1.0) / 2.0
     stack = np.concatenate([truths, preds, error], -2)[:, None]
-    writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, self.G.vidstack)[None], epoch)
+    writer.add_image('proprio/decode', utils.combine_imgs(stack, 1, self.G.vidstack)[None], epoch)
 
     if self.G.phase == 2:
       idxs = idxs.detach().flatten(-2)

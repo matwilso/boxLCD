@@ -51,7 +51,7 @@ class VQVAE(nn.Module):
     pass
 
   def evaluate(self, writer, batch, epoch):
-    bs = batch['pstate'].shape[0]
+    bs = batch['proprio'].shape[0]
     #ebatch = self.flatbatch(batch)
     flatter_batch = {key: val[:8, 0] for key, val in batch.items()}
     _, decoded, _, idxs = self.forward(flatter_batch)
@@ -62,25 +62,25 @@ class VQVAE(nn.Module):
     writer.add_image('image/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
     import ipdb; ipdb.set_trace()
-    pred_state = decoded['pstate'].mean[:8,0].detach().cpu()
-    true_state = flatter_batch['pstate'][:8,0].cpu()
+    pred_state = decoded['proprio'].mean[:8,0].detach().cpu()
+    true_state = flatter_batch['proprio'][:8,0].cpu()
     preds = []
     for s in pred_state:
-      preds += [self.env.reset(pstate=s)['lcd']]
+      preds += [self.env.reset(proprio=s)['lcd']]
     truths = []
     for s in true_state:
-      truths += [self.env.reset(pstate=s)['lcd']]
+      truths += [self.env.reset(proprio=s)['lcd']]
     preds = 1.0 * np.stack(preds)
     truths = 1.0 * np.stack(truths)
     error = (preds - truths + 1.0) / 2.0
     stack = np.concatenate([truths, preds, error], -2)[:, None]
-    writer.add_image('pstate/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
+    writer.add_image('proprio/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
 
   def loss(self, batch, eval=False, return_idxs=False):
     embed_loss, decoded, perplexity, idxs = self.forward(batch)
     recon_losses = {}
-    recon_losses['recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['recon_proprio'] = -decoded['proprio'].log_prob(batch['proprio']).mean()
     recon_losses['recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:,None]).mean()
     recon_loss = sum(recon_losses.values())
     loss = recon_loss + embed_loss
@@ -99,7 +99,7 @@ class Encoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
     H = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     act_n = env.action_space.shape[0]
 
     self.state_embed = nn.Sequential(
@@ -119,7 +119,7 @@ class Encoder(nn.Module):
     ])
 
   def forward(self, batch):
-    state = batch['pstate']
+    state = batch['proprio']
     lcd = batch['lcd']
     emb = self.state_embed(state)
     x = lcd[:,None]
@@ -144,7 +144,7 @@ class Decoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
     H = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     self.state_net = nn.Sequential(
       nn.Flatten(-3),
       nn.Linear(G.vqD*4*8, H),
@@ -165,4 +165,4 @@ class Decoder(nn.Module):
   def forward(self, x):
     lcd_dist = thd.Bernoulli(logits=self.net(x))
     state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'pstate': state_dist}
+    return {'lcd': lcd_dist, 'proprio': state_dist}

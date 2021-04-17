@@ -15,7 +15,7 @@ class ArbiterAE(Autoencoder):
   def __init__(self, env, G):
     super().__init__(env, G)
     self.z_size = 128
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     self.encoder = Encoder(state_n, self.z_size, G)
     self.decoder = Decoder(state_n, self.z_size, G)
     self._init()
@@ -34,7 +34,7 @@ class ArbiterAE(Autoencoder):
     z = self.encoder(batch)
     decoded = self.decoder(z)
     recon_losses = {}
-    recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(batch['proprio']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
     metrics = {'loss/recon_total': recon_loss, **recon_losses}
@@ -72,7 +72,7 @@ class Encoder(nn.Module):
     ])
 
   def forward(self, batch):
-    state = batch['pstate']
+    state = batch['proprio']
     lcd = batch['lcd']
     emb = self.state_embed(state)
     x = lcd[:, None]
@@ -110,4 +110,4 @@ class Decoder(nn.Module):
   def forward(self, x):
     lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]))
     state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'pstate': state_dist}
+    return {'lcd': lcd_dist, 'proprio': state_dist}

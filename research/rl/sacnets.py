@@ -43,7 +43,7 @@ class BaseCNN(nn.Module):
     )
     mult = 1 if G.zdelta else 2
     #self.linear = nn.Linear(mult * size * G.nfilter, out_size)
-    extra = 2 + obs_space['pstate'].shape[0]
+    extra = 2 + obs_space['proprio'].shape[0]
     self.linear = nn.Sequential(
         nn.Linear(mult * size * G.nfilter + extra, G.hidden_size),
         nn.ReLU(),
@@ -66,7 +66,7 @@ class BaseCNN(nn.Module):
       x = g - s
     else:
       x = th.cat([s, g], -1)
-    x = th.cat([x, obs['goal:pstate'], obs['pstate']], -1)
+    x = th.cat([x, obs['goal:proprio'], obs['proprio']], -1)
     x = self.linear(x)
     return x
 
@@ -118,7 +118,7 @@ class QFunction(nn.Module):
     super().__init__()
     H = G.hidden_size
     self.G = G
-    gsize = obs_space['goal:pstate'].shape[0]
+    gsize = obs_space['goal:proprio'].shape[0]
     size = obs_space[self.G.state_key].shape[0] + gsize + act_dim
     if self.G.net == 'mlp':
       self.base = BaseMLP(size, 1, G)
@@ -150,16 +150,16 @@ class QFunction(nn.Module):
 
   def forward(self, obs, act):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:pstate'], act], -1)
+      x = th.cat([obs[self.G.state_key], obs['goal:proprio'], act], -1)
       return self.base(x).squeeze(-1)
     elif self.G.net == 'bvae':
       x = self.preproc.encode(obs).detach()
       x = self.statie(x)
-      if 'goal:pstate' in obs:
+      if 'goal:proprio' in obs:
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gx = self.preproc.encode(goals).detach()
         #gx = self.goalie(gx)
-        x = th.cat([x, obs['goal:pstate']], -1)
+        x = th.cat([x, obs['goal:proprio']], -1)
         #x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
@@ -176,7 +176,7 @@ class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, G, preproc=None):
     super().__init__()
     self.G = G
-    gsize = obs_space['goal:pstate'].shape[0]
+    gsize = obs_space['goal:proprio'].shape[0]
     size = obs_space[self.G.state_key].shape[0] + gsize
     self.size = size
     if self.G.net == 'mlp':
@@ -202,16 +202,16 @@ class SquashedGaussianActor(nn.Module):
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:pstate']], -1)
+      x = th.cat([obs[self.G.state_key], obs['goal:proprio']], -1)
     elif self.G.net == 'bvae':
       z = self.preproc.encode(obs).detach()
       x = self.statie(z)
-      if 'goal:pstate' in obs:
+      if 'goal:proprio' in obs:
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gz = self.preproc.encode(goals).detach()
         #gx = self.goalie(gz)
         #x = th.cat([x, gx], -1)
-        x = th.cat([x, obs['goal:pstate']], -1)
+        x = th.cat([x, obs['goal:proprio']], -1)
         #1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
         #x = x + gx
     else:

@@ -108,8 +108,6 @@ class MDNHead(nn.Module):
     # TODO: should this be view or something
     mu = mu.reshape(list(mu.shape[:-1]) + [self.G.mdn_k, -1])
     std = std.reshape(list(std.shape[:-1]) + [self.G.mdn_k, -1])
-    if past_o is not None:
-      mu = mu + past_o[..., None, :]
     cat = thd.Categorical(logits=logits)
     dist = thd.MixtureSameFamily(cat, thd.MultivariateNormal(mu, th.diag_embed(std)))
     return dist
@@ -206,7 +204,7 @@ class MultiHead(nn.Module):
     xb, xs = self.layer(x).chunk(2, -1)
     bin = self.binary(xb) 
     state = self.state(xs)
-    return {'lcd': bin, 'pstate': state}
+    return {'lcd': bin, 'proprio': state}
 
 class ResBlock(nn.Module):
   def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0, group_size=16):

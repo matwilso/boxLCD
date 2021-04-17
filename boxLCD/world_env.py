@@ -127,11 +127,11 @@ class WorldEnv(gym.Env, EzPickle):
     # observation is a dict space
     spaces = {}
     spaces['full_state'] = gym.spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
-    # pstate = partial state
+    # proprio = partial state
     if self.pobs_size == 0:
-      spaces['pstate'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
+      spaces['proprio'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
     else:
-      spaces['pstate'] = gym.spaces.Box(-1, +1, (self.pobs_size,), dtype=np.float32)
+      spaces['proprio'] = gym.spaces.Box(-1, +1, (self.pobs_size,), dtype=np.float32)
     spaces['lcd'] = gym.spaces.Box(0, 1, (self.G.lcd_base, int(self.G.lcd_base * self.G.wh_ratio)), dtype=np.bool)
     self.observation_space = gym.spaces.Dict(spaces)
 
@@ -303,7 +303,7 @@ class WorldEnv(gym.Env, EzPickle):
       body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
       self.dynbodies[obj.name] = body
 
-  def reset(self, full_state=None, pstate=None):
+  def reset(self, full_state=None, proprio=None):
     self.ep_t = 0
     self._destroy()
     self.statics = {}
@@ -317,10 +317,10 @@ class WorldEnv(gym.Env, EzPickle):
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
     #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
-    if pstate is not None:
-      assert pstate.shape[-1] == self.observation_space.spaces['pstate'].shape[-1], f'invalid shape for pstate {pstate.shape} {self.observation_space.spaces["pstate"]}'
+    if proprio is not None:
+      assert proprio.shape[-1] == self.observation_space.spaces['proprio'].shape[-1], f'invalid shape for proprio {proprio.shape} {self.observation_space.spaces["proprio"]}'
       full_state = np.zeros(self.observation_space.spaces['full_state'].shape)
-      full_state[self.pobs_idxs] = pstate
+      full_state[self.pobs_idxs] = proprio
     if full_state is not None:
       full_state = utils.NamedArray(np.array(full_state).astype(np.float), self.obs_info)
 
@@ -424,8 +424,8 @@ class WorldEnv(gym.Env, EzPickle):
             full_state[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
 
     full_state = full_state.arr
-    pstate = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
-    return {'full_state': full_state, 'pstate': pstate, 'lcd': self.lcd_render()}
+    proprio = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
+    return {'full_state': full_state, 'proprio': proprio, 'lcd': self.lcd_render()}
 
   def step(self, action):
     self.ep_t += 1

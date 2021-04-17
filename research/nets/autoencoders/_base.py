@@ -12,11 +12,8 @@ class Autoencoder(Net):
     self.env = env
     self.viz_idxs = np.arange(0, self.G.window * 8, self.G.window)
 
-  def _flat_batch(self, batch):
-    return {key: val.flatten(0, 1) for key, val in batch.items()}
-
   def train_step(self, batch, dry=False):
-    return super().train_step(self._flat_batch(batch), dry)
+    return super().train_step(utils.flat_batch(batch), dry)
 
   # TODO: add support for different types of encoders. like the distribution. and sampling or taking the mode. or doing the logits.
   # TODO: same for decoder
@@ -28,8 +25,8 @@ class Autoencoder(Net):
     dists = self._decode(z)
     if 'lcd' in dists:
       mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
-    if 'pstate' in dists:
-      mode['pstate'] = dists['pstate'].mean
+    if 'proprio' in dists:
+      mode['proprio'] = dists['proprio'].mean
     return mode
 
   def decode_dist(self, z):
@@ -43,7 +40,7 @@ class Autoencoder(Net):
       return self.decode_dist(z)
 
   def evaluate(self, epoch, writer, batch, arbiter=None):
-    flat_batch = self._flat_batch(batch)
+    flat_batch = utils.flat_batch(batch)
     metrics = {}
     self._unprompted_eval(epoch, writer, metrics, flat_batch, arbiter)
     self._prompted_eval(epoch, writer, metrics, flat_batch, arbiter)
@@ -57,9 +54,9 @@ class Autoencoder(Net):
       sample_lcd = decoded['lcd']
       self._plot_lcds(epoch, writer, sample_lcd)
 
-    if 'pstate' in decoded:
-      sample_pstate = decoded['pstate']
-      self._plot_pstates(epoch, writer, sample_pstate)
+    if 'proprio' in decoded:
+      sample_proprio = decoded['proprio']
+      self._plot_proprios(epoch, writer, sample_proprio)
 
     if arbiter is not None:
       decoded['lcd'] = decoded['lcd'][:, 0]
@@ -84,12 +81,12 @@ class Autoencoder(Net):
       # visualize reconstruction
       self._plot_lcds(epoch, writer, pred_lcd, true_lcd) 
 
-    if 'pstate' in decoded:
-      pred_pstate = decoded['pstate']
-      true_pstate = batch['pstate']
-      metrics['eval/pstate_log_mse'] = ((true_pstate - pred_pstate)**2).mean().log().cpu()
-      # visualize pstate reconstructions
-      self._plot_pstates(epoch, writer, pred_pstate, true_pstate)
+    if 'proprio' in decoded:
+      pred_proprio = decoded['proprio']
+      true_proprio = batch['proprio']
+      metrics['eval/proprio_log_mse'] = ((true_proprio - pred_proprio)**2).mean().log().cpu()
+      # visualize proprio reconstructions
+      self._plot_proprios(epoch, writer, pred_proprio, true_proprio)
 
     if arbiter is not None:
       decoded['lcd'] = decoded['lcd'][:, 0]
@@ -109,23 +106,23 @@ class Autoencoder(Net):
     else:
       writer.add_image('sample_lcd', utils.combine_imgs(pred, 1, 8)[None], epoch)
 
-  def _plot_pstates(self, epoch, writer, pred, truth=None):
-    """visualize pstate reconstructions"""
-    pred_pstate = pred[self.viz_idxs].cpu()
+  def _plot_proprios(self, epoch, writer, pred, truth=None):
+    """visualize proprio reconstructions"""
+    pred_proprio = pred[self.viz_idxs].cpu()
     preds = []
-    for s in pred_pstate:
-      preds += [self.env.reset(pstate=s)['lcd']]
+    for s in pred_proprio:
+      preds += [self.env.reset(proprio=s)['lcd']]
     preds = 1.0 * np.stack(preds)
 
     if truth is not None:
-      true_pstate = truth[self.viz_idxs].cpu()
+      true_proprio = truth[self.viz_idxs].cpu()
       truths = []
-      for s in true_pstate:
-        truths += [self.env.reset(pstate=s)['lcd']]
+      for s in true_proprio:
+        truths += [self.env.reset(proprio=s)['lcd']]
       truths = 1.0 * np.stack(truths)
       error = (preds - truths + 1.0) / 2.0
       stack = np.concatenate([truths, preds, error], -2)[:, None]
-      writer.add_image('recon_pstate', utils.combine_imgs(stack, 1, 8)[None], epoch)
+      writer.add_image('recon_proprio', utils.combine_imgs(stack, 1, 8)[None], epoch)
     else:
-      writer.add_image('sample_pstate', utils.combine_imgs(preds[:,None], 1, 8)[None], epoch)
+      writer.add_image('sample_proprio', utils.combine_imgs(preds[:,None], 1, 8)[None], epoch)
 

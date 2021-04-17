@@ -21,7 +21,7 @@ class FlatEverything(nn.Module):
     self.act_n = env.action_space.shape[0]
     self.observation_space = env.observation_space
     self.action_space = env.action_space
-    self.pstate_n = env.observation_space.spaces['pstate'].shape[0]
+    self.proprio_n = env.observation_space.spaces['proprio'].shape[0]
     self.block_size = self.G.window
 
     # LOAD SVAE
@@ -72,7 +72,7 @@ class FlatEverything(nn.Module):
     BS, EPL, *HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
     acts = batch['acts']
-    z_q = self.svae(utils.filtdict(batch, 'pstate'))[0]
+    z_q = self.svae(utils.filtdict(batch, 'proprio'))[0]
     x = th.cat([lcd, z_q], -1)
     # forward the GPT model
     x = self.embed(x)
@@ -105,8 +105,8 @@ class FlatEverything(nn.Module):
     dist = self.dist_head(logits)
 
     target_lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
-    target_pstate = self.svae(utils.filtdict(batch, 'pstate'))[0].detach()
-    target = th.cat([target_lcd, target_pstate], -1)
+    target_proprio = self.svae(utils.filtdict(batch, 'proprio'))[0].detach()
+    target = th.cat([target_lcd, target_proprio], -1)
     loss = -dist.log_prob(target).mean([0, 1])
     metrics['loss/lcd'] = loss[:self.G.imsize].mean()
     metrics['loss/state'] = loss[self.G.imsize:].mean()
@@ -118,9 +118,9 @@ class FlatEverything(nn.Module):
     dist = self.dist_head(logits / temp)
     sample = dist.sample()
     batch['lcd'][:, i] = sample[:, i, :self.G.imsize].reshape(batch['lcd'][:,i].shape)
-    pstate_code = sample[:, i, self.G.imsize:]
-    pstate = self.svae.decoder(pstate_code).mean
-    batch['pstate'][:, i] = pstate
+    proprio_code = sample[:, i, self.G.imsize:]
+    proprio = self.svae.decoder(proprio_code).mean
+    batch['proprio'][:, i] = proprio
     return batch
 
   def sample(self, n, acts=None, prompts=None):
@@ -130,13 +130,13 @@ class FlatEverything(nn.Module):
         n = acts.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.G.imsize).to(self.G.device)
-      batch['pstate'] = th.zeros(n, self.block_size, self.pstate_n).to(self.G.device)
+      batch['proprio'] = th.zeros(n, self.block_size, self.proprio_n).to(self.G.device)
       batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
         batch['lcd'][:, :10] = lcd
-        batch['pstate'][:, :10] = prompts['pstate']
+        batch['proprio'][:, :10] = prompts['proprio']
         start = lcd.shape[1]
 
       for i in range(start, self.block_size):
@@ -145,9 +145,9 @@ class FlatEverything(nn.Module):
         dist = self.dist_head(logits)
         sample = dist.sample()
         batch['lcd'][:, i] = sample[:, i, :self.G.imsize]
-        pstate_code = sample[:, i, self.G.imsize:]
-        pstate = self.svae.decoder(pstate_code).mean
-        batch['pstate'][:, i] = pstate
+        proprio_code = sample[:, i, self.G.imsize:]
+        proprio = self.svae.decoder(proprio_code).mean
+        batch['proprio'][:, i] = proprio
 
         if i == self.block_size - 1:
           sample_loss = self.loss(batch)[0]

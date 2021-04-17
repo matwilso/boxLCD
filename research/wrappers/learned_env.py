@@ -38,12 +38,12 @@ class RewardLenv:
   def observation_space(self):
     base_space = self.lenv.observation_space
     base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
-    base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
+    base_space.spaces['goal:proprio'] = base_space.spaces['proprio']
     return base_space
 
   def step(self, act):
     obs, rew, done, info = self.lenv.step(act)
-    obs['goal:pstate'] = self.goal['goal:pstate'].detach().clone()
+    obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
     rew, _done = self.comp_rew_done(obs, info)
     done = th.logical_or(done, _done)
@@ -68,7 +68,7 @@ class RewardLenv:
     self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device))
     obs = self.lenv.reset(*args, **kwargs)
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
-    obs['goal:pstate'] = self.goal['goal:pstate'].detach().clone()
+    obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
     return obs
 
   def render(self, *args, **kwargs):
@@ -77,7 +77,7 @@ class RewardLenv:
   def comp_rew_done(self, obs, info={}):
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
     if self.G.state_rew:
-      delta = ((obs['goal:pstate'] - obs['pstate'])**2)
+      delta = ((obs['goal:proprio'] - obs['proprio'])**2)
       keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
       idxs = [self.pobs_keys.index(x) for x in keys]
       delta = delta[..., idxs].mean(-1)
@@ -120,7 +120,7 @@ class LearnedEnv:
     self.action_space.sample = act_sample
 
     spaces = {}
-    self.keys = ['lcd', 'pstate']
+    self.keys = ['lcd', 'proprio']
     for key in self.keys:
       val = self.real_env.observation_space.spaces[key]
       spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
@@ -197,13 +197,13 @@ if __name__ == '__main__':
   start = time.time()
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
-  pslcds = [env.reset(pstate=obs['pstate'][0].cpu())['lcd']]
+  pslcds = [env.reset(proprio=obs['proprio'][0].cpu())['lcd']]
   for i in range(200):
     act = lenv.action_space.sample()
     obs, rew, done, info = lenv.step(act)
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
-    pslcds += [env.reset(pstate=obs['pstate'][0].cpu())['lcd']]
+    pslcds += [env.reset(proprio=obs['proprio'][0].cpu())['lcd']]
 
   lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
   glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()

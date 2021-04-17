@@ -29,7 +29,7 @@ class BVAE(Autoencoder):
     decoded = self.decoder(z_q)
     # compute losses
     recon_losses = {}
-    recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(batch['proprio']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
     loss = recon_loss - self.G.entropy_bonus*entropy
@@ -58,7 +58,7 @@ class BVAE(Autoencoder):
 class Encoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     n = G.hidden_size
     self.state_embed = nn.Sequential(
         nn.Linear(state_n, n),
@@ -79,7 +79,7 @@ class Encoder(nn.Module):
     ])
 
   def forward(self, batch):
-    state = batch['pstate']
+    state = batch['proprio']
     lcd = batch['lcd']
     emb = self.state_embed(state)
     x = lcd[:, None]
@@ -103,7 +103,7 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     n = G.hidden_size
     self.state_net = nn.Sequential(
         nn.Flatten(-3),
@@ -127,13 +127,13 @@ class Decoder(nn.Module):
   def forward(self, x):
     lcd_dist = thd.Bernoulli(logits=self.net(x))
     state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'pstate': state_dist}
+    return {'lcd': lcd_dist, 'proprio': state_dist}
 
 class StateEncoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
     H = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     self.state_embed = nn.Sequential(
         nn.Linear(state_n, H),
         nn.ReLU(),
@@ -142,7 +142,7 @@ class StateEncoder(nn.Module):
         nn.Linear(H, H),
     )
   def forward(self, batch):
-    state = batch['pstate']
+    state = batch['proprio']
     x = self.state_embed(state)
     return x
 
@@ -150,7 +150,7 @@ class StateDecoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
     n = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     self.state_net = nn.Sequential(
         nn.Linear(G.vqK, n),
         nn.ReLU(),

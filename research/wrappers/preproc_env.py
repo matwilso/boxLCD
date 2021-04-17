@@ -42,7 +42,7 @@ class PreprocEnv:
   def observation_space(self):
     base_space = self._env.observation_space
     base_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
-    if 'goal:pstate' in base_space.spaces:
+    if 'goal:proprio' in base_space.spaces:
       base_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
     return base_space
 
@@ -50,7 +50,7 @@ class PreprocEnv:
     batch_obs = {key: th.as_tensor(1.0 * val[None]).float().to(self.G.device) for key, val in obs.items()}
     zstate = self.model.encode(batch_obs)
     obs['zstate'] = zstate.detach().cpu().numpy()
-    if 'goal:pstate' in batch_obs:
+    if 'goal:proprio' in batch_obs:
       goal = utils.filtdict(batch_obs, 'goal:', fkey=lambda x: x[5:])
       zgoal = self.model.encode(goal)
       obs['goal:zstate'] = zgoal.detach().cpu().numpy()

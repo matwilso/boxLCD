@@ -18,10 +18,18 @@ import utils
 # TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
 # basically so that you can do multi-modal stuff in a single vector
 
+class TanhD(nn.Module):
+  def __init__(self):
+    super().__init__()
+
+  def forward(self, z, noise=True):
+    z = th.tanh(z)
+    return z
+
 class RNLD(nn.Module):
   """
   Real Number Line Discretization (RNLD)
-  it's pronounced ronald
+  you can call it ronald
 
   Chunk up the number line into 4 bins.
   Assign all values in each bin to the mean of that bin.
@@ -33,9 +41,9 @@ class RNLD(nn.Module):
     super().__init__()
     self.num_cat = num_cat
 
-  def forward(self, z):
+  def forward(self, z, noise=True):
     z = th.tanh(z)
-    if self.training:
+    if noise:
       zn = z + 0.25 * (2 * th.rand(z.shape).to(z.device) - 1)
     else:
       zn = z

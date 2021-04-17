@@ -5,51 +5,51 @@ from torch import nn
 import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
-from .quantize import BinaryQuantize, RNLD
+from .quantize import BinaryQuantize, RNLD, TanhD
 from ._base import Autoencoder
 
-class RNLDA(Autoencoder):
-  """RNLDA. a ronald autoencoder"""
+class Tanha(Autoencoder):
+  """Real Number Line Discrete Autoencoder. ronalda"""
   def __init__(self, env, G):
     super().__init__(env, G)
     # encoder -> binary -> decoder
     self.encoder = Encoder(env, G)
-    self.vq = RNLD(4)
     self.decoder = Decoder(env, G)
     self.z_size = 4 * 8 * G.vqD
     self._init()
 
   def sample_z(self, n):
-    z = th.bernoulli(0.5*th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, 4, 8])
+    z = th.bernoulli(0.5 * th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, 4, 8])
     return z
 
   def loss(self, batch):
     # autoencode
     z_e = self.encoder(batch)
-    z_q, idxs = self.vq(z_e)
-    decoded = self.decoder(z_q)
+    decoded = self.decoder(z_e.rsample())
     # compute losses
     recon_losses = {}
-    recon_losses['loss/recon_pstate'] = -decoded['pstate'].log_prob(batch['pstate']).mean()
+    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(batch['proprio']).mean()
     recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
-    loss = recon_loss
-    metrics = {'loss/total': loss, **recon_losses, 'loss/recon_total': recon_loss, 
-    'idx0': th.mean(1.0*(idxs ==0)),
-    'idx1': th.mean(1.0*(idxs==1)),
-    'idx2': th.mean(1.0*(idxs==2)), 
-    'idx3': th.mean(1.0*(idxs==3))
-    }
+    # kl div constraint
+    z_prior = thd.Normal(0, 1)
+    kl_loss = thd.kl_divergence(z_e, z_prior).mean(-1)
+    # full loss and metrics
+    loss = (recon_loss + self.G.entropy_bonus * kl_loss).mean()
+    metrics = {'loss/total': loss, **recon_losses, 'loss/recon_total': recon_loss,}
     return loss, metrics
 
-  def encode(self, batch, flatten=True):
+  def encode(self, batch, flatten=True, noise=True):
     shape = batch['lcd'].shape
     if len(shape) == 4:
       batch = {key: val.clone().flatten(0, 1) for key, val in batch.items()}
     batch['lcd'].reshape
     z_e = self.encoder(batch)
     # return z_e.flatten(-3)
-    z_q, idxs = self.vq(z_e)
+    if noise:
+      z_q = z_e.sample()
+    else:
+      z_q = z_e.mean
     if flatten:
       z_q = z_q.flatten(-3)
       assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'
@@ -64,7 +64,7 @@ class RNLDA(Autoencoder):
 class Encoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     n = G.hidden_size
     self.state_embed = nn.Sequential(
         nn.Linear(state_n, n),
@@ -81,11 +81,16 @@ class Encoder(nn.Module):
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Conv2d(nf, G.vqD, 1, 1),
+        nn.Conv2d(nf, 2*G.vqD, 1, 1),
     ])
 
+  def get_dist(self, x):
+    mu, log_std = x.chunk(2, 1)
+    std = F.softplus(log_std) + 1e-4
+    return thd.Normal(mu, std)
+
   def forward(self, batch):
-    state = batch['pstate']
+    state = batch['proprio']
     lcd = batch['lcd']
     emb = self.state_embed(state)
     x = lcd[:, None]
@@ -94,7 +99,7 @@ class Encoder(nn.Module):
         x = layer(x, emb)
       else:
         x = layer(x)
-    return x
+    return self.get_dist(x)
 
 class Upsample(nn.Module):
   """double the size of the input"""
@@ -109,7 +114,7 @@ class Upsample(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, env, G):
     super().__init__()
-    state_n = env.observation_space.spaces['pstate'].shape[0]
+    state_n = env.observation_space.spaces['proprio'].shape[0]
     n = G.hidden_size
     self.state_net = nn.Sequential(
         nn.Flatten(-3),
@@ -133,36 +138,4 @@ class Decoder(nn.Module):
   def forward(self, x):
     lcd_dist = thd.Bernoulli(logits=self.net(x))
     state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'pstate': state_dist}
-
-class StateEncoder(nn.Module):
-  def __init__(self, env, G):
-    super().__init__()
-    H = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
-    self.state_embed = nn.Sequential(
-        nn.Linear(state_n, H),
-        nn.ReLU(),
-        nn.Linear(H, H),
-        nn.ReLU(),
-        nn.Linear(H, H),
-    )
-  def forward(self, batch):
-    state = batch['pstate']
-    x = self.state_embed(state)
-    return x
-
-class StateDecoder(nn.Module):
-  def __init__(self, env, G):
-    super().__init__()
-    n = G.hidden_size
-    state_n = env.observation_space.spaces['pstate'].shape[0]
-    self.state_net = nn.Sequential(
-        nn.Linear(G.vqK, n),
-        nn.ReLU(),
-        nn.Linear(n, n),
-        nn.ReLU(),
-        nn.Linear(n, state_n),
-    )
-  def forward(self, x):
-    return thd.Normal(self.state_net(x), 1)
+    return {'lcd': lcd_dist, 'proprio': state_dist}

@@ -1,5 +1,4 @@
 from re import I
-from research.wrappers import preproc_vec_env
 import yaml
 import sys
 from collections import defaultdict
@@ -12,23 +11,23 @@ from torch import nn
 import torch.nn.functional as F
 from nets.common import TransformerBlock, BinaryHead
 import utils
-from research.nets.autoencoders.bvae import BVAE
+from research.nets.autoencoders.rnlda import RNLDA
 from ._base import VideoModel
 
-class FlatBToken(VideoModel):
+class FlatRonald(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
-    # <LOAD BVAE>
-    sd = th.load(G.weightdir / 'BVAE.pt')
-    bvaeC = sd.pop('G')
-    self.bvae = BVAE(env, bvaeC)
-    self.bvae.load(G.weightdir)
-    for p in self.bvae.parameters():
+    # <LOAD ronald>
+    sd = th.load(G.weightdir / 'RNLDA.pt')
+    ronaldG = sd.pop('G')
+    self.ronald = RNLDA(env, ronaldG)
+    self.ronald.load(G.weightdir)
+    for p in self.ronald.parameters():
       p.requires_grad = False
-    self.bvae.eval()
-    # </LOAD BVAE>
+    self.ronald.eval()
+    # </LOAD ronald>
 
-    self.size = self.bvae.G.vqD * 4 * 8
+    self.size = self.ronald.G.vqD * 4 * 8
     self.block_size = self.G.window
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
@@ -39,7 +38,6 @@ class FlatBToken(VideoModel):
     self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
-    self.dist_head = BinaryHead(G.n_embed, self.size, G)
     self._init()
 
   def forward(self, z, acts):
@@ -60,30 +58,24 @@ class FlatBToken(VideoModel):
     return logits
 
   def loss(self, batch):
-    z = self.bvae.encode(batch).detach()
+    z = self.ronald.encode(batch, noise=False).detach()
     logits = self.forward(z, batch['acts'])
-    dist = self.dist_head(logits)
-    loss = -dist.log_prob(z).mean()
-    import ipdb; ipdb.set_trace()
-
-
+    loss = ((th.tanh(logits) - z)**2).mean()
     return loss, {'loss/total': loss}
 
   def onestep(self, batch, i, temp=1.0):
-    import ipdb; ipdb.set_trace()
     logits = self.forward(batch)
-    dist = self.dist_head(logits / temp)
+    import ipdb; ipdb.set_trace()
     sample = dist.sample()
     batch['lcd'][:, i] = sample[:, i, :self.G.imsize].reshape(batch['lcd'][:, i].shape)
     proprio_code = sample[:, i, self.G.imsize:]
-    proprio = self.bvae.decoder(proprio_code).mean
+    proprio = self.ronald.decoder(proprio_code).mean
     batch['proprio'][:, i] = proprio
     return batch
 
   def latent_onestep(self, z, a, i, temp=1.0):
     logits = self.forward(z, a)
-    dist = self.dist_head(logits / temp)
-    z[:, i] = dist.sample()[:, i]
+    z[:,i] = self.ronald.vq(logits, noise=True)[0][:,i]
     return z
 
   def latent_sample(self, z, a, start):
@@ -107,15 +99,15 @@ class FlatBToken(VideoModel):
         batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
-      z = self.bvae.encode(batch)
-      z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * 8).to(self.G.device)
+      z = self.ronald.encode(batch, noise=False)
+      z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * 8).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, acts, start)
-      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, 8])
+      z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD, 4, 8])
 
       # DECODE
-      dist = self.bvae.decoder(z_sample)
+      dist = self.ronald.decoder(z_sample)
       batch['lcd'] = (1.0 * (dist['lcd'].probs > 0.5)).reshape([n, self.block_size, 1, self.G.lcd_h, self.G.lcd_w])
       batch['proprio'] = (dist['proprio'].mean).reshape([n, self.block_size, -1])
     return batch

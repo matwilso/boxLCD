@@ -26,7 +26,7 @@ class BodyGoalEnv:
   def observation_space(self):
    base_space = self._env.observation_space
    base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
-   base_space.spaces['goal:pstate'] = base_space.spaces['pstate']
+   base_space.spaces['goal:proprio'] = base_space.spaces['proprio']
    return base_space
 
   def reset(self, *args, **kwargs):
@@ -34,7 +34,7 @@ class BodyGoalEnv:
     obs = self._env.reset(*args, **kwargs)
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
-    obs['goal:pstate'] = np.array(self.goal['pstate'])
+    obs['goal:proprio'] = np.array(self.goal['proprio'])
     self.last_obs = copy.deepcopy(obs)
     return obs
 
@@ -55,13 +55,13 @@ class BodyGoalEnv:
   def comp_rew_done(self, obs, info={}):
     done = False
     if self.G.state_rew:
-      delta = ((obs['goal:pstate'] - obs['pstate'])**2)
+      delta = ((obs['goal:proprio'] - obs['proprio'])**2)
       #keys = utils.filtlist(self._env.pobs_keys, '.*x:p')
       keys = utils.filtlist(self._env.pobs_keys, '.*(x|y):p')
       idxs = [self._env.pobs_keys.index(x) for x in keys]
       delta = delta[idxs].mean()
       if self.G.diff_delt:
-        last_delta = ((self.last_obs['goal:pstate'] - self.last_obs['pstate'])**2)[idxs].mean()
+        last_delta = ((self.last_obs['goal:proprio'] - self.last_obs['proprio'])**2)[idxs].mean()
         rew = -0.05 + 10*(last_delta**0.5 - delta**0.5)
       else:
         rew = -delta**0.5
@@ -86,7 +86,7 @@ class BodyGoalEnv:
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
-    obs['goal:pstate'] = np.array(self.goal['pstate'])
+    obs['goal:proprio'] = np.array(self.goal['proprio'])
     rew, _done = self.comp_rew_done(obs, info)
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
