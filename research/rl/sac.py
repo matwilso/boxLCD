@@ -535,6 +535,7 @@ _C.preproc_rew = 0
 
 
 if __name__ == '__main__':
+  print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
   import argparse
   parser = argparse.ArgumentParser()
   for key, value in config().items():

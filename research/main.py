@@ -70,7 +70,8 @@ if __name__ == '__main__':
   elif G.mode == 'viz':
     runner = runners.Vizer(model, env, G)
   elif G.mode == 'collect':
-    data.collect(env_fn(G), G)
+    data.collect(env_fn, G)
+    exit()
   elif G.mode == 'fiddle':
     runner = runners.Fiddler(model, env, G)
   if G.ipython_mode:

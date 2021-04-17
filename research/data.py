@@ -16,36 +16,86 @@ from boxLCD.utils import A
 import utils
 from tqdm import tqdm
 import time
-
+from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
 
-def collect(make_env, G):
+def collect(env_fn, G):
   G.logdir.mkdir(parents=True, exist_ok=True)
   utils.dump_logger({}, None, 0, G)
-  env = make_env()
+  env = env_fn(G)()
+  venv = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)], G=G)
+  assert BARREL_SIZE % G.num_envs == 0, f'barrel size must be divisible by number of envs you use {BARREL_SIZE} % {G.num_envs} != 0'
   assert G.train_barrels != -1 and G.test_barrels != -1, f'must set the number of barrels you want to fill. G.train_barrels=={G.train_barrels}'
-  fill_barrels(env, G.test_barrels, G.logdir/'test')
-  fill_barrels(env, G.train_barrels, G.logdir/'train')
+  fill_barrels(env, venv, G.test_barrels, 'test', G)
+  fill_barrels(env, venv, G.train_barrels, 'train', G)
 
-def fill_barrels(env, num_barrels, logdir):
+def fill_barrels(env, venv, num_barrels, prefix, G):
   """Create files with:
   BARREL_SIZE x EP_LEN x *STATE_DIMS
-  
+
   o1,a1 --> o2
   Meaning that the last action doesn't matter
   """
+  BARS = BARREL_SIZE // G.num_envs
+  logdir = G.logdir / prefix
+  logdir.mkdir(parents=True, exist_ok=True)
+  total_bar = tqdm(total=num_barrels)
+  barrel_bar = tqdm(total=BARS)
+  total_bar.set_description(f'TOTAL PROGRESS (FPS=N/A)')
+  for ti in range(num_barrels):
+    obses = {key: np.zeros([BARS, G.num_envs, G.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
+    acts = np.zeros([BARS, G.num_envs, G.ep_len, env.action_space.shape[0]])
+    barrel_bar.reset()
+    for bi in range(BARS):
+      start = time.time()
+      obs = venv.reset(np.arange(G.num_envs))
+      for j in range(G.ep_len):
+        act = venv.action_space.sample()
+        for key in obses:
+          obses[key][bi, :, j] = obs[key]
+        acts[bi, :, j] = np.stack(act)
+        obs, rew, done, info = venv.step(act)
+        # plt.imshow(obs['lcd']);plt.show()
+        # venv.render()
+        #plt.imshow(1.0*venv.lcd_render()); plt.show()
+      barrel_bar.update(1)
+      fps = G.ep_len / (time.time() - start)
+      barrel_bar.set_description(f'current barrel')
+      # barrel_bar.set_description(f'fps: {} | current barrel')
+    if (G.logdir / 'pause.marker').exists():
+      import ipdb; ipdb.set_trace()
+
+    obses = {key: utils.flatten_first(val) for key, val in obses.items()}
+    acts = utils.flatten_first(acts)
+    assert obses['proprio'].ndim == 3
+    assert acts.ndim == 3
+    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', acts=acts, **obses)
+    total_bar.update(1)
+    total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
+
+
+def fill_barrels_slow(env, num_barrels, prefix, G):
+  """Create files with:
+  BARREL_SIZE x EP_LEN x *STATE_DIMS
+
+  o1,a1 --> o2
+  Meaning that the last action doesn't matter
+  """
+  import ipdb; ipdb.set_trace()
+  logdir = G.logdir / prefix
   logdir.mkdir(parents=True, exist_ok=True)
   total_bar = tqdm(total=num_barrels)
   barrel_bar = tqdm(total=BARREL_SIZE)
   total_bar.set_description(f'TOTAL PROGRESS (FPS=N/A)')
   for ti in range(num_barrels):
-    obses = {key: np.zeros([BARREL_SIZE, env.G.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
-    acts = np.zeros([BARREL_SIZE, env.G.ep_len, env.action_space.shape[0]])
+    obses = {key: np.zeros([BARREL_SIZE, G.ep_len, *val.shape], dtype=val.dtype) for key, val in env.observation_space.spaces.items()}
+    acts = np.zeros([BARREL_SIZE, G.ep_len, env.action_space.shape[0]])
     barrel_bar.reset()
     for bi in range(BARREL_SIZE):
       start = time.time()
       obs = env.reset()
-      for j in range(env.G.ep_len):
+      for j in range(G.ep_len):
         act = env.action_space.sample()
         for key in obses:
           obses[key][bi, j] = obs[key]
@@ -55,14 +105,14 @@ def fill_barrels(env, num_barrels, logdir):
         # env.render()
         #plt.imshow(1.0*env.lcd_render()); plt.show()
       barrel_bar.update(1)
-      fps = env.G.ep_len / (time.time() - start)
+      fps = G.ep_len / (time.time() - start)
       barrel_bar.set_description(f'current barrel')
       # barrel_bar.set_description(f'fps: {} | current barrel')
-    if (env.G.logdir / 'pause.marker').exists():
+    if (G.logdir / 'pause.marker').exists():
       import ipdb; ipdb.set_trace()
 
     timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-    data = np.savez_compressed(logdir/f'{timestamp}-{env.G.ep_len}.barrel', acts=acts, **obses)
+    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', acts=acts, **obses)
     total_bar.update(1)
     total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
 
@@ -107,7 +157,7 @@ class RolloutDataset(IterableDataset):
         assert elem['lcd'].max() <= 1.0 and elem['lcd'].min() >= 0.0
         yield elem
       curr_barrel.close()
-      if ct >= self.nbarrels-1 and not self.infinite:
+      if ct >= self.nbarrels - 1 and not self.infinite:
         break
 
 def load_ds(G):

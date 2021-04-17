@@ -74,11 +74,10 @@ if __name__ == '__main__':
   import matplotlib.pyplot as plt
   from boxLCD import envs
   import utils
-  from rl.sacnets import ActorCritic
   import torch as th
   import pathlib
   import time
-  from research.nets.bvae import BVAE
+  #from research.nets.bvae import BVAE
   from boxLCD import envs, env_map
   G = utils.AttrDict()
   G.env = 'Urchin'
@@ -99,7 +98,7 @@ if __name__ == '__main__':
   G.goal_thresh = 0.01
   env = envs.Urchin(G)
   G.fps = env.G.fps
-  model = BVAE(env, G)
+  #model = BVAE(env, G)
   def env_fn(G, seed=None):
     def _make():
       env = envs.Urchin(G)
@@ -112,7 +111,7 @@ if __name__ == '__main__':
 
   start = time.time()
   env = AsyncVectorEnv([env_fn(G) for _ in range(8)])
-  env = PreprocVecEnv(model, env, G, device='cpu')
+  #env = PreprocVecEnv(model, env, G, device='cpu')
   obs = env.reset(np.arange(8))
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]

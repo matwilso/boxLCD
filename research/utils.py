@@ -221,3 +221,7 @@ def compute_fid(x, y):
 
 def flat_batch(batch):
   return {key: val.flatten(0, 1) for key, val in batch.items()}
+
+def flatten_first(arr):
+  shape = arr.shape
+  return arr.reshape([shape[0]*shape[1], *shape[2:]])

@@ -63,7 +63,7 @@ class AsyncVectorEnv(VectorEnv):
       if you are writing your own worker, it is recommended to start from the code
       for `_worker` (or `_worker_shared_memory`) method below, and add changes
   """
-  def __init__(self, env_fns, observation_space=None, action_space=None, shared_memory=True, copy=True, context=None, daemon=True, worker=None):
+  def __init__(self, env_fns, observation_space=None, action_space=None, shared_memory=True, copy=True, context=None, daemon=True, worker=None, G={}):
     try:
       ctx = mp.get_context(context)
     except AttributeError:
@@ -73,6 +73,7 @@ class AsyncVectorEnv(VectorEnv):
     self.env_fns = env_fns
     self.shared_memory = shared_memory
     self.copy = copy
+    self.G = G
 
     if (observation_space is None) or (action_space is None):
       dummy_env = env_fns[0]()
@@ -148,7 +149,7 @@ class AsyncVectorEnv(VectorEnv):
     for key in kwargs:
       for arr in [*kwargs[key]]:
         kws += [{key: arr}]
-    if kwargs is None:
+    if kwargs == {} or kwargs is None:
       kws = [{}] * len(pps)
     for pipe, kw in zip(pps, kws):
       pipe.send(('reset', kw))
