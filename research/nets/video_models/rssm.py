@@ -24,7 +24,7 @@ class RSSM(Net):
   def forward(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
-    acts = batch['acts']
+    action = batch['action']
     x = lcd
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
@@ -33,8 +33,8 @@ class RSSM(Net):
     if self.G.conv_io:
       x = self.custom_embed(x)
     x = self.embed(x)
-    cin = self.cond_in(acts)
-    if acts.ndim == 2:
+    cin = self.cond_in(action)
+    if action.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
     else:
       x = th.cat([x, cin], -1)
@@ -59,14 +59,14 @@ class RSSM(Net):
     batch['lcd'][:, i] = dist.sample()[:, i]
     return batch
 
-  def sample(self, n, acts=None, prompts=None):
+  def sample(self, n, action=None, prompts=None):
     # TODO: feed act_n
     with th.no_grad():
-      if acts is not None:
-        n = acts.shape[0]
+      if action is not None:
+        n = action.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+      batch['action'] = action if action is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)
@@ -86,8 +86,8 @@ class RSSM(Net):
   def evaluate(self, writer, batch, epoch):
     N = self.G.num_envs
     # unpropted
-    acts = (th.rand(N, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
-    sample, sample_loss = self.sample(N, acts=acts)
+    action = (th.rand(N, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
+    sample, sample_loss = self.sample(N, action=action)
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
     #writer.add_video('lcd_samples', utils.force_shape(lcd), epoch, fps=self.G.fps)
@@ -101,7 +101,7 @@ class RSSM(Net):
     else:
       reset_states = [None] * N
     obses = {key: [[] for ii in range(N)] for key in self.env.observation_space.spaces}
-    acts = [[] for ii in range(N)]
+    action = [[] for ii in range(N)]
     for ii in range(N):
       for key, val in self.env.reset(reset_states[ii]).items():
         obses[key][ii] += [val]
@@ -110,16 +110,16 @@ class RSSM(Net):
         obs = self.env.step(act)[0]
         for key, val in obs.items():
           obses[key][ii] += [val]
-        acts[ii] += [act]
-      acts[ii] += [np.zeros_like(act)]
+        action[ii] += [act]
+      action[ii] += [np.zeros_like(act)]
     obses = {key: np.array(val) for key, val in obses.items()}
-    acts = np.array(acts)
-    acts = th.as_tensor(acts, dtype=th.float32).to(self.G.device)
+    action = np.array(action)
+    action = th.as_tensor(action, dtype=th.float32).to(self.G.device)
     prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.G.device) for key, val in obses.items()}
     # dupe
     for key in prompts: prompts[key][4:] = prompts[key][4:5]
-    acts[4:] = acts[4:5]
-    prompted_samples, prompt_loss = self.sample(N, acts=acts, prompts=prompts)
+    action[4:] = action[4:5]
+    prompted_samples, prompt_loss = self.sample(N, action=action, prompts=prompts)
     real_lcd = obses['lcd'][:, :, None]
     lcd_psamp = prompted_samples['lcd']
     lcd_psamp = lcd_psamp.cpu().detach().numpy()

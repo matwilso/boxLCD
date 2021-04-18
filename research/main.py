@@ -35,7 +35,7 @@ if __name__ == '__main__':
   defaults = {
       'vidstack': temp_cfg.ep_len,
   }
-  ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weightdir']
+  ignore = ['logdir', 'full_cmd', 'dark_mode', 'ipython_mode', 'weightdir',  'arbiterdir']
   if data_yaml.exists():
     with data_yaml.open('r') as f:
       data_cfg = yaml.load(f, Loader=yaml.Loader)

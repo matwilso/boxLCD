@@ -5,10 +5,10 @@ from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 from research import utils
-from ._base import Autoencoder
+from ._base import Autoencoder, SingleStepAE
 from research.nets.common import ResBlock
 
-class VAE(Autoencoder):
+class VAE(SingleStepAE):
   def __init__(self, env, G):
     super().__init__(env, G)
     self.z_size = 128

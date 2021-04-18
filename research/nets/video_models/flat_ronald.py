@@ -40,15 +40,15 @@ class FlatRonald(VideoModel):
     self.ln_f = nn.LayerNorm(G.n_embed)
     self._init()
 
-  def forward(self, z, acts):
+  def forward(self, z, action):
     x = self.embed(z)
     # forward the GPT model
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
     x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
-    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.G.device), acts[:, :-1]], dim=1)
-    cin = self.cond_in(acts)
-    if acts.ndim == 2:
+    action = th.cat([th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1)
+    cin = self.cond_in(action)
+    if action.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
     else:
       x = th.cat([x, cin], -1)
@@ -59,7 +59,7 @@ class FlatRonald(VideoModel):
 
   def loss(self, batch):
     z = self.ronald.encode(batch, noise=False).detach()
-    logits = self.forward(z, batch['acts'])
+    logits = self.forward(z, batch['action'])
     loss = ((th.tanh(logits) - z)**2).mean()
     return loss, {'loss/total': loss}
 
@@ -83,14 +83,14 @@ class FlatRonald(VideoModel):
       z = self.latent_onestep(z, a, i, temp=1.0)
     return z
 
-  def sample(self, n, acts=None, prompts=None, prompt_n=10, temp=1.0):
+  def sample(self, n, action=None, prompts=None, prompt_n=10, temp=1.0):
     # TODO: feed act_n
     with th.no_grad():
       # CREATE PROMPT
-      if acts is None:
-        acts = (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+      if action is None:
+        action = (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       else:
-        n = acts.shape[0]
+        n = action.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(self.G.device)
       batch['proprio'] = th.zeros(n, self.block_size, self.proprio_n).to(self.G.device)
@@ -103,7 +103,7 @@ class FlatRonald(VideoModel):
       z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * 8).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
-      z_sample = self.latent_sample(z_sample, acts, start)
+      z_sample = self.latent_sample(z_sample, action, start)
       z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD, 4, 8])
 
       # DECODE

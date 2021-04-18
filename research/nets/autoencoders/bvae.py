@@ -6,9 +6,9 @@ import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
 from .quantize import BinaryQuantize
-from ._base import Autoencoder
+from ._base import Autoencoder, SingleStepAE
 
-class BVAE(Autoencoder):
+class BVAE(SingleStepAE):
   def __init__(self, env, G):
     super().__init__(env, G)
     # encoder -> binary -> decoder

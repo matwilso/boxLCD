@@ -51,7 +51,7 @@ class CausalSelfAttention(nn.Module):
     y = self.proj(y)
     return y
 
-class Block(nn.Module):
+class TransformerBlock(nn.Module):
   """ an unassuming Transformer block """
 
   def __init__(self, block_size, G):
@@ -82,7 +82,7 @@ class GPT(nn.Module):
     self.act_condition = nn.Linear(act_dim, G.n_embed//2, bias=False)
     self.embed = nn.Linear(self.size, G.n_embed//2, bias=False)
     # transformer
-    self.blocks = nn.Sequential(*[Block(self.block_size, G) for _ in range(G.n_layer)])
+    self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head distributipn
     self.ln_f = nn.LayerNorm(G.n_embed)
     self.dist_head = BinaryHead(G.n_embed, self.size, G)
@@ -97,14 +97,14 @@ class GPT(nn.Module):
     BS, LEN, *HW = batch['lcd'].shape
     E = np.prod(HW)
     x = batch['lcd'].reshape(BS, LEN, E) # flatten lcd to make a single flat frame a token
-    acts = batch['acts']
+    act = batch['act']
 
     # SHIFT RIGHT (add a padding on the left) so you can't see yourself 
     x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
     # forward the GPT model
     x = self.embed(x)
-    cin = self.act_condition(acts)
-    if acts.ndim == 2:
+    cin = self.act_condition(act)
+    if act.ndim == 2:
       x = th.cat([x, cin[:,None].repeat_interleave(self.block_size, 1)], -1)
     else:
       x = th.cat([x, cin], -1)
@@ -120,14 +120,14 @@ class GPT(nn.Module):
     lcd_loss = -dist.log_prob(batch['lcd'].reshape(dist.logits.shape)).mean()
     return lcd_loss
 
-  def sample(self, n, acts=None, prompts=None):
+  def sample(self, n, act=None, prompts=None):
     # TODO: feed act_n
     with th.no_grad():
-      if acts is not None:
-        n = acts.shape[0]
+      if act is not None:
+        n = act.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+      batch['act'] = act if act is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)

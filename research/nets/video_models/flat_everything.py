@@ -71,7 +71,7 @@ class FlatEverything(nn.Module):
   def forward(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
-    acts = batch['acts']
+    action = batch['action']
     z_q = self.svae(utils.filtdict(batch, 'proprio'))[0]
     x = th.cat([lcd, z_q], -1)
     # forward the GPT model
@@ -79,9 +79,9 @@ class FlatEverything(nn.Module):
     BS, T, E = x.shape
     # SHIFT RIGHT (add a padding on the left)
     x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
-    acts = th.cat([th.zeros(BS, 1, acts.shape[-1]).to(self.G.device), acts[:,:-1]], dim=1)
-    cin = self.cond_in(acts)
-    if acts.ndim == 2:
+    action = th.cat([th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:,:-1]], dim=1)
+    cin = self.cond_in(action)
+    if action.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
     else:
       x = th.cat([x, cin], -1)
@@ -123,15 +123,15 @@ class FlatEverything(nn.Module):
     batch['proprio'][:, i] = proprio
     return batch
 
-  def sample(self, n, acts=None, prompts=None):
+  def sample(self, n, action=None, prompts=None):
     # TODO: feed act_n
     with th.no_grad():
-      if acts is not None:
-        n = acts.shape[0]
+      if action is not None:
+        n = action.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.G.imsize).to(self.G.device)
       batch['proprio'] = th.zeros(n, self.block_size, self.proprio_n).to(self.G.device)
-      batch['acts'] = acts if acts is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+      batch['action'] = action if action is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)

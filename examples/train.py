@@ -54,8 +54,8 @@ class Trainer:
   def sample(self, i):
     # TODO: prompt to a specific point and sample from there. to compare against ground truth.
     N = 5
-    acts = (th.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
-    sample, sample_loss = self.model.sample(N, acts=acts)
+    action = (th.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
+    sample, sample_loss = self.model.sample(N, action=action)
     self.logger['sample_loss'] += [sample_loss]
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
@@ -81,10 +81,10 @@ class Trainer:
         acts[ii] += [act]
       acts[ii] += [np.zeros_like(act)]
     obses = {key: np.array(val) for key, val in obses.items()}
-    acts = np.array(acts)
-    acts = th.as_tensor(acts, dtype=th.float32).to(self.G.device)
+    action = np.array(acts)
+    action = th.as_tensor(action, dtype=th.float32).to(self.G.device)
     prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.G.device) for key, val in obses.items()}
-    prompted_samples, prompt_loss = self.model.sample(N, acts=acts, prompts=prompts)
+    prompted_samples, prompt_loss = self.model.sample(N, action=action, prompts=prompts)
     self.logger['prompt_sample_loss'] += [prompt_loss]
     real_lcd = obses['lcd'][:, :, None]
     lcd_psamp = prompted_samples['lcd']

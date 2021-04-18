@@ -96,10 +96,10 @@ class Multistep(nn.Module):
         # PRIOR
         code_idxs = F.one_hot(idxs, self.G.vqK).float()
         code_idxs = code_idxs.reshape([bs, self.block_size, self.G.vqK])
-        acts = self.act_preproc(batch['acts'])
-        acts = acts.reshape([bs, -1, self.G.vidstack, self.G.n_embed]).mean(2)
-        acts = acts.repeat_interleave(self.num_stack_tokens, 1)
-        gpt_dist = self.gpt.forward(code_idxs, cond=acts)
+        action = self.act_preproc(batch['action'])
+        action = action.reshape([bs, -1, self.G.vidstack, self.G.n_embed]).mean(2)
+        action = action.repeat_interleave(self.num_stack_tokens, 1)
+        gpt_dist = self.gpt.forward(code_idxs, cond=action)
         prior_loss = -gpt_dist.log_prob(code_idxs).mean()
         if not dry:
           self.optimizer.step()

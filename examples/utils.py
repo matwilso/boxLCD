@@ -49,14 +49,14 @@ class RolloutDataset(Dataset):
   def __init__(self, npzfile, train=True, G=None):
     data = np.load(npzfile, allow_pickle=True)
     self.bufs = {key: th.as_tensor(data[key]) for key in data.keys()}
-    cut = int(len(self.bufs['acts']) * 0.8)
+    cut = int(len(self.bufs['action']) * 0.8)
     if train:
       self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
     else:
       self.bufs = {key: val[cut:] for key, val in self.bufs.items()}
 
   def __len__(self):
-    return len(self.bufs['acts'])
+    return len(self.bufs['action'])
 
   def __getitem__(self, idx):
     elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in self.bufs.items()}

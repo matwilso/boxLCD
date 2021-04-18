@@ -15,12 +15,12 @@ def args_type(default):
     return lambda x: pathlib.Path(x).expanduser()
   return type(default)
 
-class X:
+class ConciseNumpyArray:
   """
   Singleton object to be able to easily create numpy arrays without having to type as much
 
   usage:
-    >>> A = X()
+    >>> A = ConciseNumpyArray()
     >>> arr = A[1, 2, 3]
     array([1, 2, 3])
     >>> arr = A[-1.0, 1.0]
@@ -28,7 +28,7 @@ class X:
   """
   def __getitem__(self, stuff):
     return np.array(stuff)
-A = X()
+A = ConciseNumpyArray()
 
 class NamedArray():
   """

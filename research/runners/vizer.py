@@ -44,9 +44,9 @@ class AutoEnv:
         obses[key] += [val]
       acts += [act]
     obses = {key: np.stack(val, 0)[None] for key, val in obses.items()}
-    acts = np.stack(acts, 0)[None]
+    action = np.stack(acts, 0)[None]
     self.window_batch = obses
-    self.window_batch['acts'] = acts
+    self.window_batch['action'] = action
     img = outproc(obses['lcd'][0, -1])
     self.count = self.window_batch['lcd'].shape[1] - 1
     for key, val in self.window_batch.items():
@@ -59,7 +59,7 @@ class AutoEnv:
     self.tot_count += 1
     obs, rew, done, info = self.env.step(act)
     truth = obs['lcd']
-    self.window_batch['acts'][:, self.count] = act[None]
+    self.window_batch['action'][:, self.count] = act[None]
     batch = {key: th.as_tensor(1.0 * val).float().to(self.G.device) for key, val in self.window_batch.items()}
     lcd_shape = batch['lcd'].shape
     batch['lcd'] = batch['lcd'].flatten(-2)
@@ -144,7 +144,7 @@ class Vizer:
     return g.detach().cpu().numpy()
 
   def look_ahead(self, prompto, a):
-    sample = self.model.sample(1, acts=a, prompts={'lcd': prompto})[0]
+    sample = self.model.sample(1, action=a, prompts={'lcd': prompto})[0]
     return sample['lcd']
 
   def sample_traj(self, prompto, prompta, g):
@@ -159,7 +159,7 @@ class Vizer:
     a.requires_grad = True
     for i in range(10):
       o = self.look_ahead(prompto, a)
-      out = self.model.forward({'lcd': o, 'acts': a})
+      out = self.model.forward({'lcd': o, 'action': a})
       loss = -self.model.dist_head(out).log_prob(g.flatten(-2)).mean()
       loss.backward()
       a.grad[:, :10] = 0.0
@@ -218,7 +218,7 @@ class Vizer:
     while True:
       kwargs = {}
       if self.check_message('sample'):
-        acts, lcds = self.sample()
+        action, lcds = self.sample()
       imgs = []
       k = (i + 1) % self.G.window
       for j in range(len(lcds)):
@@ -263,17 +263,17 @@ class Vizer:
       acts += [act]
     acts += [np.zeros_like(act)]
     obses = {key: np.stack(val, 0)[None] for key, val in obses.items()}
-    acts = np.stack(acts, 0)
-    acts = th.as_tensor(acts, dtype=th.float32).to(self.G.device)[None]
+    action = np.stack(acts, 0)
+    action = th.as_tensor(action, dtype=th.float32).to(self.G.device)[None]
     prompts = {key: th.as_tensor(1.0 * val[:, :5]).to(self.G.device) for key, val in obses.items()}
     lcds = []
-    lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
-    lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
-    lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
-    lcds += [outproc(self.model.sample(1, cond=acts, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
+    lcds += [outproc(self.model.sample(1, cond=action, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
+    lcds += [outproc(self.model.sample(1, cond=action, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
+    lcds += [outproc(self.model.sample(1, cond=action, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
+    lcds += [outproc(self.model.sample(1, cond=action, prompts=prompts)[0]['lcd'][0, :, 0].cpu().numpy())]
     truth = outproc(obses['lcd'][0])
 
-    return acts, [truth, *lcds]
+    return action, [truth, *lcds]
 
   def render(self, return_rgb_array=False, texts=[], size=4, imgs=[], action=None):
     # if self._c.dark_mode:

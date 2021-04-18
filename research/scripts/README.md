@@ -34,6 +34,11 @@ python main.py --mode=collect --env=$env --train_barrels=100 --logdir=logs/datad
 args="--window=4 --bs=256"
 ```
 
+#### Arbiter
+```bash
+python main.py --mode=train --env=Luxo --datapath=logs/datadump/Luxo/ --model=ArbiterAE --nfilter=32 --lr=1e-3 --logdir=logs/autoencoder/Luxo/ArbiterAE/better_enc_norelu_compile --log_n=1000 --bs=32 --window=4
+```
+
 #### VAE 
 
 ```bash
@@ -47,6 +52,18 @@ python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$m
 model=BVAE
 python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model  --nfilter=16 --vqD=8 --vqK=32 --hidden_size=64  --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small $args
 ```
+
+
+```bash
+python main.py --mode=train --env=Luxo --datapath=logs/datadump/Luxo/ --model=BVAE --window=4 --log_n=1000 --lr=1e-3 --bs=64 --log_n=1000 --lr=1e-3 --vqK=64 --hidden_size=64 --logdir=logs/newfolder/autoencoder/bvae/x --lr=1e-3 --skip_train=0 --nfilter=64 --vqD=32 --log_n=1000 --arbiterdir=logs/newfolder/arbiter/singlestep/2/
+
+# should run for about 70s per 1000 training iterations on my 1080Ti.
+# maybe about 10 mins or so total, until the error in the pstate stuff goes away. around -6 log mse
+
+
+```
+
+
 
 env=LuxoCube
 DP=logs/datadump/10fps/luxocube/

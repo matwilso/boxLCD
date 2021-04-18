@@ -41,11 +41,12 @@ class Trainer:
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.num_envs)])
 
     #import ipdb; ipdb.set_trace()
-    arbiter_path = G.arbiterdir / 'ArbiterAE.pt'
-    if arbiter_path.exists():
+    arbiter_path = list(G.arbiterdir.glob('*.pt'))
+    if len(arbiter_path) > 0:
+      arbiter_path = arbiter_path[0]
       self.arbiter = th.jit.load(str(arbiter_path))
       self.arbiter.eval()
-      print('LOADED ARBITER')
+      print('LOADED ARBITER', arbiter_path)
     else:
       self.arbiter = None
 

@@ -79,6 +79,7 @@ if __name__ == '__main__':
       action = env.action_space.sample()
       #action = np.zeros_like(action)
       obs, rew, done, info = env.step(action)
+      print(obs.keys())
       print(obs['full_state'])
       nobs = utils.NamedArray(obs, env.obs_info, do_map=False)
       if obs_log:

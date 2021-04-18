@@ -39,4 +39,4 @@ if __name__ == '__main__':
       obs, rew, done, info = env.step(act)
     pbar.set_description(f'fps: {G.ep_len/(time.time()-start)}')
   os.makedirs('rollouts', exist_ok=True)
-  np.savez_compressed(f'rollouts/{G.env}-{N}.npz', acts=acts, **obses)
+  np.savez_compressed(f'rollouts/{G.env}-{N}.npz', action=acts, **obses)

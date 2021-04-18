@@ -10,6 +10,22 @@ import scipy
 import re
 import numpy as np
 from scipy.linalg import fractional_matrix_power
+from torch import nn
+
+class ConciseNumpyArray:
+  """
+  Singleton object to be able to easily create numpy arrays without having to type as much
+
+  usage:
+    >>> A = ConciseNumpyArray()
+    >>> arr = A[1, 2, 3]
+    array([1, 2, 3])
+    >>> arr = A[-1.0, 1.0]
+    array([-1.0, 1.0])
+  """
+  def __getitem__(self, stuff):
+    return np.array(stuff)
+A = ConciseNumpyArray()
 
 # general dictionary and list utils
 def subdict(dict, subkeys): return {key: dict[key] for key in subkeys}
@@ -28,7 +44,7 @@ def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), n
 def mapto(a, lowhigh): return ((a + 1.0) / (2.0) * (lowhigh[1] - lowhigh[0])) + lowhigh[0]
 # map from bounds to -1,1
 def rmapto(a, lowhigh): return ((a - lowhigh[0]) / (lowhigh[1] - lowhigh[0]) * (2)) + -1
-def prefix_dict(name, dict): return {name+key: dict[key] for key in dict}
+def prefix_dict(name, dict): return {name + key: dict[key] for key in dict}
 
 class AttrDict(dict):
   __setattr__ = dict.__setitem__
@@ -103,6 +119,27 @@ def force_shape(out):
     out = th.cat([out, th.zeros(out.shape[:-1])[..., None]], -1)
   out = out.reshape(T, C, H, N * (W + 1))[None]
   return out
+
+def combine_rgbs(arr, row=5, col=5):
+  """takes batch of video or image and pushes the batch dim into certain image shapes given by b,row,col"""
+  if isinstance(arr, np.ndarray):
+    permute = np.transpose
+  else:
+    permute = lambda x, y: x.permute(y)
+
+  if len(arr.shape) == 4:  # image
+    BS, C, H, W = arr.shape
+    assert BS == row * col, f'{(BS, row, col, H, W)} {row*col},{BS}'
+    x = permute(arr.reshape([row, col, C, H, W]), (2, 0, 3, 1, 4)).reshape([C, row * H, col * W])
+    return x
+  elif len(arr.shape) == 5:  # video
+    BS, T, C, H, W = arr.shape
+    assert BS == row * col, (BS, T, row, col, C, H, W)
+    x = permute(arr.reshape([row, col, T, C, H, W]), (2, 3, 0, 4, 1, 5)).reshape([T, C, row * H, col * W])
+    return x
+  else:
+    assert False, (arr.shape, arr.ndim)
+
 
 def combine_imgs(arr, row=5, col=5):
   """takes batch of video or image and pushes the batch dim into certain image shapes given by b,row,col"""
@@ -200,7 +237,6 @@ def compute_grad_norm(parameters):
   total_norm = th.norm(th.stack([th.norm(p.grad.detach()).to(device) for p in parameters]))
   return total_norm
 
-
 def compute_fid(x, y):
   """
   FID / Wasserstein Computation
@@ -224,4 +260,31 @@ def flat_batch(batch):
 
 def flatten_first(arr):
   shape = arr.shape
-  return arr.reshape([shape[0]*shape[1], *shape[2:]])
+  return arr.reshape([shape[0] * shape[1], *shape[2:]])
+
+def manifold_estimate(set_a, set_b, k):
+  """https://arxiv.org/abs/1904.06991"""
+  # compute manifold
+  d = th.cdist(set_a, set_a)
+  radii = th.topk(d, k+1, largest=False)[0][...,-1:]
+  # eval
+  d2 = th.cdist(set_a, set_b) 
+  return (d2 < radii).any(0).float().mean()
+
+
+
+class Reshape(nn.Module):
+  def __init__(self, *args):
+    super().__init__()
+    self.args = args
+  def forward(self, x):
+    return x.reshape(*self.args)
+
+if __name__ == '__main__':
+  real = th.rand(10000, 128)
+  gen = th.randn(10000, 128)
+  # precision = realistic, recall = coverage.
+  precision = manifold_estimate(real, gen, 3)
+  recall = manifold_estimate(gen, real, 3)
+  f1 = 2 * (precision * recall) / (precision + recall)
+  print(precision, recall, f1)

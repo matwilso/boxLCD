@@ -20,6 +20,7 @@ from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
 
 def collect(env_fn, G):
+  collect_start = time.time()
   G.logdir.mkdir(parents=True, exist_ok=True)
   utils.dump_logger({}, None, 0, G)
   env = env_fn(G)()
@@ -28,6 +29,7 @@ def collect(env_fn, G):
   assert G.train_barrels != -1 and G.test_barrels != -1, f'must set the number of barrels you want to fill. G.train_barrels=={G.train_barrels}'
   fill_barrels(env, venv, G.test_barrels, 'test', G)
   fill_barrels(env, venv, G.train_barrels, 'train', G)
+  print('TOTAL COLLECT TIME', time.time()-collect_start)
 
 def fill_barrels(env, venv, num_barrels, prefix, G):
   """Create files with:
@@ -70,7 +72,7 @@ def fill_barrels(env, venv, num_barrels, prefix, G):
     assert obses['proprio'].ndim == 3
     assert acts.ndim == 3
     timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', acts=acts, **obses)
+    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', action=acts, **obses)
     total_bar.update(1)
     total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
 
@@ -112,7 +114,7 @@ def fill_barrels_slow(env, num_barrels, prefix, G):
       import ipdb; ipdb.set_trace()
 
     timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', acts=acts, **obses)
+    data = np.savez_compressed(logdir / f'{timestamp}-{G.ep_len}.barrel', action=acts, **obses)
     total_bar.update(1)
     total_bar.set_description(f'TOTAL PROGRESS (FPS={fps})')
 

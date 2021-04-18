@@ -60,7 +60,7 @@ def config():
   G.n_head = 4
   G.n_embed = 128
   G.hidden_size = 128
-  G.nfilter = 128
+  G.nfilter = 64
   G.vidstack = -1
   G.stacks_per_block = 32
 
@@ -102,8 +102,6 @@ def config():
   for key, val in ENV_DG.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
     G[key] = val
-
-  
 
 
   return G

@@ -130,7 +130,7 @@ class LearnedEnv:
     prompts = [self.real_env.reset() for _ in range(self.num_envs)]
     prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
     window_batch = {key: th.zeros([self.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
-    window_batch['acts'] = th.zeros([self.G.window, *self.action_space.shape]).to(self.G.device)
+    window_batch['action'] = th.zeros([self.G.window, *self.action_space.shape]).to(self.G.device)
     window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
     for key in self.keys:
       window_batch[key][:, 0] = prompts[key]
@@ -139,7 +139,7 @@ class LearnedEnv:
       #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
       self.ptr = 1
     else:
-      window_batch['acts'] += 2.0 * th.rand(window_batch['acts'].shape).to(self.G.device) - 1.0
+      window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
       with th.no_grad():
        for self.ptr in range(10):
          window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
@@ -153,7 +153,7 @@ class LearnedEnv:
 
   def step(self, act):
     with th.no_grad():
-      self.window_batch['acts'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
+      self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
       self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
       obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
       self.ptr = min(1 + self.ptr, self.G.window - 1)
