@@ -31,6 +31,7 @@ class VideoModel(Net):
     self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
     self._prompted_eval(epoch, writer, metrics, batch, arbiter)
     self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
+    metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
     return metrics
 
   def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
@@ -112,7 +113,6 @@ class VideoModel(Net):
       self._proprio_video(epoch, writer, pred_proprio, true_proprio)
 
     if arbiter is not None:
-      import ipdb; ipdb.set_trace()
       t10 = tree_map(lambda x: x[:, 8:], batch)
       s10 = tree_map(lambda x: x[:, 8:], sample)
       s10['lcd'] = s10['lcd'][:,:,0]

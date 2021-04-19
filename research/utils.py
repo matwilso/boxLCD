@@ -273,6 +273,8 @@ def manifold_estimate(set_a, set_b, k=3):
   return (d2 < radii).any(0).float().mean()
 
 def precision_recall_f1(real, gen):
+  # precision = realistic. fraction of generated images that are realistic
+  # recall = coverage. fraction of data manifold covered by generator 
   precision = manifold_estimate(real, gen, 3)
   recall = manifold_estimate(gen, real, 3)
   f1 = 2 * (precision * recall) / (precision + recall)
