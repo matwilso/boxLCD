@@ -78,6 +78,7 @@ def dump_logger(logger, writer, i, G):
     print(val)
   print(G.full_cmd)
   print(G.num_vars)
+  print(G.logdir)
   with open(pathlib.Path(G.logdir) / 'hps.yaml', 'w') as f:
     yaml.dump(G, f, width=1000)
   print('=' * 30)
@@ -262,7 +263,7 @@ def flatten_first(arr):
   shape = arr.shape
   return arr.reshape([shape[0] * shape[1], *shape[2:]])
 
-def manifold_estimate(set_a, set_b, k):
+def manifold_estimate(set_a, set_b, k=3):
   """https://arxiv.org/abs/1904.06991"""
   # compute manifold
   d = th.cdist(set_a, set_a)
@@ -271,7 +272,11 @@ def manifold_estimate(set_a, set_b, k):
   d2 = th.cdist(set_a, set_b) 
   return (d2 < radii).any(0).float().mean()
 
-
+def precision_recall_f1(real, gen):
+  precision = manifold_estimate(real, gen, 3)
+  recall = manifold_estimate(gen, real, 3)
+  f1 = 2 * (precision * recall) / (precision + recall)
+  return precision, recall, f1
 
 class Reshape(nn.Module):
   def __init__(self, *args):

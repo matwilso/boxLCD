@@ -23,7 +23,7 @@ class VideoModel(Net):
   def onestep(self):
     raise NotImplementedError
 
-  def sample(self, n, action=None, prompts=None, prompt_n=10):
+  def sample(self, n, action=None, prompts=None, prompt_n=8):
     raise NotImplementedError
 
   def evaluate(self, epoch, writer, batch, arbiter=None):
@@ -45,23 +45,38 @@ class VideoModel(Net):
       self._proprio_video(epoch, writer, sample['proprio'])
 
     if arbiter is not None:
-      b10 = tree_map(lambda x: x[:, 10:], batch)
-      s10 = tree_map(lambda x: x[:, 10:], sample)
+      t10 = tree_map(lambda x: x[:, 8:], batch)
+      s10 = tree_map(lambda x: x[:, 8:], sample)
       s10['lcd'] = s10['lcd'][:,:,0]
+      if arbiter.original_name == 'Dummy':
+        s4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), s10)
+        t4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), t10)
+        sact = action[:,8:]
+        tact = batch['action'][:,8:]
+        sact = sact.reshape([-1, 4, *sact.shape[2:]])[:,:-1]
+        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:,:-1]
 
-      b4 = tree_map(lambda x: x[:, :4], batch)
-      s4 = tree_map(lambda x: x[:, :4], sample)
-      import ipdb; ipdb.set_trace() # only do from step 10 onwards. allow some burn in.
+        paz, paa = arbiter.forward(s4)
+        metrics['eval/unprompted_action_log_mse'] = ((sact - paa)**2).mean().log()
+        taz, taa = arbiter.forward(t4)
+        fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
+        metrics['eval/unprompted_fid'] = fid
+        precision, recall, f1 = utils.precision_recall_f1(taz, paz)
+        metrics['eval/unprompted_precision'] = precision.cpu()
+        metrics['eval/unprompted_recall'] = recall.cpu()
+        metrics['eval/unprompted_f1'] = f1.cpu()
+      else:
+        paz = arbiter.forward(utils.flat_batch(s10)).cpu().numpy()
+        taz = arbiter.forward(utils.flat_batch(t10)).cpu().numpy()
+        fid = utils.compute_fid(paz, taz)
+        metrics['eval/fid'] = fid
 
-      paz = arbiter.forward(utils.flat_batch(s10)).cpu().numpy()
-      taz = arbiter.forward(utils.flat_batch(b10)).cpu().numpy()
-      fid = utils.compute_fid(paz, taz)
-      metrics['eval/fid'] = fid
+
 
   def _duplicate_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]
     batch = {key: val[:1].repeat_interleave(8,0) for key, val in batch.items()}
-    sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=10)
+    sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=8)
     if 'lcd' in sample:
       pred_lcd = sample['lcd']
       true_lcd = batch['lcd'][:, :, None]
@@ -73,7 +88,7 @@ class VideoModel(Net):
 
   def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]
-    sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=10)
+    sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=8)
 
     if 'lcd' in sample:
       pred_lcd = sample['lcd']
@@ -97,11 +112,33 @@ class VideoModel(Net):
       self._proprio_video(epoch, writer, pred_proprio, true_proprio)
 
     if arbiter is not None:
-      sample['lcd'] = sample['lcd'][:,:,0]
-      paz = arbiter.forward(utils.flat_batch(sample))
-      taz = arbiter.forward(utils.flat_batch(batch))
-      cosdist = 1 - self.cossim(paz, taz).mean().cpu()
-      metrics['eval/cosdist'] = cosdist
+      import ipdb; ipdb.set_trace()
+      t10 = tree_map(lambda x: x[:, 8:], batch)
+      s10 = tree_map(lambda x: x[:, 8:], sample)
+      s10['lcd'] = s10['lcd'][:,:,0]
+      if arbiter.original_name == 'Dummy':
+        s4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), s10)
+        t4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), t10)
+        tact = batch['action'][:,8:]
+        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:,:-1]
+
+        paz, paa = arbiter.forward(s4)
+        metrics['eval/prompted_action_log_mse'] = ((tact - paa)**2).mean().log()
+        taz, taa = arbiter.forward(t4)
+        metrics['eval/true_action_log_mse'] = ((tact - taa)**2).mean().log()
+        fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
+        metrics['eval/prompted_fid'] = fid
+        precision, recall, f1 = utils.precision_recall_f1(taz, paz)
+        metrics['eval/prompted_precision'] = precision.cpu()
+        metrics['eval/prompted_recall'] = recall.cpu()
+        metrics['eval/prompted_f1'] = f1.cpu()
+      else:
+        import ipdb; ipdb.set_trace()
+        sample['lcd'] = sample['lcd'][:,:,0]
+        paz = arbiter.forward(utils.flat_batch(sample))
+        taz = arbiter.forward(utils.flat_batch(batch))
+        cosdist = 1 - self.cossim(paz, taz).mean().cpu()
+        metrics['eval/cosdist'] = cosdist
 
   def _lcd_video(self, epoch, writer, pred, truth=None, name=None):
     """visualize lcd reconstructions"""
