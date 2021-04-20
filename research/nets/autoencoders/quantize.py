@@ -65,13 +65,13 @@ class BinaryQuantize(nn.Module):
   def __init__(self):
     super().__init__()
 
-  def forward(self, z):
+  def forward(self, z, noise=True):
     #logits = self.proj(z)
     dist = thd.Bernoulli(logits=z)
     z_q = dist.sample()
     z_q += dist.probs - dist.probs.detach()
     entropy = dist.entropy().mean()
-    if self.training:
+    if noise:
       return z_q, entropy, dist.probs
     else:
       return 1.0 * (dist.probs > 0.5), entropy, dist.probs  # deterministic mode

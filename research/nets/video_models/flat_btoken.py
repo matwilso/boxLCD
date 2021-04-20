@@ -25,7 +25,7 @@ class FlatBToken(VideoModel):
     self.bvae.load(G.weightdir)
     for p in self.bvae.parameters():
       p.requires_grad = False
-    self.bvae.eval()
+    #self.bvae.eval()
     print('LOADED BVAE', G.weightdir)
     # </LOAD BVAE>
 
@@ -43,6 +43,10 @@ class FlatBToken(VideoModel):
     self.ln_f = nn.LayerNorm(G.n_embed)
     self.dist_head = BinaryHead(G.n_embed, self.size, G)
     self._init()
+
+  def train(self, *args):
+    super().train(*args)
+    self.bvae.eval()
 
   def forward(self, z, action):
     x = self.embed(z)
@@ -62,7 +66,7 @@ class FlatBToken(VideoModel):
     return logits
 
   def loss(self, batch):
-    z = self.bvae.encode(batch).detach()
+    z = self.bvae.encode(batch, noise=False).detach()
     logits = self.forward(z, batch['action'])
     dist = self.dist_head(logits)
     loss = -dist.log_prob(z).mean()
@@ -107,7 +111,7 @@ class FlatBToken(VideoModel):
         batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
-      z = self.bvae.encode(batch)
+      z = self.bvae.encode(batch, noise=False).detach()
       z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * self.zW).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
