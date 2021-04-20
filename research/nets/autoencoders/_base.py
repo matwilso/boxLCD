@@ -6,7 +6,6 @@ import torch.nn as nn
 from research.nets._base import Net
 from research import utils
 
-
 class Autoencoder(Net):
   def __init__(self, env, G):
     super().__init__(G)

@@ -103,10 +103,16 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
   def __init__(self, act_n, state_n, in_size, G):
     super().__init__()
-    assert G.lcd_h == 16, G.lcd_w == 32
+    #assert G.lcd_h == 16 and G.lcd_w == 32
+    if G.lcd_w == 32:
+      W = 4
+    elif G.lcd_w == 24:
+      W = 3
+    elif G.lcd_w == 16:
+      W = 2
     nf = G.nfilter
     self.net = nn.Sequential(
-        nn.ConvTranspose2d(in_size, nf, (2, 4), 2),
+        nn.ConvTranspose2d(in_size, nf, (2, W), 2),
         nn.ReLU(),
         nn.ConvTranspose2d(nf, nf, 4, 4, padding=0),
         nn.ReLU(),

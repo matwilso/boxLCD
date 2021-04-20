@@ -26,9 +26,11 @@ class FlatBToken(VideoModel):
     for p in self.bvae.parameters():
       p.requires_grad = False
     self.bvae.eval()
+    print('LOADED BVAE', G.weightdir)
     # </LOAD BVAE>
 
-    self.size = self.bvae.G.vqD * 4 * 8
+    self.zW = int(self.bvae.G.wh_ratio*4)
+    self.size = self.bvae.G.vqD * 4 * self.zW
     self.block_size = self.G.window
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
@@ -106,11 +108,11 @@ class FlatBToken(VideoModel):
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
       z = self.bvae.encode(batch)
-      z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * 8).to(self.G.device)
+      z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * self.zW).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, action, start)
-      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, 8])
+      z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, self.zW])
 
       # DECODE
       dist = self.bvae.decoder(z_sample)

@@ -15,11 +15,13 @@ class BVAE(SingleStepAE):
     self.encoder = Encoder(env, G)
     self.vq = BinaryQuantize()
     self.decoder = Decoder(env, G)
-    self.z_size = 4 * 8 * G.vqD
+    self.zH = 4
+    self.zW = int(G.wh_ratio * self.zH)
+    self.z_size = self.zH * self.zW * G.vqD
     self._init()
 
   def sample_z(self, n):
-    z = th.bernoulli(0.5*th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, 4, 8])
+    z = th.bernoulli(0.5*th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, self.zH, self.zW])
     return z
 
   def loss(self, batch):
@@ -105,9 +107,11 @@ class Decoder(nn.Module):
     super().__init__()
     state_n = env.observation_space.spaces['proprio'].shape[0]
     n = G.hidden_size
+    H = 4
+    W = int(G.wh_ratio * H)
     self.state_net = nn.Sequential(
         nn.Flatten(-3),
-        nn.Linear(G.vqD * 4 * 8, n),
+        nn.Linear(G.vqD * H * W, n),
         nn.ReLU(),
         nn.Linear(n, n),
         nn.ReLU(),

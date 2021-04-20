@@ -1,4 +1,4 @@
-from research.wrappers import preproc_vec_env
+import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 from torch import distributions as thd
@@ -9,6 +9,8 @@ from research import utils
 from wrappers.async_vector_env import AsyncVectorEnv
 from research.define_config import env_fn
 from jax.tree_util import tree_map
+A = utils.A
+RED, GREEN = A[0.83, 0.18, 0.18], A[0.22, 0.55, 0.24]
 
 class VideoModel(Net):
   def __init__(self, env, G):
@@ -48,21 +50,21 @@ class VideoModel(Net):
     if arbiter is not None:
       t10 = tree_map(lambda x: x[:, 8:], batch)
       s10 = tree_map(lambda x: x[:, 8:], sample)
-      s10['lcd'] = s10['lcd'][:,:,0]
+      s10['lcd'] = s10['lcd'][:, :, 0]
       if arbiter.original_name == 'Dummy':
         s4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), s10)
         t4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), t10)
-        sact = action[:,8:]
-        tact = batch['action'][:,8:]
-        sact = sact.reshape([-1, 4, *sact.shape[2:]])[:,:-1]
-        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:,:-1]
+        sact = action[:, 8:]
+        tact = batch['action'][:, 8:]
+        sact = sact.reshape([-1, 4, *sact.shape[2:]])[:, :-1]
+        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:, :-1]
 
         paz, paa = arbiter.forward(s4)
         metrics['eval/unprompted_action_log_mse'] = ((sact - paa)**2).mean().log()
         taz, taa = arbiter.forward(t4)
         fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
         metrics['eval/unprompted_fid'] = fid
-        precision, recall, f1 = utils.precision_recall_f1(taz, paz)
+        precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=7)
         metrics['eval/unprompted_precision'] = precision.cpu()
         metrics['eval/unprompted_recall'] = recall.cpu()
         metrics['eval/unprompted_f1'] = f1.cpu()
@@ -72,20 +74,18 @@ class VideoModel(Net):
         fid = utils.compute_fid(paz, taz)
         metrics['eval/fid'] = fid
 
-
-
   def _duplicate_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]
-    batch = {key: val[:1].repeat_interleave(8,0) for key, val in batch.items()}
+    batch = {key: val[:1].repeat_interleave(8, 0) for key, val in batch.items()}
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=8)
     if 'lcd' in sample:
       pred_lcd = sample['lcd']
       true_lcd = batch['lcd'][:, :, None]
-      self._lcd_video(epoch, writer, pred_lcd, true_lcd, name='duplicate')
+      self._lcd_video(epoch, writer, pred_lcd, true_lcd, name='duplicate', prompt_n=8)
     if 'proprio' in sample:
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
-      self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate')
+      self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate', prompt_n=8)
 
   def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]
@@ -103,24 +103,24 @@ class VideoModel(Net):
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
       # visualize reconstruction
-      self._lcd_video(epoch, writer, pred_lcd, true_lcd)
+      self._lcd_video(epoch, writer, pred_lcd, true_lcd, prompt_n=8)
 
     if 'proprio' in sample:
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
       metrics['eval/proprio_log_mse'] = ((true_proprio - pred_proprio)**2).mean().log().cpu()
       # visualize reconstruction
-      self._proprio_video(epoch, writer, pred_proprio, true_proprio)
+      self._proprio_video(epoch, writer, pred_proprio, true_proprio, prompt_n=8)
 
     if arbiter is not None:
       t10 = tree_map(lambda x: x[:, 8:], batch)
       s10 = tree_map(lambda x: x[:, 8:], sample)
-      s10['lcd'] = s10['lcd'][:,:,0]
+      s10['lcd'] = s10['lcd'][:, :, 0]
       if arbiter.original_name == 'Dummy':
         s4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), s10)
         t4 = tree_map(lambda x: x.reshape([-1, 4, *x.shape[2:]]), t10)
-        tact = batch['action'][:,8:]
-        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:,:-1]
+        tact = batch['action'][:, 8:]
+        tact = tact.reshape([-1, 4, *tact.shape[2:]])[:, :-1]
 
         paz, paa = arbiter.forward(s4)
         metrics['eval/prompted_action_log_mse'] = ((tact - paa)**2).mean().log()
@@ -128,19 +128,19 @@ class VideoModel(Net):
         metrics['eval/true_action_log_mse'] = ((tact - taa)**2).mean().log()
         fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
         metrics['eval/prompted_fid'] = fid
-        precision, recall, f1 = utils.precision_recall_f1(taz, paz)
+        precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=7)
         metrics['eval/prompted_precision'] = precision.cpu()
         metrics['eval/prompted_recall'] = recall.cpu()
         metrics['eval/prompted_f1'] = f1.cpu()
       else:
         import ipdb; ipdb.set_trace()
-        sample['lcd'] = sample['lcd'][:,:,0]
+        sample['lcd'] = sample['lcd'][:, :, 0]
         paz = arbiter.forward(utils.flat_batch(sample))
         taz = arbiter.forward(utils.flat_batch(batch))
         cosdist = 1 - self.cossim(paz, taz).mean().cpu()
         metrics['eval/cosdist'] = cosdist
 
-  def _lcd_video(self, epoch, writer, pred, truth=None, name=None):
+  def _lcd_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
     """visualize lcd reconstructions"""
     # visualization
     pred_lcds = pred[:8].cpu().detach().numpy()
@@ -153,10 +153,25 @@ class VideoModel(Net):
     else:
       out = pred_lcds
       name = name or 'unprompted_lcd'
-    out = out.repeat(4, -1).repeat(4, -2)
-    utils.add_video(writer, name, utils.force_shape(out), epoch, fps=self.G.fps)
+    out = utils.force_shape(out)
+    out = out.repeat(3, 2)
+    if prompt_n is not None:
+      W, H = self.G.lcd_w, self.G.lcd_h
+      out = out.transpose(0, 1, 4, 3, 2)
+      for j in range(7):
+        out[:, :prompt_n, W*(j+1)+j, :] = GREEN
+        out[:, prompt_n:, W*(j+1)+j, :] = RED
+      out[:, :prompt_n, :, H] = GREEN
+      out[:, prompt_n:, :, H] = RED
+      out[:, :prompt_n, :, 2*H+1] = GREEN
+      out[:, prompt_n:, :, 2*H+1] = RED
+      out = out.transpose(0, 1, 4, 3, 2)
 
-  def _proprio_video(self, epoch, writer, pred, truth=None, name=None):
+    #  out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
+    out = out.repeat(4, -1).repeat(4, -2)
+    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
+
+  def _proprio_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
     """visualize proprio reconstructions"""
     pred_proprio = pred[:8].cpu().detach().numpy()
     pred_lcds = []
@@ -179,5 +194,19 @@ class VideoModel(Net):
     else:
       name = name or 'unprompted_proprio'
       out = pred_lcds
+    out = utils.force_shape(out)
+    out = out.repeat(3, 2)
+    if prompt_n is not None:
+      W, H = self.G.lcd_w, self.G.lcd_h
+      out = out.transpose(0, 1, 4, 3, 2)
+      for j in range(7):
+        out[:, :prompt_n, W*(j+1)+j, :] = GREEN
+        out[:, prompt_n:, W*(j+1)+j, :] = RED
+      out[:, :prompt_n, :, H] = GREEN
+      out[:, prompt_n:, :, H] = RED
+      out[:, :prompt_n, :, 2*H+1] = GREEN
+      out[:, prompt_n:, :, 2*H+1] = RED
+      out = out.transpose(0, 1, 4, 3, 2)
+      #out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
     out = out.repeat(4, -1).repeat(4, -2)
-    utils.add_video(writer, name, utils.force_shape(out), epoch, fps=self.G.fps)
+    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
