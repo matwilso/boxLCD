@@ -21,24 +21,23 @@ from jax.tree_util import tree_map, tree_multimap
 class RSSM(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
-    self._stoch_size = 30
-    self._deter_size = 200
-    self._hidden_size = 200
+    self._stoch_size = 64
+    self._deter_size = 256
     state_n = env.observation_space.spaces['proprio'].shape[0]
-    self.z_size = 128
-    self.encoder = Encoder(state_n, self.z_size, G)
-    self.cell = nn.GRUCell(self._hidden_size, self._deter_size)
-    self.decoder = Decoder(state_n, self._stoch_size + self._hidden_size, G)
+    self.embed_size = 256
+    self.encoder = Encoder(state_n, self.embed_size, G)
+    self.cell = nn.GRUCell(self.G.hidden_size, self._deter_size)
+    self.decoder = Decoder(state_n, self._stoch_size + self._deter_size, G)
     self.obs_net = nn.Sequential(
-        nn.Linear(self.z_size + self._deter_size, self._hidden_size),
+        nn.Linear(self.embed_size + self._deter_size, self.G.hidden_size),
         nn.ReLU(),
-        nn.Linear(self._hidden_size, 2 * self._stoch_size),
+        nn.Linear(self.G.hidden_size, 2 * self._stoch_size),
     )
-    self.img1 = nn.Linear(self._stoch_size + env.action_space.shape[0], self._hidden_size)
+    self.img1 = nn.Linear(self._stoch_size + env.action_space.shape[0], self.G.hidden_size)
     self.img_net = nn.Sequential(
-        nn.Linear(self._deter_size, self._hidden_size),
+        nn.Linear(self._deter_size, self.G.hidden_size),
         nn.ReLU(),
-        nn.Linear(self._hidden_size, 2 * self._stoch_size),
+        nn.Linear(self.G.hidden_size, 2 * self._stoch_size),
     )
     self._init()
 

@@ -69,8 +69,8 @@ class VideoModel(Net):
         paz, paa = arbiter.forward(s_window)
         metrics['eval/unprompted_action_log_mse'] = ((sact - paa)**2).mean().log()
         taz, taa = arbiter.forward(t_window)
-        fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
-        metrics['eval/unprompted_fid'] = fid
+        fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
+        metrics['eval/unprompted_fvd'] = fvd
         precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=5)
         metrics['eval/unprompted_precision'] = precision.cpu()
         metrics['eval/unprompted_recall'] = recall.cpu()
@@ -140,8 +140,8 @@ class VideoModel(Net):
         metrics['eval/prompted_action_log_mse'] = ((tact - paa)**2).mean().log()
         taz, taa = arbiter.forward(t_window)
         metrics['eval/true_action_log_mse'] = ((tact - taa)**2).mean().log()
-        fid = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
-        metrics['eval/prompted_fid'] = fid
+        fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
+        metrics['eval/prompted_fvd'] = fvd
         precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=5)
         metrics['eval/prompted_precision'] = precision.cpu()
         metrics['eval/prompted_recall'] = recall.cpu()

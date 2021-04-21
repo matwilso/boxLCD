@@ -65,6 +65,8 @@ if __name__ == '__main__':
 
   if G.mode == 'train':
     runner = runners.Trainer(model, env, G)
+  elif G.mode == 'eval':
+    runner = runners.Evaler(model, env, G)
   elif G.mode == 'viz':
     runner = runners.Vizer(model, env, G)
   elif G.mode == 'collect':
