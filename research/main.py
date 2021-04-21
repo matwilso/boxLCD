@@ -12,15 +12,13 @@ import numpy as np
 import yaml
 from datetime import datetime
 import argparse
-from define_config import config, args_type, env_fn
+from research.define_config import config, args_type, env_fn
 from boxLCD import envs
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 
 from boxLCD import env_map
-import utils
-import runners
+from research import utils, runners, data
 from research.nets import net_map
-import data
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

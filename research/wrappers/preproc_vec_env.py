@@ -5,7 +5,7 @@ import gym
 import numpy as np
 from gym.utils import seeding, EzPickle
 from research import utils
-from wrappers.async_vector_env import AsyncVectorEnv
+from .async_vector_env import AsyncVectorEnv
 from scipy.spatial.distance import cosine
 
 class PreprocVecEnv:

@@ -10,7 +10,6 @@ class Autoencoder(Net):
   def __init__(self, env, G):
     super().__init__(G)
     self.env = env
-    self.viz_idxs = np.arange(0, self.G.window * 8, self.G.window)
     self.batch_proc = lambda x: x
 
   def train_step(self, batch, dry=False):
@@ -51,34 +50,36 @@ class Autoencoder(Net):
 
   def _plot_lcds(self, epoch, writer, pred, truth=None):
     """visualize lcd reconstructions"""
-    pred = pred[self.viz_idxs].cpu()
+    viz_idxs = np.arange(0, pred.shape[0], pred.shape[0]//self.G.video_n)
+    pred = pred[viz_idxs].cpu()
     if truth is not None:
-      truth = self.unproc(truth[self.viz_idxs]).cpu()
+      truth = self.unproc(truth[viz_idxs]).cpu()
       error = (pred - truth + 1.0) / 2.0
       stack = th.cat([truth, pred, error], -2)
-      writer.add_image('recon_lcd', utils.combine_rgbs(stack, 1, 8), epoch)
+      writer.add_image('recon_lcd', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
     else:
-      writer.add_image('sample_lcd', utils.combine_rgbs(pred, 1, 8), epoch)
+      writer.add_image('sample_lcd', utils.combine_rgbs(pred, 1, self.G.video_n), epoch)
 
   def _plot_proprios(self, epoch, writer, pred, truth=None):
     """visualize proprio reconstructions"""
-    pred_proprio = pred[self.viz_idxs].cpu()
+    viz_idxs = np.arange(0, pred.shape[0], pred.shape[0]//self.G.video_n)
+    pred_proprio = pred[viz_idxs].cpu()
     preds = []
     for s in pred_proprio:
       preds += [self.env.reset(proprio=s)['lcd']]
     preds = 1.0 * np.stack(preds)
 
     if truth is not None:
-      true_proprio = truth[self.viz_idxs].cpu()
+      true_proprio = truth[viz_idxs].cpu()
       truths = []
       for s in true_proprio:
         truths += [self.env.reset(proprio=s)['lcd']]
       truths = 1.0 * np.stack(truths)
       error = (preds - truths + 1.0) / 2.0
       stack = np.concatenate([truths, preds, error], -2)[:, None]
-      writer.add_image('recon_proprio', utils.combine_rgbs(stack, 1, 8), epoch)
+      writer.add_image('recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
     else:
-      writer.add_image('sample_proprio', utils.combine_rgbs(preds[:, None], 1, 8), epoch)
+      writer.add_image('sample_proprio', utils.combine_rgbs(preds[:, None], 1, self.G.video_n), epoch)
 
   def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]

@@ -13,7 +13,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
+from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
 from torch import distributions as thd
 from torch.optim import Adam
@@ -21,7 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from .quantize import VectorQuantizer
-import utils
+from research import utils
 from research.nets.common import ResBlock
 
 class VQVAE(nn.Module):

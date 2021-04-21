@@ -37,7 +37,7 @@ def config():
   G.arbiterdir = pathlib.Path('.')
   G.device = 'cuda' # 'cuda', 'cpu'
   G.mode = 'train'
-  G.model = 'frame_token'
+  G.model = 'BVAE'
   G.datamode = 'video'
   G.ipython_mode = 0
 
@@ -85,11 +85,17 @@ def config():
   G.seed = 0
   G.end2end = 0
 
+
+  G.video_n = 8
+  G.prompt_n = 8
+
   G.env = 'Dropbox'
   G.goals = 0
   G.preproc = 0
   G.state_rew = 1
   G.rew_scale = 1.0
+  G.free_nats = 3.0
+  G.kl_scale = 1.0
 
   # extra info that we set here for convenience and don't modify 
   G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

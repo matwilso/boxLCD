@@ -10,8 +10,8 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import TransformerBlock, BinaryHead
-import utils
+from research.nets.common import TransformerBlock, BinaryHead
+from research import utils
 from research.nets.autoencoders.bvae import BVAE
 from ._base import VideoModel
 

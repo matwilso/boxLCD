@@ -12,11 +12,10 @@ from datetime import datetime
 import argparse
 
 from boxLCD.utils import A
-import utils
-from utils import Timer
-import data
-from define_config import env_fn
-from wrappers import AsyncVectorEnv
+from research import utils, data
+from research.utils import Timer
+from research.define_config import env_fn
+from research.wrappers import AsyncVectorEnv
 
 class Trainer:
   def __init__(self, model, env, G):
@@ -45,6 +44,9 @@ class Trainer:
     if len(arbiter_path) > 0:
       arbiter_path = arbiter_path[0]
       self.arbiter = th.jit.load(str(arbiter_path))
+      with (arbiter_path.parent/'hps.yaml').open('r') as f:
+        arbiterG = yaml.load(f, Loader=yaml.Loader)
+      self.arbiter.G = arbiterG
       self.arbiter.eval()
       print('LOADED ARBITER', arbiter_path)
     else:

@@ -6,14 +6,13 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-#from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
+#from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as th
 from torch import distributions as thd
 from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import utils
 
 # TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
 # basically so that you can do multi-modal stuff in a single vector

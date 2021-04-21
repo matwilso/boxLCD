@@ -11,18 +11,16 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
-import utils
+from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
+from research import utils
 import ignite
+from ._base import VideoModel
 
-class FlatImageTransformer(nn.Module):
+class FlatImageTransformer(VideoModel):
   def __init__(self, env, G):
-    super().__init__()
-    self.G = G
-    self.env = env
+    super().__init__(env, G)
     self.imsize = self.G.lcd_h * self.G.lcd_w
     self.act_n = env.action_space.shape[0]
-    self.block_size = self.G.window
 
     self.size = self.imsize
     self.gpt_size = self.imsize
@@ -122,7 +120,6 @@ class FlatImageTransformer(nn.Module):
         logits = self.forward(batch)
         dist = self.dist_head(logits)
         batch['lcd'][:, i] = dist.sample()[:, i]
-        if i == self.block_size - 1:
-          sample_loss = self.loss(batch)[0]
     batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-    return batch, sample_loss.mean().cpu().detach()
+    batch['proprio'] = th.zeros([*batch['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(batch['lcd'].device)
+    return batch

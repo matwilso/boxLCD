@@ -12,12 +12,10 @@ from datetime import datetime
 import argparse
 
 from boxLCD.utils import A
-import utils
-from utils import Timer
-import data
-from define_config import env_fn
+from research import utils, data
+from research.define_config import env_fn
+from research.wrappers import AsyncVectorEnv
 import ignite
-from wrappers import AsyncVectorEnv
 from jax.tree_util import tree_multimap, tree_map
 
 class Fiddler:

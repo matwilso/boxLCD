@@ -16,8 +16,8 @@ import scipy.signal
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from nets.vae import VAE
-from nets.bvae import BVAE
+from research.nets.vae import VAE
+from research.nets.bvae import BVAE
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20

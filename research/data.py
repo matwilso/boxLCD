@@ -1,3 +1,4 @@
+from re import I
 import uuid
 from sys import maxsize
 import matplotlib.pyplot as plt
@@ -13,11 +14,12 @@ import argparse
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 from boxLCD.utils import A
-import utils
+from research import utils
 from tqdm import tqdm
 import time
 from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
+#from jax.tree_util import tree_map, tree_multimap
 
 def collect(env_fn, G):
   collect_start = time.time()
@@ -136,7 +138,7 @@ class RolloutDataset(IterableDataset):
   def __iter__(self):
     worker_info = th.utils.data.get_worker_info()
     if worker_info is not None:
-      np.random.seed(worker_info.id)
+      np.random.seed(worker_info.id+round(time.time()))
 
     for ct in itertools.count():
       if self.infinite:
@@ -163,8 +165,13 @@ class RolloutDataset(IterableDataset):
         break
 
 def load_ds(G):
+  #def collate_fn(*args, **kwargs):
+  #  print(args, kwargs)
+  #  tree_multi_map(lambda x, *y: )
+  #  import ipdb; ipdb.set_trace()
+  #  pass
   train_dset = RolloutDataset(G.datapath / 'train', G.window, refresh_data=G.refresh_data)
   test_dset = RolloutDataset(G.datapath / 'test', G.window, infinite=False)
-  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=8, drop_last=True)
-  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=8, drop_last=True)
+  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=0, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=0, drop_last=True)
   return train_loader, test_loader

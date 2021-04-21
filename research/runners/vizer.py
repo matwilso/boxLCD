@@ -11,9 +11,8 @@ import numpy as np
 import yaml
 from datetime import datetime
 from boxLCD.utils import A, NamedArray
-import utils
-import data
-from define_config import env_fn
+from research import utils, data
+from research.define_config import env_fn
 from pyglet.gl import glClearColor
 KEY = pyglet.window.key
 

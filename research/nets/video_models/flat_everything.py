@@ -9,9 +9,9 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import TransformerBlock, BinaryHead
-import utils
-#from nets.statevq import SVAE
+from research.nets.common import TransformerBlock, BinaryHead
+from research import utils
+#from research.nets.statevq import SVAE
 
 class FlatEverything(nn.Module):
   def __init__(self, env, G):

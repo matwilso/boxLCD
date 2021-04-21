@@ -12,7 +12,7 @@ import numpy as np
 import yaml
 from datetime import datetime
 from boxLCD.utils import A, NamedArray
-import utils
+import research.utils
 import gym
 from boxLCD import env_map
 

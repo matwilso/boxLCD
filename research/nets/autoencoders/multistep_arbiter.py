@@ -10,7 +10,6 @@ from torch.optim import Adam
 from ._base import Autoencoder, SingleStepAE, MultiStepAE
 from jax.tree_util import tree_map
 
-
 class MultiStepArbiter(MultiStepAE):
   def __init__(self, env, G):
     super().__init__(env, G)
@@ -30,8 +29,7 @@ class MultiStepArbiter(MultiStepAE):
     self.eval()
     self.encoder.eval()
 
-    class Dummy(nn.Module):
-      """i fucking hate torch jit. it is so shitty but still useful"""
+    class TracedArbiter(nn.Module):
       def __init__(self, encoder, decoder) -> None:
         super().__init__()
         self.encoder = encoder
@@ -40,7 +38,7 @@ class MultiStepArbiter(MultiStepAE):
         z = self.encoder(batch)
         dec = self.decoder(z)
         return z, dec[2]
-    d = Dummy(self.encoder, self.decoder)
+    d = TracedArbiter(self.encoder, self.decoder)
     jit_enc = th.jit.trace(d, self.batch_proc(batch))
     th.jit.save(jit_enc, str(path))
     print(path)

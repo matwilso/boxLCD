@@ -9,8 +9,8 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import TransformerBlock, BinaryHead
-import utils
+from research.nets.common import TransformerBlock, BinaryHead
+from research import utils
 from research.nets.autoencoders.rnlda import RNLDA
 from ._base import VideoModel
 
@@ -27,7 +27,8 @@ class FlatRonald(VideoModel):
     self.ronald.eval()
     # </LOAD ronald>
 
-    self.size = self.ronald.G.vqD * 4 * 8
+    self.zW = int(self.ronald.G.wh_ratio*4)
+    self.size = self.ronald.G.vqD * 4 * self.zW
     self.block_size = self.G.window
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
@@ -38,6 +39,7 @@ class FlatRonald(VideoModel):
     self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
+    self.out_net = nn.Linear(G.n_embed, self.size)
     self._init()
 
   def forward(self, z, action):
@@ -55,7 +57,7 @@ class FlatRonald(VideoModel):
     x += self.pos_emb  # each position maps to a (learnable) vector
     x = self.blocks(x)
     logits = self.ln_f(x)
-    return logits
+    return self.out_net(logits)
 
   def loss(self, batch):
     z = self.ronald.encode(batch, noise=False).detach()
@@ -100,11 +102,11 @@ class FlatRonald(VideoModel):
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
       z = self.ronald.encode(batch, noise=False)
-      z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * 8).to(self.G.device)
+      z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * self.zW).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, action, start)
-      z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD, 4, 8])
+      z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD, 4, self.zW])
 
       # DECODE
       dist = self.ronald.decoder(z_sample)

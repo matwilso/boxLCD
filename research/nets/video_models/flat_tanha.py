@@ -9,8 +9,8 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from nets.common import TransformerBlock, BinaryHead, MDNHead, GaussHead
-import utils
+from research.nets.common import TransformerBlock, BinaryHead, MDNHead, GaussHead
+from research import utils
 from research.nets.autoencoders.tanha import Tanha
 from ._base import VideoModel
 

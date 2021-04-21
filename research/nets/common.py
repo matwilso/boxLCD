@@ -1,4 +1,3 @@
-from define_config import env_fn
 import sys
 from collections import defaultdict
 import numpy as np

@@ -6,10 +6,10 @@ import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
 from .quantize import BinaryQuantize, RNLD
-from ._base import Autoencoder
+from ._base import Autoencoder, SingleStepAE
 from .bvae import Encoder, Decoder
 
-class RNLDA(Autoencoder):
+class RNLDA(SingleStepAE):
   """Real Number Line Discrete Autoencoder. ronalda"""
   def __init__(self, env, G):
     super().__init__(env, G)
@@ -17,11 +17,13 @@ class RNLDA(Autoencoder):
     self.encoder = Encoder(env, G)
     self.vq = RNLD(4)
     self.decoder = Decoder(env, G)
-    self.z_size = 4 * 8 * G.vqD
+    self.zH = 4
+    self.zW = int(G.wh_ratio * self.zH)
+    self.z_size = self.zH * self.zW * G.vqD
     self._init()
 
   def sample_z(self, n):
-    z = th.bernoulli(0.5 * th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, 4, 8])
+    z = th.bernoulli(0.5 * th.ones(n, self.z_size)).to(self.G.device).reshape([n, -1, self.zH, self.zW])
     return z
 
   def loss(self, batch):

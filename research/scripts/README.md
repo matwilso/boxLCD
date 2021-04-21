@@ -1,5 +1,11 @@
 # COMMON SHELL COMMANDS THAT I SAVE SO I DON'T FORGET THEM
 
+## Overview:
+
+Step 1: collect data <br>
+Step 2: learn models on that data <br>
+Step 3: do RL. perhaps inside of a learned model <br>
+
 - [Collect data](#collect-data)
 - [MODEL LEARNING](#model-learning)
   - [Autoencoding](#autoencoding)
@@ -9,8 +15,9 @@
 - [MISC](#misc)
 
 ## Collect data
+
+Choose an env, and then run the collect command
 ```bash
-# choose an env, and then run the collect command
 # basics 
 env=Dropbox
 env=Bounce
@@ -23,8 +30,22 @@ env=Luxo
 env=LuxoCube
 env=UrchinCube
 
-python main.py --mode=collect --env=$env --train_barrels=100 --logdir=logs/datadump/$env
+python main.py --mode=collect --num_envs=10 --env=$env --train_barrels=100 --logdir=logs/datadump/$env
 ```
+
+Or run one of these commands to collect data for many envs
+
+```bash
+bash scripts/collect_all.sh 0 # tier 0 envs: Dropbox, Bounce, Bounce2, Object3
+bash scripts/collect_all.sh 1 # tier 1 envs: Urchin, Luxo, UrchinCube, LuxoCube, UrchinBall, LuxoBall
+```
+
+## Arbiter training
+```
+python main.py --mode=train --env=Dropbox --datapath=logs/datadump/Dropbox/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/evals/arbiter/Dropbox/ --window=5
+
+```
+
 
 ## MODEL LEARNING
 
