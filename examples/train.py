@@ -22,7 +22,7 @@ import argparse
 
 from boxLCD.utils import A
 from model import GPT
-import utils
+from research import utils
 from utils import parse_args
 
 class Trainer:

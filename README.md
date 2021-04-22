@@ -61,23 +61,20 @@ while True:
     env.render(mode='human')
 ```
 
-Tier 0: Basics |  Tier 1: Simple Robots |  
-:-------------------------:|:------|
+Tier 0: Basic Passive Objects |  Tier 1: Simple Robots and Manipulation |  
+:-------------------------:|:------:|
 `envs.Dropbox()` (16x16) | `envs.Urchin()` (16x32) | 
 ![](./assets/Dropbox.gif)  |  ![](./assets/Urchin.gif)  |  
 `envs.Bounce()` (16x16) | `envs.Luxo()` (16x32) | 
 ![](./assets/Bounce.gif)  |  ![](./assets/Luxo.gif)  |  
-`envs.Bounce2()` (16x16) | `envs.UrchinCube()` (16x32) | 
+`envs.Bounce2()` (16x16) | `envs.UrchinCube()` (16x24) | 
 ![](./assets/Bounce2.gif)  |  ![](./assets/UrchinCube.gif)  |  
-`envs.Object2()` (16x24) | `envs.LuxoCube()` (16x32) | 
+`envs.Object2()` (16x16) | `envs.LuxoCube()` (16x24) | 
 ![](./assets/Object2.gif)  |  ![](./assets/LuxoCube.gif)  |  
-
-x | 
-:-------------------------:|
-`envs.UrchinBall()` (16x32) | 
-![](./assets/UrchinBall.gif)  |  
-`envs.LuxoBall()` (16x32) | 
-![](./assets/LuxoBall.gif)  |  
+\- | `envs.UrchinBall()` (16x24) | 
+![](./assets/Object2-cubes.gif) | ![](./assets/UrchinBall.gif)  |  
+\- | `envs.LuxoBall()` (16x24) | 
+![](./assets/Object2-circles.gif) | ![](./assets/LuxoBall.gif)  |  
 
 
 

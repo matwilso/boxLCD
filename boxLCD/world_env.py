@@ -443,6 +443,7 @@ class WorldEnv(gym.Env, EzPickle):
           self.joints[name].maxMotorTorque = float(joint.torque * np.clip(np.abs(action[name + ':torque']), 0, 1))
     # RUN SIM STEP
     if self.FPS < 30:
+      # run multiple subiterations for stability
       self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
       self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
       self.b2_world.Step(1.0 / (self.FPS*3), 6 * 30, 2 * 30)
@@ -455,34 +456,39 @@ class WorldEnv(gym.Env, EzPickle):
     info = {'timeout': done}
     return self._get_obs(), reward, done, info
 
-  def lcd_render(self, width=None, height=None, pretty=False):
+  def lcd_render(self, width=None, height=None, lcd_mode='1'):
     """render the env using PIL at potentially very low resolution
-
     # TODO: deal with scrolling
     """
+    lcd_mode = lcd_mode.upper()
+    assert lcd_mode in ['1', 'RGB'], 'lcd_mode must be in one of these PIL supported modes'
+
     if width is None and height is None:
       width = int(self.G.lcd_base * self.G.wh_ratio)
       height = self.G.lcd_base
-    if pretty:
-      mode = "RGB"
-      backgrond = (1, 1, 1)
-    else:
-      mode = "1"
+    if lcd_mode == '1':
       backgrond = 1
+    elif lcd_mode == 'RGB':
+      backgrond = (1, 1, 1)
 
-    image = Image.new(mode, (width, height))
+    image = Image.new(lcd_mode, (width, height))
     draw = ImageDraw.Draw(image)
     draw.rectangle([0, 0, width, height], fill=backgrond)
-    for body in self.dynbodies.values():
+    for name, body in self.dynbodies.items():
       pos = A[body.position]
       shape = body.fixtures[0].shape
-      if pretty:
+      if lcd_mode == 'RGB':
         color = tuple([int(255.0 * (1 - x)) for x in body.color1])
         outline = tuple([int(255.0 * (1 - x)) for x in body.color2])
       else:
         color = 0
         outline = None
-
+        #if 'root' in name or 'object' in name:
+        #  color = 1
+        #  outline = 0
+        #else:
+        #  color = 0
+        #  outline = None
       if isinstance(shape, circleShape):
         rad = shape.radius
         topleft = (pos - rad) / self.WIDTH
@@ -500,24 +506,27 @@ class WorldEnv(gym.Env, EzPickle):
     lcd = np.asarray(image)
     if lcd.dtype == np.bool:
       lcd = lcd.astype(np.float).astype(np.bool)  # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
-    if pretty:
+    if lcd_mode == 'RGB':
       lcd = 255 - lcd
     return lcd
 
-  def render(self, mode='rgb_array', pretty=False, return_pyglet_view=False):
+  def render(self, mode='rgb_array', lcd_mode='1', return_pyglet_view=False):
+    lcd_mode = lcd_mode.upper()
     width = int(self.G.lcd_base * self.G.wh_ratio)
     height = self.G.lcd_base
-    lcd = self.lcd_render(width, height, pretty=pretty)
+    lcd = self.lcd_render(width, height, lcd_mode=lcd_mode)
     if mode == 'rgb_array':
       return lcd
     elif mode == 'human':
       # use a pyglet viewer to show the images to the user in realtime.
       if self.viewer is None:
         self.viewer = Viewer(width * 8, height * 8, self.G)
-      high_res = self.lcd_render(width * 8, height * 8, pretty=True).astype(np.uint8)
-      if False:
-        high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
-      low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
+      high_res = self.lcd_render(width * 8, height * 8, lcd_mode='RGB').astype(np.uint8)
+      #high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
+      if lcd_mode == 'RGB':
+        low_res = lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
+      else:
+        low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
       img = np.concatenate([high_res, np.zeros_like(low_res)[:, :2], low_res], axis=1)
       out = self.viewer.render(img, return_rgb_array=return_pyglet_view)
       if not return_pyglet_view:

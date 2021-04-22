@@ -2,7 +2,7 @@
 # collect data for all envs in a tier.
 # usage: bash scripts/collect_all.sh TIER
 if [ -z "$1" ] || [ $1 -eq 0 ]; then
-    envs=(Dropbox Bounce Bounce2 Object3)
+    envs=(Dropbox Bounce Bounce2 Object2)
 elif [ $1 -eq 1 ]; then
     envs=(Urchin Luxo UrchinCube LuxoCube UrchinBall LuxoBall)
 else
@@ -10,5 +10,5 @@ else
     exit 1;
 fi
 for env in ${envs[@]}; do
-    python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --env=$env --logdir=logs/datadump/$env
+    python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=$env --logdir=logs/datadump/fill/comprehensive/$env
 done

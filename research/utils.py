@@ -60,7 +60,7 @@ def combined_shape(length, shape=None):
 def count_vars(module):
   return sum([np.prod(p.shape) for p in module.parameters()])
 
-def dump_logger(logger, writer, i, G):
+def dump_logger(logger, writer, i, G, verbose=True):
   print('=' * 30)
   print(i)
   for key in logger:
@@ -163,6 +163,24 @@ def combine_imgs(arr, row=5, col=5):
   else:
     assert False, (arr.shape, arr.ndim)
 
+class PTimer:
+  def __init__(self, message):
+    self.message = message
+
+  def __enter__(self):
+    self.time_start = time.time()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    new_time = time.time() - self.time_start
+    print(self.message, new_time)
+
+  def start(self):
+    self.__enter__()
+
+  def stop(self):
+    self.__exit__(None, None, None)
+
+
 class Timer:
   def __init__(self, logger, message):
     self.logger = logger
@@ -263,12 +281,17 @@ def flatten_first(arr):
   shape = arr.shape
   return arr.reshape([shape[0] * shape[1], *shape[2:]])
 
+
+
 def manifold_estimate(set_a, set_b, k=3):
   """https://arxiv.org/abs/1904.06991"""
   # compute manifold
+  #with PTimer('cdist1'):
   d = th.cdist(set_a, set_a)
+  #with PTimer('topk'):
   radii = th.topk(d, k+1, largest=False)[0][...,-1:]
   # eval
+  #with PTimer('cdist2'):
   d2 = th.cdist(set_a, set_b) 
   return (d2 < radii).any(0).float().mean()
 
@@ -296,10 +319,12 @@ class Reshape(nn.Module):
     return x.reshape(*self.args)
 
 if __name__ == '__main__':
-  real = th.rand(10000, 128)
-  gen = th.randn(10000, 128)
-  # precision = realistic, recall = coverage.
-  precision = manifold_estimate(real, gen, 3)
-  recall = manifold_estimate(gen, real, 3)
-  f1 = 2 * (precision * recall) / (precision + recall)
-  print(precision, recall, f1)
+  real = th.rand(1000, 128)
+  gen = th.randn(1000, 128)
+  dist = th.cdist(real, gen)
+
+  ## precision = realistic, recall = coverage.
+  #precision = manifold_estimate(real, gen, 3)
+  #recall = manifold_estimate(gen, real, 3)
+  #f1 = 2 * (precision * recall) / (precision + recall)
+  #print(precision, recall, f1)

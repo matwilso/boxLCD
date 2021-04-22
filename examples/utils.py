@@ -18,6 +18,7 @@ def config():
   G.datapath = pathlib.Path('.')
   G.collect_n = 10000
   G.env = 'Bounce'
+  G.lcd_mode = '1'  # just for visualization
   # training stuff
   G.device = 'cuda'  # 'cuda', 'cpu'
   G.num_epochs = 200

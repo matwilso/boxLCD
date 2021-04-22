@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from utils import parse_args
+from examples.utils import parse_args
 import time
 from pyglet.gl import glClearColor
 import argparse
@@ -23,6 +23,7 @@ A = utils.A
 
 if __name__ == '__main__':
   G = parse_args()
+
   env = env_map[G.env](G)
   start = env.reset()
   env.render(mode='human', lcd_mode=G.lcd_mode)

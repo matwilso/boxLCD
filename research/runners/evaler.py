@@ -1,3 +1,5 @@
+import pickle
+from collections import defaultdict
 import ignite
 import time
 import copy
@@ -29,7 +31,6 @@ class Evaler:
     self.env = env
     self.model = model
     self.G = G
-    self.writer = SummaryWriter(G.logdir)
     self.b = lambda x: {key: val.to(G.device) for key, val in x.items()}
     arbiter_path = list(G.arbiterdir.glob('*.pt'))
     if len(arbiter_path) > 0:
@@ -42,6 +43,7 @@ class Evaler:
       print('LOADED ARBITER', arbiter_path)
     else:
       self.arbiter = None
+
     def chop(x):
       T = x.shape[1]
       _chop = T % self.arbiter.G.window
@@ -56,53 +58,82 @@ class Evaler:
 
   def run(self):
     self.model.eval()
-    ulogger = utils.dump_logger({}, self.writer, 0, self.G)
-    plogger = utils.dump_logger({}, self.writer, 0, self.G)
+    self.N = 1e4
     with th.no_grad():
-        # compute loss on all data
-      all_paz = []
-      all_upaz = []
-      all_taz = []
-      for i, test_batch in enumerate(self.test_ds):
-        batch = self.b(test_batch)
-        upaz, umetrics = self.unprompted(batch)
-        for key in umetrics:
-          ulogger[key] += [umetrics[key].cpu()]
-        paz, taz, pmetrics = self.prompted(batch)
-        for key in pmetrics:
-          plogger[key] += [pmetrics[key].cpu()]
-        all_paz += [paz]
-        all_upaz += [upaz]
-        all_taz += [taz]
-        print(i*self.G.bs)
-      paz = th.cat(all_paz)
-      upaz = th.cat(all_upaz)
-      taz = th.cat(all_taz)
-      pm = self.compute_agged(paz, taz)
-      um = self.compute_agged(upaz, taz)
-      for key in plogger:
-        plogger[key] = np.mean(plogger[key])
-      for key in ulogger:
-        ulogger[key] = np.mean(ulogger[key])
+      logger = defaultdict(lambda: [])
+      for i in range(2):
+        test_logger = self.do_ds(self.test_ds)
+        train_logger = self.do_ds(self.train_ds)
+        for key in test_logger:
+          logger['test:'+key] += [test_logger[key]]
+        for key in train_logger:
+          logger['train:'+key] += [train_logger[key]]
+      final_logger = {}
+      for key in logger:
+        final_logger[key] = np.mean(logger[key]), np.std(logger[key])
+      with open(self.G.logdir / 'logger.pkl', 'wb') as f:
+        pickle.dump(logger, f)
+      test = utils.filtdict(final_logger, 'test:', fkey=lambda x:x[5:])
+      testu = utils.filtdict(test, 'u:', fkey=lambda x:x[2:])
+      testp = utils.filtdict(test, 'p:', fkey=lambda x:x[2:])
       print()
-      print('UNPROMPTED', um)
+      print('Test Unprompted'+'-'*15)
+      for key, val in testu.items(): print(f'{key}: {val[0]}  +/-  {val[1]}')
       print()
-      #print(ulogger)
-      print('PROMPTED', pm)
+      print('Test Prompted'+'-'*15)
+      for key, val in testp.items(): print(f'{key}: {val[0]}  +/-  {val[1]}')
+      train = utils.filtdict(final_logger, 'train:', fkey=lambda x:x[6:])
+      trainu = utils.filtdict(train, 'u:', fkey=lambda x:x[2:])
+      trainp = utils.filtdict(train, 'p:', fkey=lambda x:x[2:])
       print()
-      print(plogger)
+      print('Train Unprompted'+'-'*15)
+      for key, val in trainu.items(): print(f'{key}: {val[0]}  +/-  {val[1]}')
+      print()
+      print('Train Prompted'+'-'*15)
+      for key, val in trainp.items(): print(f'{key}: {val[0]}  +/-  {val[1]}')
+
       import ipdb; ipdb.set_trace()
+
+  def do_ds(self, ds):
+    logger = defaultdict(lambda: [])
+    plogger = defaultdict(lambda: [])
+    # compute loss on all data
+    all_paz = []
+    all_upaz = []
+    all_taz = []
+    for i, test_batch in enumerate(self.test_ds):
+      batch = self.b(test_batch)
+      upaz, umetrics = self.unprompted(batch)
+      for key in umetrics:
+        logger['u:'+key] += [umetrics[key].cpu()]
+      paz, taz, pmetrics = self.prompted(batch)
+      for key in pmetrics:
+        logger['p:'+key] += [pmetrics[key].cpu()]
+      all_paz += [paz]
+      all_upaz += [upaz]
+      all_taz += [taz]
+      print((i+1) * self.G.bs)
+      if (i+1) * self.G.bs >= self.N:
+        break
+    paz = th.cat(all_paz)
+    upaz = th.cat(all_upaz)
+    taz = th.cat(all_taz)
+    for key, val in self.compute_agged(upaz, taz).items():
+      logger['u:'+key] += [val]
+    for key, val in self.compute_agged(paz, taz).items():
+      logger['p:'+key] += [val]
+    for key in logger: logger[key] = np.mean(logger[key])
+    return dict(logger)
 
   def compute_agged(self, paz, taz):
     metrics = {}
     fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
     metrics['fvd'] = fvd
-    precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=3)
+    precision, recall, f1 = utils.precision_recall_f1(taz[:5000], paz[:5000], k=3)
     metrics['precision'] = precision.cpu()
     metrics['recall'] = recall.cpu()
     metrics['f1'] = f1.cpu()
     return metrics
-
 
   def unprompted(self, batch):
     # take sample of same size as batch

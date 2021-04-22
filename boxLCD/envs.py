@@ -33,6 +33,13 @@ class Bounce2(WorldEnv):
     super().__init__(w, G)
 
 @cc(ep_len=50, wh_ratio=1.0)
+class Object2(WorldEnv):
+  def __init__(self, G={}):
+    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8) for i in range(2)])
+    super().__init__(w, G)
+
+
+@cc(ep_len=50, wh_ratio=1.0)
 class Object3(WorldEnv):
   def __init__(self, G={}):
     w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
@@ -107,11 +114,13 @@ class LuxoCubes(WorldEnv):
 # MORE ADVANCED
 # (still being designed. and you might want to run these at higher FPS/Hz)
 
+@cc(lcd_base=32)
 class Crab(WorldEnv):
   def __init__(self, G={}):
     w = WorldDef(robots=[Robot(type='crab', name='crab0')])
     super().__init__(w, G)
 
+@cc(lcd_base=32)
 class CrabCube(WorldEnv):
   def __init__(self, G={}):
     w = WorldDef(robots=[Robot(type='crab', name='crab0')], objects=[Object(f'object{i}', shape='box', size=0.4, density=1.0, friction=1.0) for i in range(1)])
@@ -122,6 +131,7 @@ class CrabCube(WorldEnv):
 #    w = WorldDef(robots=[Robot(type='quad', name='quad0')], objects=[Object(f'object{i}', shape='box', size=0.3, density=0.1, friction=1.0) for i in range(1)])
 #    super().__init__(w, G)
 
+@cc(lcd_base=32)
 class SpiderCube(WorldEnv):
   def __init__(self, G={}):
     w = WorldDef(robots=[Robot(type='spider', name='spider0')], objects=[Object(f'object{i}', shape='box', size=0.3, density=0.1, friction=1.0) for i in range(1)])

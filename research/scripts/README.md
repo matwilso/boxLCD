@@ -22,7 +22,7 @@ Choose an env, and then run the collect command
 env=Dropbox
 env=Bounce
 env=Bounce2
-env=Object3
+env=Object2
 # simple robots 
 env=Urchin
 env=Luxo
@@ -36,7 +36,7 @@ python main.py --mode=collect --num_envs=10 --env=$env --train_barrels=100 --log
 Or run one of these commands to collect data for many envs
 
 ```bash
-bash scripts/collect_all.sh 0 # tier 0 envs: Dropbox, Bounce, Bounce2, Object3
+bash scripts/collect_all.sh 0 # tier 0 envs: Dropbox, Bounce, Bounce2, Object2
 bash scripts/collect_all.sh 1 # tier 1 envs: Urchin, Luxo, UrchinCube, LuxoCube, UrchinBall, LuxoBall
 ```
 
