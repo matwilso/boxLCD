@@ -61,20 +61,25 @@ while True:
     env.render(mode='human')
 ```
 
-Pretty rendering vs LCD rendering (upscaled for visualization) |  
+Tier 0: Basics |  Tier 1: Simple Robots |  
+:-------------------------:|:------|
+`envs.Dropbox()` (16x16) | `envs.Urchin()` (16x32) | 
+![](./assets/Dropbox.gif)  |  ![](./assets/Urchin.gif)  |  
+`envs.Bounce()` (16x16) | `envs.Luxo()` (16x32) | 
+![](./assets/Bounce.gif)  |  ![](./assets/Luxo.gif)  |  
+`envs.Bounce2()` (16x16) | `envs.UrchinCube()` (16x32) | 
+![](./assets/Bounce2.gif)  |  ![](./assets/UrchinCube.gif)  |  
+`envs.Object2()` (16x24) | `envs.LuxoCube()` (16x32) | 
+![](./assets/Object2.gif)  |  ![](./assets/LuxoCube.gif)  |  
+
+x | 
 :-------------------------:|
-`envs.Dropbox()` (16x16) | 
-![](./assets/demos/dropbox.gif)  |  
-`envs.Bounce()` (16x16) | 
-![](./assets/demos/bounce.gif)  |  
-`envs.Urchin()` (16x16) | 
-![](./assets/demos/urchin.gif)  |  
-`envs.UrchinBall()` (16x24) | 
-![](./assets/demos/urchin_ball.gif)  |  
-`envs.UrchinBalls()` (16x32) | 
-![](./assets/demos/urchin_balls.gif)  |  
-`envs.UrchinCubes()` (16x32) | 
-![](./assets/demos/urchin_cubes.gif)  |  
+`envs.UrchinBall()` (16x32) | 
+![](./assets/UrchinBall.gif)  |  
+`envs.LuxoBall()` (16x32) | 
+![](./assets/LuxoBall.gif)  |  
+
+
 
 
 ## Training examples 📉
