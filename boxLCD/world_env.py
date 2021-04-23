@@ -527,7 +527,7 @@ class WorldEnv(gym.Env, EzPickle):
         low_res = lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
       else:
         low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
-      img = np.concatenate([high_res, np.zeros_like(low_res)[:, :2], low_res], axis=1)
+      img = np.concatenate([high_res, np.zeros_like(low_res)[:, :1], low_res], axis=1)
       out = self.viewer.render(img, return_rgb_array=return_pyglet_view)
       if not return_pyglet_view:
         out = lcd

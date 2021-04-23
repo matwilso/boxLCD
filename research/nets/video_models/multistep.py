@@ -56,17 +56,6 @@ class Multistep(nn.Module):
       return ebatch
     self.flatbatch = flatbatch
 
-  def save(self, dir):
-    print("SAVED MODEL", dir)
-    path = dir / 'multienc.pt'
-    th.save(self.multi_encoder.state_dict(), path)
-    print(path)
-
-  def load(self, path):
-    enc_path = path / 'multienc.pt'
-    self.multi_encoder.load_state_dict(th.load(enc_path))
-    print(f'LOADED {enc_path}')
-
   def forward(self, batch):
     import ipdb; ipdb.set_trace()
 

@@ -47,9 +47,6 @@ class VQVAE(nn.Module):
       self.optimizer.step()
     return metrics
 
-  def save(self, *args, **kwargs):
-    pass
-
   def evaluate(self, writer, batch, epoch):
     bs = batch['proprio'].shape[0]
     #ebatch = self.flatbatch(batch)

@@ -14,8 +14,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# TODO: something like binaryquantize, but having 3-4 values. so somehow you need to split the real number line up
-# basically so that you can do multi-modal stuff in a single vector
 
 class TanhD(nn.Module):
   def __init__(self):
@@ -34,7 +32,7 @@ class RNLD(nn.Module):
   Assign all values in each bin to the mean of that bin.
 
   -1          -0.5            0             0.5         1.0
-  | ------------|-------------|--------------|------------|
+  | -----a------|------b------|------c-------|------d-----|
   """
   def __init__(self, num_cat):
     super().__init__()

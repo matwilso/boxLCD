@@ -38,7 +38,7 @@ class FlatTanha(VideoModel):
     self.blocks = nn.Sequential(*[TransformerBlock(self.block_size, G) for _ in range(G.n_layer)])
     # decoder head
     self.ln_f = nn.LayerNorm(G.n_embed)
-    self.dist_head = GaussHead(G.n_embed, self.size, G)
+    self.dist_head = MDNHead(G.n_embed, self.size, G)
     self._init()
 
   def forward(self, z, action):

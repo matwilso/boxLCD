@@ -57,6 +57,7 @@ class RSSM(VideoModel):
     # make it so that we can reconstruct obs with only seeing action.
     prior_dist = self.get_dist(prior)
     post_dist = self.get_dist(post)
+    # TODO: assert they are same size
     div = thd.kl_divergence(post_dist, prior_dist)
     div = th.max(div, self.G.free_nats * th.ones_like(div)).mean()
     div_loss = self.G.kl_scale * div
@@ -81,7 +82,7 @@ class RSSM(VideoModel):
       priors += [prior]
       state = post
     posts = tree_multimap(lambda x, *y: th.stack([x, *y], 1), posts[0], *posts[1:])
-    priors = tree_multimap(lambda x, *y: th.stack([x, *y], 1), priors[1], *priors[1:])
+    priors = tree_multimap(lambda x, *y: th.stack([x, *y], 1), priors[0], *priors[1:])
     return posts, priors
 
   def obs_step(self, prev_state, prev_action, embed):
@@ -113,7 +114,7 @@ class RSSM(VideoModel):
       prior = self.img_step(state, action[:, i])
       priors += [prior]
       state = prior
-    priors = tree_multimap(lambda x, *y: th.stack([x, *y], 1), priors[1], *priors[1:])
+    priors = tree_multimap(lambda x, *y: th.stack([x, *y], 1), priors[0], *priors[1:])
     return priors
 
   def sample(self, n, action=None, prompts=None, prompt_n=10):
@@ -126,9 +127,9 @@ class RSSM(VideoModel):
         prior = self.imagine(action)
         feat = self.get_feat(prior)
         decoded = self.decoder(feat.flatten(0, 1))
-        batch = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
-        batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        batch['proprio'] = th.zeros([*batch['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(batch['lcd'].device)
+        gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
+        gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
+        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
       else:
         batch = tree_map(lambda x: x[:, :prompt_n], prompts)
         flat_batch = tree_map(lambda x: x.flatten(0,1), batch)
@@ -137,13 +138,13 @@ class RSSM(VideoModel):
         prior = self.imagine(action[:,prompt_n:], state=tree_map(lambda x: x[:,-1], post))
         feat = self.get_feat(prior)
         decoded = self.decoder(feat.flatten(0, 1))
-        batch = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
-        batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        batch['proprio'] = th.zeros([*batch['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(batch['lcd'].device)
+        gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
+        gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
+        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
         prompts['lcd'] = prompts['lcd'][:,:,None]
-        batch = tree_multimap(lambda x, y: th.cat([x,y[:,:prompt_n]], 1), batch, utils.subdict(prompts, ['lcd', 'proprio']))
+        gen = tree_multimap(lambda x, y: th.cat([x[:,:prompt_n], y], 1), utils.subdict(prompts, ['lcd', 'proprio']), gen)
         prompts['lcd'] = prompts['lcd'][:,:,0]
-    return batch
+    return gen
 
   def get_feat(self, state):
     return th.cat([state['stoch'], state['deter']], -1)

@@ -27,6 +27,8 @@ class Evaler:
     super().__init__()
     print('wait dataload')
     self.train_ds, self.test_ds = data.load_ds(G)
+    import ipdb; ipdb.set_trace() # DO a check here to make sure we are using approximately the right amount of data.
+    # usually we assume 10 barrels of test data to run this.
     print('dataloaded')
     self.env = env
     self.model = model
@@ -61,7 +63,7 @@ class Evaler:
     self.N = 1e4
     with th.no_grad():
       logger = defaultdict(lambda: [])
-      for i in range(2):
+      for i in range(5):
         test_logger = self.do_ds(self.test_ds)
         train_logger = self.do_ds(self.train_ds)
         for key in test_logger:
@@ -71,8 +73,10 @@ class Evaler:
       final_logger = {}
       for key in logger:
         final_logger[key] = np.mean(logger[key]), np.std(logger[key])
+      self.G.logdir.mkdir(parents=True, exist_ok=True)
       with open(self.G.logdir / 'logger.pkl', 'wb') as f:
-        pickle.dump(logger, f)
+        pickle.dump(final_logger, f)
+      print('wrote pickle', self.G.logdir)
       test = utils.filtdict(final_logger, 'test:', fkey=lambda x:x[5:])
       testu = utils.filtdict(test, 'u:', fkey=lambda x:x[2:])
       testp = utils.filtdict(test, 'p:', fkey=lambda x:x[2:])
@@ -91,8 +95,6 @@ class Evaler:
       print()
       print('Train Prompted'+'-'*15)
       for key, val in trainp.items(): print(f'{key}: {val[0]}  +/-  {val[1]}')
-
-      import ipdb; ipdb.set_trace()
 
   def do_ds(self, ds):
     logger = defaultdict(lambda: [])

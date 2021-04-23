@@ -1,4 +1,5 @@
 
+*.swp
 *.npy
 *.npz
 logs/

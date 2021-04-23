@@ -108,7 +108,7 @@ class MDNHead(nn.Module):
     mu = mu.reshape(list(mu.shape[:-1]) + [self.G.mdn_k, -1])
     std = std.reshape(list(std.shape[:-1]) + [self.G.mdn_k, -1])
     cat = thd.Categorical(logits=logits)
-    dist = thd.MixtureSameFamily(cat, thd.MultivariateNormal(mu, th.diag_embed(std)))
+    dist = thd.MixtureSameFamily(cat, thd.MultivariateNormal(mu, scale_tril=th.diag_embed(std)))
     return dist
 
 class CategoricalHead(nn.Module):

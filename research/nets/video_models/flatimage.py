@@ -43,17 +43,6 @@ class FlatImageTransformer(VideoModel):
     self.optimizer = Adam(self.parameters(), lr=G.lr)
     self.to(G.device)
 
-  def save(self, dir):
-    print("SAVED MODEL", dir)
-    path = dir / 'flattie.pt'
-    th.save(self.state_dict(), path)
-    print(path)
-
-  def load(self, path):
-    path = path / 'flattie.pt'
-    self.load_state_dict(th.load(path))
-    print(f'LOADED {path}')
-
   def forward(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))

@@ -40,8 +40,10 @@ class Trainer:
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.num_envs)])
 
     #import ipdb; ipdb.set_trace()
-    arbiter_path = list(G.arbiterdir.glob('*.pt'))
-    if len(arbiter_path) > 0:
+    if G.arbiterdir.name != '':
+      arbiter_path = list(G.arbiterdir.glob('*.pt'))
+      if len(arbiter_path) == 0:
+        assert False, f'probably wrong arbiter path that you pointed to {G.arbiterdir}'
       arbiter_path = arbiter_path[0]
       self.arbiter = th.jit.load(str(arbiter_path))
       with (arbiter_path.parent/'hps.yaml').open('r') as f:

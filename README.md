@@ -72,9 +72,9 @@ Tier 0: Basic Passive Objects |  Tier 1: Simple Robots and Manipulation |
 `envs.Object2()` (16x16) | `envs.LuxoCube()` (16x24) | 
 ![](./assets/Object2.gif)  |  ![](./assets/LuxoCube.gif)  |  
 \- | `envs.UrchinBall()` (16x24) | 
-![](./assets/Object2-cubes.gif) | ![](./assets/UrchinBall.gif)  |  
+\- | ![](./assets/UrchinBall.gif)  |  
 \- | `envs.LuxoBall()` (16x24) | 
-![](./assets/Object2-circles.gif) | ![](./assets/LuxoBall.gif)  |  
+\- | ![](./assets/LuxoBall.gif)  |  
 
 
 
@@ -175,7 +175,8 @@ But in the future, we plan to expand this scope and design tasks that leverage o
 - more evaluations of learned simulators, like how can we leverage them (for building curriculum, specifying goals, etc.)
 - lifelong learning tasks that tests the ability to remember from episode experience how to do a task many steps later. not terminating the environment basically ever.
 - tests for temporal abstraction. if we crank up the FPS and have tasks that require longer horizon thinking, this makes it harder for single step RL to work, so it would help select for methods that do better at temporal abstraction.
-- 
+- some scaling law analysis. is there something we can say about how the complexity of an environment relates to the size of model needed to learn it well? like just how GPT3 picks up grammar, maybe you need a certain size of model to pick up object permanence. On the fact that objects retain identity over time. Maybe you could see in a more advanced model this notion of objects retaining identity. You could construct deliberately fucked up samples (like maybe an object that changes identity, midway through. And you do this by hacking boxLCD). And then you see if the model responds to this. Like baby surprisal.
+- baby surprisal
 
 ![](./assets/roadmap_pic.png)
 

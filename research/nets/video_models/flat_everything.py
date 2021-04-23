@@ -51,23 +51,6 @@ class FlatEverything(nn.Module):
     self.optimizer = Adam(self.parameters(), lr=G.lr)
     self.to(G.device)
 
-  def save(self, dir):
-    print("SAVED MODEL", dir)
-    path = dir / 'flatev.pt'
-    sd = self.state_dict()
-    sd['G'] = self.G
-    th.save(sd, path)
-    print(path)
-    self.svae.save(dir)
-
-  def load(self, dir):
-    path = dir / 'flatev.pt'
-    sd = th.load(path)
-    G = sd.pop('G')
-    self.load_state_dict(sd)
-    self.svae.load(dir)
-    print(f'LOADED {path}')
-
   def forward(self, batch):
     BS, EPL, *HW = batch['lcd'].shape
     lcd = batch['lcd'].reshape(BS, EPL, np.prod(HW))
