@@ -16,7 +16,7 @@ for env in ${envs[@]}; do
         prompt_n=1
     else
         window=50
-        prompt_n=3
+        prompt_n=5
     fi
     #python -m research.main --mode=train --env=$env --datapath=logs/datadump/fill/comprehensive/$env/ --arbiterdir=logs/april22/arbiter/$env --model=FlatBToken --lr=5e-4 --log_n=1000 --bs=32 --n_layer=2 --n_head=4 --n_embed=256 --hidden_size=256 --window=$window --total_itr=100000 --prompt_n=$prompt_n --logdir=logs/april22/video/FlatBToken/two/$env/ --weightdir=logs/april22a/autoencoder/BVAE/two/$env/
     python -m research.main --mode=train --env=$env --datapath=logs/datadump/fill/comprehensive/$env/ --arbiterdir=logs/april22/arbiter/$env --model=FlatBToken --lr=5e-4 --log_n=1000 --bs=32 --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --window=$window --total_itr=100000 --prompt_n=$prompt_n --logdir=logs/april22a/video/FlatBToken/$env/ --weightdir=logs/april22a/autoencoder/BVAE/$env/

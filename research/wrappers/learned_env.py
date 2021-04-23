@@ -19,6 +19,71 @@ from boxLCD import env_map
 def outproc(img):
   return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
 
+# TODO: add back this wrapper probably, since it makes things a bit cleaner.
+# i was wrong about something when i removed it.
+class LearnedEnv:
+  def __init__(self, num_envs, model, G):
+    self.num_envs = num_envs
+    self.window_batch = None
+    self.G = G
+    self.model = model
+    self.real_env = env_fn(G)()
+    self.obs_keys = self.real_env._env.obs_keys
+    self.pobs_keys = self.real_env._env.pobs_keys
+    self.model.load(G.weightdir)
+    self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
+    self.model.eval()
+    for p in self.model.parameters():
+      p.requires_grad = False
+
+    def act_sample():
+      return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
+    self.action_space.sample = act_sample
+
+    spaces = {}
+    self.keys = ['lcd', 'proprio']
+    for key in self.keys:
+      val = self.real_env.observation_space.spaces[key]
+      spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
+    self.observation_space = gym.spaces.Dict(spaces)
+
+  def reset(self, *args, update_window_batch=True, **kwargs):
+    prompts = [self.real_env.reset() for _ in range(self.num_envs)]
+    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
+    window_batch = {key: th.zeros([self.model.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
+    window_batch['action'] = th.zeros([self.model.G.window, *self.action_space.shape]).to(self.G.device)
+    window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
+    for key in self.keys:
+      window_batch[key][:, 0] = prompts[key]
+    if self.G.reset_prompt:
+      #with th.no_grad():
+      #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
+      self.ptr = 1
+    else:
+      window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
+      with th.no_grad():
+       for self.ptr in range(10):
+         window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
+       window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
+       self.ptr = 4
+      
+    obs = {key: val[:, self.ptr-1] for key, val in window_batch.items() if key in self.keys}
+    if update_window_batch: # False if we want to preserve the simulator state
+      self.window_batch = window_batch
+    return obs
+
+  def step(self, act):
+    with th.no_grad():
+      self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
+      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
+      obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
+      self.ptr = min(1 + self.ptr, self.model.G.window - 1)
+      if self.ptr == self.model.G.window - 1:
+        self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
+        self.ptr -= 1
+    rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
+    return obs, rew, done, {}
+
 class RewardLenv:
   def __init__(self, env):
     self.lenv = env
@@ -97,80 +162,13 @@ class RewardLenv:
         done = True
     return rew, done
 
-
-# TODO: add back this wrapper probably, since it makes things a bit cleaner.
-# i was wrong about something when i removed it.
-class LearnedEnv:
-  def __init__(self, num_envs, model, G):
-    self.num_envs = num_envs
-    self.window_batch = None
-    self.G = G
-    self.model = model
-    self.real_env = env_fn(G)()
-    self.obs_keys = self.real_env._env.obs_keys
-    self.pobs_keys = self.real_env._env.pobs_keys
-    self.model.load(G.weightdir)
-    self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
-    self.model.eval()
-    for p in self.model.parameters():
-      p.requires_grad = False
-
-    def act_sample():
-      return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
-    self.action_space.sample = act_sample
-
-    spaces = {}
-    self.keys = ['lcd', 'proprio']
-    for key in self.keys:
-      val = self.real_env.observation_space.spaces[key]
-      spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
-    self.observation_space = gym.spaces.Dict(spaces)
-
-  def reset(self, *args, update_window_batch=True, **kwargs):
-    prompts = [self.real_env.reset() for _ in range(self.num_envs)]
-    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
-    window_batch = {key: th.zeros([self.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
-    window_batch['action'] = th.zeros([self.G.window, *self.action_space.shape]).to(self.G.device)
-    window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
-    for key in self.keys:
-      window_batch[key][:, 0] = prompts[key]
-    if self.G.reset_prompt:
-      #with th.no_grad():
-      #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
-      self.ptr = 1
-    else:
-      window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
-      with th.no_grad():
-       for self.ptr in range(10):
-         window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
-       window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
-       self.ptr = 4
-      
-    obs = {key: val[:, self.ptr-1] for key, val in window_batch.items() if key in self.keys}
-    if update_window_batch: # False if we want to preserve the simulator state
-      self.window_batch = window_batch
-    return obs
-
-  def step(self, act):
-    with th.no_grad():
-      self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
-      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
-      obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
-      self.ptr = min(1 + self.ptr, self.G.window - 1)
-      if self.ptr == self.G.window - 1:
-        self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
-        self.ptr -= 1
-    rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
-    return obs, rew, done, {}
-
-
 if __name__ == '__main__':
   from research.define_config import config, args_type, env_fn
-  from research.nets.flat_everything import FlatEverything
+  from research.nets import net_map
   from research import utils
   import argparse
   from boxLCD import env_map
-  from wrappers import AsyncVectorEnv
+  from research.wrappers.async_vector_env import AsyncVectorEnv
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
@@ -183,15 +181,25 @@ if __name__ == '__main__':
   G.lcd_w = int(G.wh_ratio * G.lcd_base)
   G.lcd_h = G.lcd_base
   G.imsize = G.lcd_w * G.lcd_h
-  G.lenv_temp = 2.0
+  G.lenv_temp = 1.0
   G.reset_prompt = 0
   G.diff_delt = 0
   G.goal_thresh = 0.01
+  G.lenv_goals = 0
 
   env = env_fn(G)()
 
-  MC = th.load(G.weightdir / 'flatev2.pt').pop('G')
-  model = FlatEverything(env, MC)
+  sd = th.load(G.weightdir / f'{G.model}.pt')
+  mG = sd.pop('G')
+  mG.device = G.device
+  model = net_map[G.model](env, mG)
+  model.load(G.weightdir)
+  model.to(G.device)
+  G.num_vars = utils.count_vars(model)
+  model.eval()
+  for p in model.parameters():
+    p.requires_grad = False
+  print('LOADED MODEL', G.weightdir)
   lenv = RewardLenv(LearnedEnv(G.num_envs, model, G))
   obs = lenv.reset()
   start = time.time()

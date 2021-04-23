@@ -30,6 +30,7 @@ from research import utils
 from research import wrappers
 from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
+from research.nets import net_map
 
 def sac(G):
   print(G.full_cmd)
@@ -45,8 +46,13 @@ def sac(G):
   TN = 8
   real_tvenv = wrappers.AsyncVectorEnv([env_fn(G) for _ in range(TN)])
   if G.lenv:
-    MC = th.load(G.weightdir / 'flatev2.pt').pop('G')
-    model = FlatEverything(tenv, MC)
+    sd = th.load(G.weightdir / f'{G.model}.pt')
+    mG = sd.pop('G')
+    mG.device = G.device
+    model = net_map[G.model](tenv, mG)
+    model.to(G.device)
+    model.eval()
+    model = FlatEverything(tenv, mG)
     env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
     tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())

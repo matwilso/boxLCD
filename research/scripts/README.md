@@ -116,8 +116,6 @@ python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$m
 
 
 
-
-
 ## LEARNED SIMULATION
 ```
 # test learned simulator

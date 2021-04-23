@@ -66,13 +66,12 @@ class FlatRonald(VideoModel):
     return loss, {'loss/total': loss}
 
   def onestep(self, batch, i, temp=1.0):
-    logits = self.forward(batch)
-    import ipdb; ipdb.set_trace()
-    sample = dist.sample()
-    batch['lcd'][:, i] = sample[:, i, :self.G.imsize].reshape(batch['lcd'][:, i].shape)
-    proprio_code = sample[:, i, self.G.imsize:]
-    proprio = self.ronald.decoder(proprio_code).mean
-    batch['proprio'][:, i] = proprio
+    z = self.ronald.encode(batch)
+    logits = self.forward(z, batch['action'])
+    z_sample = self.ronald.vq(logits, noise=True)[0][:, i:i+1].reshape([-1, self.ronald.G.vqD, 4, self.zW])
+    dist = self.ronald.decoder(z_sample)
+    batch['lcd'][:, i] = 1.0*(dist['lcd'].probs > 0.5)[:, 0]
+    batch['proprio'][:, i] = dist['proprio'].mean
     return batch
 
   def latent_onestep(self, z, a, i, temp=1.0):
