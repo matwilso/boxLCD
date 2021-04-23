@@ -16,8 +16,6 @@ import scipy.signal
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from research.nets.vae import VAE
-from research.nets.bvae import BVAE
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
@@ -251,13 +249,6 @@ class ActorCritic(nn.Module):
     act_dim = act_space.shape[0]
 
     self.preproc = None
-    if G.net == 'vae':
-      self.preproc = VAE(G)
-      self.preproc.load(G.weightdir)
-      for p in self.preproc.parameters():
-        p.requires_grad = False
-      self.preproc.eval()
-
     # build policy and value functions
     self.pi = SquashedGaussianActor(obs_space, act_dim, G=G, preproc=self.preproc)
     self.q1 = QFunction(obs_space, act_dim, G=G, preproc=self.preproc)

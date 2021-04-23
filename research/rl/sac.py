@@ -1,6 +1,6 @@
 from functools import WRAPPER_UPDATES, update_wrapper
 from re import I
-from research.nets.bvae import BVAE
+from research.nets.autoencoders.bvae import BVAE
 import matplotlib.pyplot as plt
 import yaml
 from datetime import datetime
@@ -28,7 +28,7 @@ from boxLCD import env_map
 import boxLCD
 from research import utils
 from research import wrappers
-from research.nets.flat_everything import FlatEverything
+#from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
 from research.nets import net_map
 
