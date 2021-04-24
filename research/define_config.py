@@ -96,6 +96,7 @@ def config():
   G.rew_scale = 1.0
   G.free_nats = 3.0
   G.kl_scale = 1.0
+  G.autoreset = 0
 
   # extra info that we set here for convenience and don't modify 
   G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

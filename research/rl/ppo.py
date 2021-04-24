@@ -254,7 +254,7 @@ def ppo(G):
   epoch_time = start_time = time.time()
 
   if G.lenv:
-    o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), th.zeros(G.num_envs).to(G.device), th.zeros(G.num_envs).to(G.device)
+    o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), th.zeros(G.num_envs).to(G.device), np.zeros(G.num_envs)#.to(G.device)
     success = th.zeros(G.num_envs).to(G.device)
     time_to_succ = G.ep_len * th.ones(G.num_envs).to(G.device)
     pf = th
@@ -277,10 +277,14 @@ def ppo(G):
     trans = {'act': a, 'rew': r, 'val': v, 'logp': logp}
     for key in o:
       trans[f'o:{key}'] = o[key]
+    if G.lenv:
+      trans = tree_map(lambda x: x.cpu().numpy(), trans)
     buf.store_n(trans)
 
     o = next_o
 
+    if G.lenv:
+      d = d.cpu().numpy()
     timeout = ep_len == G.ep_len
     terminal = np.logical_or(d, timeout)
     epoch_ended = itr % G.steps_per_epoch == 0
@@ -382,7 +386,7 @@ if __name__ == '__main__':
   if tempC.env in env_map:
     Env = env_map[tempC.env]
     parser.set_defaults(**Env.ENV_DG)
-    parser.set_defaults(**{'goals': 1})
+    parser.set_defaults(**{'goals': 1, 'autoreset': 1})
   G = parser.parse_args()
   G.lcd_w = int(G.wh_ratio * G.lcd_base)
   G.lcd_h = G.lcd_base

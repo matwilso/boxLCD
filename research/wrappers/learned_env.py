@@ -111,12 +111,18 @@ class RewardLenv:
     return base_space
 
   def step(self, act):
-    obs, rew, done, info = self.lenv.step(act)
+    obs, rew, ep_done, info = self.lenv.step(act)
     obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
-    rew, _done = self.comp_rew_done(obs, info)
-    done = th.logical_or(done, _done)
+    rew, goal_done = self.comp_rew_done(obs, info)
+    done = th.logical_or(ep_done, goal_done)
     rew = rew * self.G.rew_scale
+    if self.G.autoreset:
+      if th.all(ep_done):
+        obs = self.reset()
+      else:
+        if th.any(goal_done):
+          self._reset_goals(goal_done)
     return obs, rew, done, info
 
   def _reset_goals(self, mask):
