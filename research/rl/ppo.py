@@ -231,7 +231,7 @@ def ppo(G):
           if use_lenv:
             color = yellow if dones[i][j].cpu().numpy() and i != G.ep_len - 1 else white
             draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nV: {vs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
-            draw.text((G.lcd_w * REP * j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
+            draw.text((G.lcd_w * REP * j + 5, 5), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
             #draw.text((G.lcd_w * REP * (j+1) - 20, 10), '[]', fill=purple, fnt=fnt)
           else:
             color = yellow if dones[i][j] and i != G.ep_len - 1 else white
@@ -285,6 +285,9 @@ def ppo(G):
 
     if G.lenv:
       d = d.cpu().numpy()
+      def proc(x): return x.cpu().float()
+    else:
+      def proc(x): return x
     timeout = ep_len == G.ep_len
     terminal = np.logical_or(d, timeout)
     epoch_ended = itr % G.steps_per_epoch == 0
@@ -297,12 +300,14 @@ def ppo(G):
     v[mask] *= 0
     buf.finish_paths(np.nonzero(terminal_epoch)[0], v)
     for idx in np.nonzero(terminal_epoch)[0]:
-      logger['EpRet'] += [ep_ret[idx]]
+      logger['EpRet'] += [proc(ep_ret[idx])]
       logger['EpLen'] += [ep_len[idx]]
       ep_ret[idx] = 0
       ep_len[idx] = 0
 
     if epoch_ended:
+      if (G.logdir / 'pause.marker').exists():
+        import ipdb; ipdb.set_trace()
       epoch = itr // G.steps_per_epoch
       update()
       with utils.Timer(logger, 'test_agent'):
