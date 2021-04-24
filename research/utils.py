@@ -126,7 +126,7 @@ def combine_rgbs(arr, row=5, col=5):
   if isinstance(arr, np.ndarray):
     permute = np.transpose
   else:
-    permute = lambda x, y: x.permute(y)
+    def permute(x, y): return x.permute(y)
 
   if len(arr.shape) == 4:  # image
     BS, C, H, W = arr.shape
@@ -282,17 +282,16 @@ def flatten_first(arr):
   return arr.reshape([shape[0] * shape[1], *shape[2:]])
 
 
-
 def manifold_estimate(set_a, set_b, k=3):
   """https://arxiv.org/abs/1904.06991"""
   # compute manifold
-  #with PTimer('cdist1'):
+  # with PTimer('cdist1'):
   d = th.cdist(set_a, set_a)
-  #with PTimer('topk'):
-  radii = th.topk(d, k+1, largest=False)[0][...,-1:]
+  # with PTimer('topk'):
+  radii = th.topk(d, k + 1, largest=False)[0][..., -1:]
   # eval
-  #with PTimer('cdist2'):
-  d2 = th.cdist(set_a, set_b) 
+  # with PTimer('cdist2'):
+  d2 = th.cdist(set_a, set_b)
   return (d2 < radii).any(0).float().mean()
 
 def precision_recall_f1(real, gen, k=3):
@@ -318,12 +317,28 @@ class Reshape(nn.Module):
   def forward(self, x):
     return x.reshape(*self.args)
 
+def discount_cumsum(x, discount):
+  """
+  magic from rllab for computing discounted cumulative sums of vectors.
+  input: 
+      vector x, 
+      [x0, 
+       x1, 
+       x2]
+  output:
+      [x0 + discount * x1 + discount^2 * x2,  
+       x1 + discount * x2,
+       x2]
+  """
+  return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
+
+
 if __name__ == '__main__':
   real = th.rand(1000, 128)
   gen = th.randn(1000, 128)
   dist = th.cdist(real, gen)
 
-  ## precision = realistic, recall = coverage.
+  # precision = realistic, recall = coverage.
   #precision = manifold_estimate(real, gen, 3)
   #recall = manifold_estimate(gen, real, 3)
   #f1 = 2 * (precision * recall) / (precision + recall)

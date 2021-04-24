@@ -107,33 +107,33 @@ class ReplayBuffer:
     assert np.isclose(np.mean((o['goal:proprio'] - o2['goal:proprio'])**2), 0.0), "AHH"
     return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch)
 
-
 class PPOBuffer:
   """
   A buffer for storing trajectories experienced by a PPO agent interacting
   with the environment, and using Generalized Advantage Estimation (GAE-Lambda)
   for calculating the advantages of state-action pairs.
   """
-
-  def __init__(self, config, obs_dim, act_dim, size, gamma=0.99, lam=0.95):
+  def __init__(self, G, obs_space, act_space, size):
+    self.G = G
     self.bufs = {}
-    self.bufs['obs'] = np.zeros(utils.combined_shape(size, obs_dim), dtype=np.float32)
-    self.bufs['act'] = np.zeros(utils.combined_shape(size, act_dim), dtype=np.float32)
-    self.bufs['adv'] = np.zeros(size, dtype=np.float32)
+    for key in obs_space.spaces:
+      self.bufs['o:' + key] = np.zeros((size, *obs_space.spaces[key].shape), dtype=np.float32)
+    self.bufs['act'] = np.zeros((size, *act_space.shape), dtype=np.float32)
     self.bufs['rew'] = np.zeros(size, dtype=np.float32)
+    self.bufs['adv'] = np.zeros(size, dtype=np.float32)
     self.bufs['ret'] = np.zeros(size, dtype=np.float32)
     self.bufs['val'] = np.zeros(size, dtype=np.float32)
     self.bufs['logp'] = np.zeros(size, dtype=np.float32)
-    self.gamma, self.lam = gamma, lam
-    self.ptr, self.path_start_idx, self.max_size = 0, np.zeros(config.num_envs), size
-    self.trajs = [defaultdict(lambda: []) for _ in range(config.num_envs)]
-    self.config = config
+    self.gamma, self.lam = G.gamma, G.lam
+    self.ptr, self.path_start_idx, self.max_size = 0, np.zeros(G.num_envs), size
+    self.trajs = [defaultdict(lambda: []) for _ in range(G.num_envs)]
+    self.G = G
 
   def store_n(self, ntrans):
     #shape = ntrans['obs'].shape[0]
     # assert self.ptr+shape< self.max_size     # buffer has to have room so you can store
     for key in ntrans:
-      for idx in range(self.config.num_envs):
+      for idx in range(self.G.num_envs):
         self.trajs[idx][key] += [ntrans[key][idx]]
 
   def finish_paths(self, idxs, last_vals):
@@ -152,7 +152,7 @@ class PPOBuffer:
     """
     # assert self.ptr+shape< self.max_size     # buffer has to have room so you can store
     for idx in idxs:
-      size = len(self.trajs[idx]['obs'])
+      size = len(self.trajs[idx]['act'])
       rews = np.array(self.trajs[idx]['rew'] + [last_vals[idx]])
       vals = np.array(self.trajs[idx]['val'] + [last_vals[idx]])
 
@@ -179,5 +179,8 @@ class PPOBuffer:
     # the next two lines implement the advantage normalization trick
     adv_mean, adv_std = np.mean(self.bufs['adv']), np.std(self.bufs['adv'])
     self.bufs['adv'] = (self.bufs['adv'] - adv_mean) / adv_std
-    data = utils.subdict(self.bufs, ['obs', 'act', 'ret', 'adv', 'logp'])
-    return {k: th.as_tensor(v, dtype=th.float32).to(self.config.device) for k, v in data.items()}
+    data = self.bufs
+    o = utils.filtdict(data, 'o:', fkey=lambda x: x[2:])
+    data = utils.nfiltdict(data, '(o:|o2:)')
+    data['obs'] = o
+    return tree_map(lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), data)

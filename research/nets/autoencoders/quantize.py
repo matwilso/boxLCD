@@ -34,17 +34,18 @@ class RNLD(nn.Module):
   -1          -0.5            0             0.5         1.0
   | -----a------|------b------|------c-------|------d-----|
   """
-  def __init__(self, num_cat):
+  def __init__(self, num_cat, noise_level=0.25):
     super().__init__()
     self.num_cat = num_cat
+    self.noise_level = noise_level
 
-  def forward(self, z, noise=0.25):
+  def forward(self, z, noise):
     z = th.tanh(z)
-    zn = z + noise * (2 * th.rand(z.shape).to(z.device) - 1)
-    #if noise:
-    #  zn = z + 0.25 * (2 * th.rand(z.shape).to(z.device) - 1)
-    #else:
-    #  zn = z
+    #zn = z + noise * (2 * th.rand(z.shape).to(z.device) - 1)
+    if noise:
+      zn = z + self.noise_level * (2 * th.rand(z.shape).to(z.device) - 1)
+    else:
+      zn = z
 
     z_q = -0.75 * (zn < -0.5) + \
         -0.25 * (th.logical_and(zn >= -0.5, zn < 0.0)) + \

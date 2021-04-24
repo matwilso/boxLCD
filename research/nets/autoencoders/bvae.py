@@ -38,7 +38,7 @@ class BVAE(SingleStepAE):
     metrics = {'loss/total': loss, 'loss/entropy': entropy, **recon_losses, 'loss/recon_total': recon_loss, 'bvae_abs_probs': th.abs(probs-0.5).mean()}
     return loss, metrics
 
-  def encode(self, batch, flatten=True, noise=True):
+  def encode(self, batch, noise, flatten=True):
     shape = batch['lcd'].shape
     if len(shape) == 4:
       batch = {key: val.clone().flatten(0, 1) for key, val in batch.items()}

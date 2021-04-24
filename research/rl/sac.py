@@ -517,34 +517,34 @@ def sac(G):
         yaml.dump(G, f, width=1000)
 
 
-_C = boxLCD.utils.AttrDict()
-_C.replay_size = int(1e6)
-_C.total_steps = 1000000
-_C.test_n = 1
-_C.save_freq = 10
-_C.gamma = 0.99
-_C.learned_alpha = 1
-_C.alpha_lr = 1e-4  # for SAC w/ learned alpha
-_C.alpha = 0.1  # for SAC w/o learned alpha
-_C.polyak = 0.995
-_C.num_test_episodes = 2
-_C.update_every = 40
-_C.start_steps = 1000
-_C.update_after = 1000
-_C.use_done = 0
-_C.net = 'mlp'
-_C.zdelta = 1
-_C.lenv = 0
-_C.lenv_mode = 'swap'
-_C.lenv_temp = 1.0
-_C.lenv_cont_roll = 0
-_C.lenv_goals = 0
-_C.reset_prompt = 0
-_C.succ_reset = 1  # between lenv and normal env
-_C.state_key = 'proprio'
-_C.diff_delt = 0
-_C.goal_thresh = 0.010
-_C.preproc_rew = 0
+_G = boxLCD.utils.AttrDict()
+_G.replay_size = int(1e6)
+_G.total_steps = 1000000
+_G.test_n = 1
+_G.save_freq = 10
+_G.gamma = 0.99
+_G.learned_alpha = 1
+_G.alpha_lr = 1e-4  # for SAC w/ learned alpha
+_G.alpha = 0.1  # for SAC w/o learned alpha
+_G.polyak = 0.995
+_G.num_test_episodes = 2
+_G.update_every = 40
+_G.start_steps = 1000
+_G.update_after = 1000
+_G.use_done = 0
+_G.net = 'mlp'
+_G.zdelta = 1
+_G.lenv = 0
+_G.lenv_mode = 'swap'
+_G.lenv_temp = 1.0
+_G.lenv_cont_roll = 0
+_G.lenv_goals = 0
+_G.reset_prompt = 0
+_G.succ_reset = 1  # between lenv and normal env
+_G.state_key = 'proprio'
+_G.diff_delt = 0
+_G.goal_thresh = 0.010
+_G.preproc_rew = 0
 # TODO: allow changing default values.
 
 
@@ -554,7 +554,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  for key, value in _C.items():
+  for key, value in _G.items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   tempC = parser.parse_args()
   # grab defaults from the env

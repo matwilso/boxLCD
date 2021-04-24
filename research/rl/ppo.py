@@ -31,6 +31,8 @@ from research import wrappers
 #from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
 from research.nets import net_map
+from gym.vector.async_vector_env import AsyncVectorEnv
+
 
 def ppo(G):
   print(G.full_cmd)
@@ -44,7 +46,7 @@ def ppo(G):
   obs_space = tenv.observation_space
   act_space = tenv.action_space
   TN = 8
-  real_tvenv = wrappers.AsyncVectorEnv([env_fn(G) for _ in range(TN)])
+  real_tvenv = AsyncVectorEnv([env_fn(G) for _ in range(TN)])
   if G.lenv:
     sd = th.load(G.weightdir / f'{G.model}.pt')
     mG = sd.pop('G')
@@ -56,7 +58,7 @@ def ppo(G):
     tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
   else:
-    env = wrappers.AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
+    env = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
     tvenv = real_tvenv
     if G.preproc:
       MC = th.load(G.weightdir / 'bvae.pt').pop('G')
@@ -77,21 +79,13 @@ def ppo(G):
 
   # Create actor-critic module and target networks
   ac = ActorCritic(obs_space, act_space, G=G).to(G.device)
-  ac_targ = deepcopy(ac)
-
-  # Freeze target networks with respect to optimizers (only updte via polyak averaging)
-  for p in ac_targ.parameters():
-    p.requires_grad = False
-
-  # List of parameters for both Q-networks (save this for convenience)
-  q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
 
   # Experience buffer
-  buf = PPOBuffer(G, obs_space=obs_space, act_space=act_space)
+  buf = PPOBuffer(G, obs_space=obs_space, act_space=act_space, size=G.num_envs * G.steps_per_epoch)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
-  var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
-  print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d\n' % var_counts)
+  var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.v])
+  print('\nNumber of parameters: \t pi: %d, \t v: %d\n' % var_counts)
   sum_count = sum(var_counts)
 
   def compute_loss_pi(data):
@@ -104,10 +98,10 @@ def ppo(G):
     loss_pi = -(th.min(ratio * adv, clip_adv)).mean()
 
     # Useful extra info
-    approx_kl = (logp_old - logp).mean().item()
-    ent = pi.entropy().mean().item()
+    approx_kl = (logp_old - logp).mean().cpu()
+    ent = pi.entropy().mean().cpu()
     clipped = ratio.gt(1 + G.clip_ratio) | ratio.lt(1 - G.clip_ratio)
-    clipfrac = th.as_tensor(clipped, dtype=th.float32).mean().item()
+    clipfrac = th.as_tensor(clipped, dtype=th.float32).mean().cpu()
     pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
 
     return loss_pi, pi_info
@@ -120,24 +114,22 @@ def ppo(G):
   # Set up optimizers for policy and value function
   pi_optimizer = Adam(ac.pi.parameters(), lr=G.pi_lr, betas=(0.9, 0.999), eps=1e-8)
   vf_optimizer = Adam(ac.v.parameters(), lr=G.vf_lr, betas=(0.9, 0.999), eps=1e-8)
-  if G.learned_alpha:
-    alpha_optimizer = Adam([ac.log_alpha], lr=G.alpha_lr)
 
   def update():
     data = buf.get()
 
     pi_l_old, pi_info_old = compute_loss_pi(data)
-    pi_l_old = pi_l_old.item()
-    v_l_old = compute_loss_v(data).item()
+    pi_l_old = pi_l_old.cpu()
+    v_l_old = compute_loss_v(data).cpu()
 
     # Train policy with multiple steps of gradient descent
     for i in range(G.train_pi_iters):
-      idxs = np.random.randint(0, data['obs'].shape[0], G.bs)
+      idxs = np.random.randint(0, data['act'].shape[0], G.bs)
       pi_optimizer.zero_grad()
-      loss_pi, pi_info = compute_loss_pi(nest.map_structure(lambda x: x[idxs], data))
+      loss_pi, pi_info = compute_loss_pi(tree_map(lambda x: x[idxs], data))
       kl = pi_info['kl']
-      if kl > 1.5 * G.target_kl:
-        break
+      #if kl > 1.5 * G.target_kl:
+      #  break
       loss_pi.backward()
       pi_optimizer.step()
 
@@ -145,92 +137,21 @@ def ppo(G):
 
     # Value function learning
     for i in range(G.train_v_iters):
-      idxs = np.random.randint(0, data['obs'].shape[0], G)
+      idxs = np.random.randint(0, data['act'].shape[0], G.bs)
       vf_optimizer.zero_grad()
-      loss_v = compute_loss_v(nest.map_structure(lambda x: x[idxs], data))
+      loss_v = compute_loss_v(tree_map(lambda x: x[idxs], data))
       loss_v.backward()
       vf_optimizer.step()
 
-    # Log changes from update
+    # Log changes from updte
     kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
-    logger['LossPi'] += [pi_l_old]
-    logger['LossV'] += [v_l_old]
-    logger['KL'] += [kl]
-    logger['Entropy'] += [ent]
-    logger['ClipFrac'] += [cf]
-    logger['DeltaLossPi'] += [loss_pi.item() - pi_l_old]
-    logger['DeltaLossV'] += [loss_v.item() - v_l_old]
-
-  def update(data):
-    # TODO: optimize this by not requiring the items right away.
-    # i think this might be blockin for pytorch to finish some computations
-
-    # First run one gradient descent step for Q1 and Q2
-    q_optimizer.zero_grad()
-    loss_q, q_info = compute_loss_q(data)
-    loss_q.backward()
-    logger['Q/grad_norm'] += [utils.compute_grad_norm(ac.q1.parameters()).detach().cpu()]
-    q_optimizer.step()
-
-    # Record things
-    logger['LossQ'] += [loss_q.detach().cpu()]
-    for key in q_info:
-      logger[key] += [q_info[key].detach().cpu()]
-
-    # Freeze Q-networks so you don't waste computational effort
-    # computing gradients for them during the policy learning step.
-    for p in q_params:
-      p.requires_grad = False
-      if 'vae' in G.net:
-        for p in ac.preproc.parameters():
-          p.requires_grad = False
-
-    # Next run one gradient descent step for pi.
-    pi_optimizer.zero_grad()
-    loss_pi, loss_alpha, pi_info = compute_loss_pi(data)
-    loss_pi.backward()
-    logger['Pi/grad_norm'] += [utils.compute_grad_norm(ac.pi.parameters()).detach().cpu()]
-    pi_optimizer.step()
-    # and optionally the alpha
-    if G.learned_alpha:
-      alpha_optimizer.zero_grad()
-      loss_alpha.backward()
-      alpha_optimizer.step()
-      logger['LossAlpha'] += [loss_alpha.detach().cpu()]
-      logger['Alpha'] += [th.exp(ac.log_alpha.detach().cpu())]
-
-    # Unfreeze Q-networks so you can optimize it at next DDPG step.
-    for p in q_params:
-      p.requires_grad = True
-
-    # Record things
-    logger['LossPi'] += [loss_pi.detach().cpu()]
-    for key in pi_info:
-      logger[key] += [pi_info[key]]
-
-    # Finally, update target networks by polyak averaging.
-    with th.no_grad():
-      for p, p_targ in zip(ac.parameters(), ac_targ.parameters()):
-        # NB: We use an in-place operations "mul_", "add_" to update target
-        # params, as opposed to "mul" and "add", which would make new tensors.
-        p_targ.data.mul_(G.polyak)
-        p_targ.data.add_((1 - G.polyak) * p.data)
-
-  def get_action(o, deterministic=False):
-    o = {key: th.as_tensor(1.0 * val, dtype=th.float32).to(G.device) for key, val in o.items()}
-    act = ac.act(o, deterministic)
-    if not G.lenv:
-      act = act.cpu().numpy()
-    return act
-
-  def get_action_val(o, deterministic=False):
-    with th.no_grad():
-      o = {key: th.as_tensor(1.0 * val, dtype=th.float32).to(G.device) for key, val in o.items()}
-      a, _, ainfo = ac.pi(o, deterministic, False)
-      q = ac.value(o, a)
-    if not G.lenv:
-      a = a.cpu().numpy()
-    return a, q
+    logger['LossPi'] += [pi_l_old.detach().cpu()]
+    logger['LossV'] += [v_l_old.detach().cpu()]
+    logger['KL'] += [kl.detach().cpu()]
+    logger['Entropy'] += [ent.detach().cpu()]
+    logger['ClipFrac'] += [cf.detach().cpu()]
+    logger['DeltaLossPi'] += [loss_pi.detach().cpu() - pi_l_old.detach().cpu()]
+    logger['DeltaLossV'] += [loss_v.detach().cpu() - v_l_old.detach().cpu()]
 
   def test_agent(itr, use_lenv=False):
     # init
@@ -238,31 +159,31 @@ def ppo(G):
     if use_lenv:
       pf = th
       _env = learned_tvenv
-      o, ep_ret, ep_len = _env.reset(np.arange(TN)), th.zeros(TN).to(G.device), th.zeros(TN).to(G.device)
+      o, ep_ret, ep_len = _env.reset(), th.zeros(TN).to(G.device), th.zeros(TN).to(G.device)
     else:
       pf = np
       _env = real_tvenv
-      o, ep_ret, ep_len = _env.reset(np.arange(TN)), np.zeros(TN), np.zeros(TN)
+      o, ep_ret, ep_len = _env.reset(), np.zeros(TN), np.zeros(TN)
 
     # run
     frames = []
     dones = []
     rs = []
-    qs = []
+    vs = []
     all_done = pf.zeros_like(ep_ret)
     success = pf.zeros_like(ep_ret)
     for i in range(G.ep_len):
       # Take deterministic actions at test time
-      a, q = get_action_val(o)
+      a, v, logp = ac.step(o)
       if not use_lenv and G.lenv:
         a = a.cpu().numpy()
-        q = q.cpu().numpy()
+        v = v.cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
       if i != (G.ep_len - 1):
         success = pf.logical_or(success, d)
       rs += [r]
-      qs += [q]
+      vs += [v]
       dones += [d]
       ep_ret += r * ~all_done
       ep_len += 1 * ~all_done
@@ -309,12 +230,12 @@ def ppo(G):
         for j in range(TN):
           if use_lenv:
             color = yellow if dones[i][j].cpu().numpy() and i != G.ep_len - 1 else white
-            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
+            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nV: {vs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
             draw.text((G.lcd_w * REP * j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
             #draw.text((G.lcd_w * REP * (j+1) - 20, 10), '[]', fill=purple, fnt=fnt)
           else:
             color = yellow if dones[i][j] and i != G.ep_len - 1 else white
-            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
+            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nV: {vs[i][j]:.3f}', fill=color, fnt=fnt)
             draw.text((G.lcd_w * REP * j + 5, 5), f'{"*"*int(success[j])}', fill=yellow, fnt=fnt)
         dframes += [np.array(pframe)]
       dframes = np.stack(dframes)
@@ -332,164 +253,58 @@ def ppo(G):
   # Prepare for interaction with environment
   epoch_time = start_time = time.time()
 
-  if G.lenv and G.lenv_cont_roll:
-    # TODO: try this with backpropping through stuff
-    o = env.reset(np.arange(G.num_envs))
-    for itr in itertools.count(1):
-      a = get_action(o).detach()
-      o2, rew, done, info = env.step(a)
-      batch = {'obs': o, 'act': a, 'rew': rew, 'obs2': o2, 'done': done}
-      batch = tree_map(lambda x: x.detach(), batch)
-      update(batch)
-      o = o2
-      #success = info['success']
-      # env._reset_goals(success)
-      # print(itr)
-      if itr % 200 == 0:
-        o = env.reset()
-      if itr % G.log_n == 0:
-        epoch = itr // G.log_n
-        if epoch % G.test_n == 0:
-          test_agent(itr)
-          if G.lenv:
-            test_agent(itr, use_lenv=True)
-        # Log info about epoch
-        print('=' * 30)
-        print('Epoch', epoch)
-        logger['var_count'] = [sum_count]
-        logger['dt'] = dt = time.time() - epoch_time
-        for key in logger:
-          val = np.mean(logger[key])
-          writer.add_scalar(key, val, itr)
-          print(key, val)
-        writer.flush()
-        print('Time', time.time() - start_time)
-        print('dt', dt)
-        print(G.logdir)
-        print(G.full_cmd)
-        print('=' * 30)
-        logger = defaultdict(lambda: [])
-        epoch_time = time.time()
-        with open(G.logdir / 'hps.yaml', 'w') as f:
-          yaml.dump(G, f, width=1000)
-
   if G.lenv:
     o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), th.zeros(G.num_envs).to(G.device), th.zeros(G.num_envs).to(G.device)
     success = th.zeros(G.num_envs).to(G.device)
     time_to_succ = G.ep_len * th.ones(G.num_envs).to(G.device)
     pf = th
   else:
-    o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), np.zeros(G.num_envs), np.zeros(G.num_envs)
+    o, ep_ret, ep_len = env.reset(), np.zeros(G.num_envs), np.zeros(G.num_envs)
     success = np.zeros(G.num_envs, dtype=np.bool)
     time_to_succ = G.ep_len * np.ones(G.num_envs)
     pf = np
-  # Main loop: collect experience in venv and update/log each epoch
-  for itr in range(G.total_steps):
-    # Until start_steps have elapsed, randomly sample actions
-    # from a uniform distribution for better exploration. Afterwards,
-    # use the learned policy.
-    if itr > G.start_steps:
-      with utils.Timer(logger, 'action'):
-        o = {key: val for key, val in o.items()}
-        a = get_action(o)
-    else:
-      a = env.action_space.sample()
-
+  # Main loop: collect experience in venv and updte/log each epoch
+  for itr in range(1, G.total_steps):
+    with utils.Timer(logger, 'action'):
+      o = {key: val for key, val in o.items()}
+      a, v, logp = ac.step(o)
     # Step the venv
-    o2, r, d, info = env.step(a)
+    next_o, r, d, info = env.step(a)
     ep_ret += r
     ep_len += 1
 
-    # Ignore the "done" signal if it comes from hitting the time
-    # horizon (that is, when it's an artificial terminal signal
-    # that isn't based on the agent's state)
-    d[ep_len == G.ep_len] = False
-    success = pf.logical_or(success, d)
-    time_to_succ = pf.minimum(time_to_succ, G.ep_len * ~success + ep_len * success)
-    # print(time_to_succ)
-
-    # Store experience to replay buffer
-    trans = {'act': a, 'rew': r, 'done': d}
+    # store
+    trans = {'act': a, 'rew': r, 'val': v, 'logp': logp}
     for key in o:
       trans[f'o:{key}'] = o[key]
-    for key in o2:
-      trans[f'o2:{key}'] = o2[key]
     buf.store_n(trans)
 
-    # Super critical, easy to overlook step: make sure to updte
-    # most recent observation!
-    o = o2
+    o = next_o
 
-    # End of trajectory handling
-    if G.lenv:
-      done = th.logical_or(d, ep_len == G.ep_len)
-      dixs = th.nonzero(done)
-      def proc(x): return x.cpu().float()
-    else:
-      done = np.logical_or(d, ep_len == G.ep_len)
-      dixs = np.nonzero(done)[0]
-      def proc(x): return x
-    if len(dixs) == G.num_envs or (not G.lenv and G.succ_reset):
-      # if not G.lenv or len(dixs) == G.num_envs:
-      for idx in dixs:
-        logger['EpRet'] += [proc(ep_ret[idx])]
-        logger['EpLen'] += [proc(ep_len[idx])]
-        logger['success_rate'] += [proc(success[idx])]
-        logger['time_to_succ'] += [proc(time_to_succ[idx])]
-        ep_ret[idx] = 0
-        ep_len[idx] = 0
-        success[idx] = 0
-        time_to_succ[idx] = G.ep_len
-        #logger['success_rate'] += [proc(d[idx])]
-        #logger['success_rate_nenv'] += [proc(d[idx])**(1/G.num_envs)]
-      if len(dixs) != 0:
-        o = env.reset(dixs)
+    timeout = ep_len == G.ep_len
+    terminal = np.logical_or(d, timeout)
+    epoch_ended = itr % G.steps_per_epoch == 0
+    terminal_epoch = np.logical_or(terminal, epoch_ended)
+    timeout_epoch = np.logical_or(timeout, epoch_ended)
+    mask = ~timeout_epoch
+
+    # if trajectory didn't reach terminal state, bootstrap value target
+    _, v, _ = ac.step(o)
+    v[mask] *= 0
+    buf.finish_paths(np.nonzero(terminal_epoch)[0], v)
+    for idx in np.nonzero(terminal_epoch)[0]:
+      logger['EpRet'] += [ep_ret[idx]]
+      logger['EpLen'] += [ep_len[idx]]
+      ep_ret[idx] = 0
+      ep_len[idx] = 0
+
+    if epoch_ended:
+      epoch = itr // G.steps_per_epoch
+      update()
+      with utils.Timer(logger, 'test_agent'):
+        test_agent(itr)
         if G.lenv:
-          assert len(dixs) == G.num_envs, "the learned env needs the envs to be in sync in terms of history.  you can't easily reset one without resetting the others. it's hard"
-        else:
-          assert env.shared_memory, "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
-        #o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
-
-    # Updte handling
-    if itr >= G.update_after and itr % G.update_every == 0:
-      for j in range(int(G.update_every * 1.0)):
-        with utils.Timer(logger, 'sample_batch'):
-          batch = buf.sample_batch(G.bs)
-        with utils.Timer(logger, 'updte'):
-          update(data=batch)
-
-    # End of epoch handling
-    if (itr + 1) % G.log_n == 0:
-      epoch = (itr + 1) // G.log_n
-
-      # Save model
-      if (epoch % G.save_freq == 0) or (itr == G.total_steps):
-        th.save(ac, G.logdir / 'weights.pt')
-
-      if (G.logdir / 'pause.marker').exists():
-        import ipdb; ipdb.set_trace()
-
-      # Test the performance of the deterministic version of the agent.
-      if epoch % G.test_n == 0:
-        with utils.Timer(logger, 'test_agent'):
-          test_agent(itr)
-          if G.lenv:
-            test_agent(itr, use_lenv=True)
-
-        if 'vae' in G.net:
-          test_batch = buf.sample_batch(8)
-          ac.preproc.evaluate(writer, test_batch['obs'], itr)
-        #test_agent(video=epoch % 1 == 0)
-        # if buf.ptr > G.ep_len*4:
-        #  eps = buf.get_last(4)
-        #  goal = eps['obs']['goal:lcd']
-        #  lcd = eps['obs']['lcd']
-        #  goal = goal.reshape([4, -1, *goal.shape[1:]])
-        #  lcd = lcd.reshape([4, -1, *lcd.shape[1:]])
-        #  error = (goal - lcd + 1) / 2
-        #  out = np.concatenate([goal, lcd, error], 2)
-        #  out = utils.combine_imgs(out[:,:,None], row=1, col=4)[None,:,None]
-        #  utils.add_video(writer, 'samples', out, epoch, fps=G.fps)
+          test_agent(itr, use_lenv=True)
 
       # Log info about epoch
       print('=' * 30)
@@ -498,9 +313,10 @@ def ppo(G):
       logger['dt'] = dt = time.time() - epoch_time
       logger['env_interactions'] = env_interactions = itr * G.num_envs
       for key in logger:
+        print(key, end=' ')
         val = np.mean(logger[key])
         writer.add_scalar(key, val, itr + 1)
-        print(key, val)
+        print(val)
       writer.flush()
       print('TotalEnvInteracts', env_interactions)
       print('Time', time.time() - start_time)
@@ -514,37 +330,42 @@ def ppo(G):
         yaml.dump(G, f, width=1000)
 
 
-_C = boxLCD.utils.AttrDict()
-_C.replay_size = int(1e6)
-_C.total_steps = 1000000
-_C.test_n = 1
-_C.save_freq = 10
-_C.gamma = 0.99
-_C.learned_alpha = 1
-_C.alpha_lr = 1e-4  # for ppo w/ learned alpha
-_C.alpha = 0.1  # for ppo w/o learned alpha
-_C.polyak = 0.995
-_C.num_test_episodes = 2
-_C.update_every = 40
-_C.start_steps = 1000
-_C.update_after = 1000
-_C.use_done = 0
-_C.net = 'mlp'
-_C.zdelta = 1
-_C.lenv = 0
-_C.lenv_mode = 'swap'
-_C.lenv_temp = 1.0
-_C.lenv_cont_roll = 0
-_C.lenv_goals = 0
-_C.reset_prompt = 0
-_C.succ_reset = 1  # between lenv and normal env
-_C.state_key = 'proprio'
-_C.diff_delt = 0
-_C.goal_thresh = 0.010
-_C.preproc_rew = 0
-_C.clip_ratio = 0.2
-_C.train_pi_iters = 80
-_C.train_v_iters = 80
+_G = boxLCD.utils.AttrDict()
+_G.replay_size = int(1e6)
+_G.total_steps = 1000000
+_G.test_n = 1
+_G.save_freq = 10
+_G.gamma = 0.99
+_G.learned_alpha = 1
+_G.pi_lr = 3e-4
+_G.vf_lr = 1e-3
+_G.alpha = 0.1  # for ppo w/o learned alpha
+_G.polyak = 0.995
+_G.num_test_episodes = 2
+_G.update_every = 40
+_G.start_steps = 1000
+_G.update_after = 1000
+_G.use_done = 0
+_G.net = 'mlp'
+_G.zdelta = 1
+_G.lenv = 0
+_G.lenv_mode = 'swap'
+_G.lenv_temp = 1.0
+_G.lenv_cont_roll = 0
+_G.lenv_goals = 0
+_G.reset_prompt = 0
+_G.succ_reset = 1  # between lenv and normal env
+_G.state_key = 'proprio'
+_G.diff_delt = 0
+_G.goal_thresh = 0.010
+_G.preproc_rew = 0
+_G.clip_ratio = 0.2
+_G.train_pi_iters = 80
+_G.train_v_iters = 80
+_G.lam = 0.97
+_G.steps_per_epoch = 4000
+_G.target_kl = 0.01
+
 # TODO: allow changing default values.
 
 
@@ -554,7 +375,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   for key, value in config().items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  for key, value in _C.items():
+  for key, value in _G.items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   tempC = parser.parse_args()
   # grab defaults from the env
