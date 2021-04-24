@@ -15,6 +15,7 @@ from boxLCD.utils import A, NamedArray
 import research.utils
 import gym
 from boxLCD import env_map
+from research import utils
 
 def outproc(img):
   return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
@@ -27,7 +28,8 @@ class LearnedEnv:
     self.window_batch = None
     self.G = G
     self.model = model
-    self.real_env = env_fn(G)()
+    #self.real_env = env_fn(G)()
+    self.real_env = model.env
     self.obs_keys = self.real_env._env.obs_keys
     self.pobs_keys = self.real_env._env.pobs_keys
     self.model.load(G.weightdir)
@@ -55,6 +57,8 @@ class LearnedEnv:
     window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
     for key in self.keys:
       window_batch[key][:, 0] = prompts[key]
+
+    # TODO: do more than one step.
     if self.G.reset_prompt:
       #with th.no_grad():
       #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
@@ -163,11 +167,10 @@ class RewardLenv:
     return rew, done
 
 if __name__ == '__main__':
-  from research.define_config import config, args_type, env_fn
   from research.nets import net_map
-  from research import utils
   import argparse
   from boxLCD import env_map
+  from research.define_config import config, args_type, env_fn
   from research.wrappers.async_vector_env import AsyncVectorEnv
   parser = argparse.ArgumentParser()
   for key, value in config().items():
@@ -182,7 +185,7 @@ if __name__ == '__main__':
   G.lcd_h = G.lcd_base
   G.imsize = G.lcd_w * G.lcd_h
   G.lenv_temp = 1.0
-  G.reset_prompt = 0
+  G.reset_prompt = 1
   G.diff_delt = 0
   G.goal_thresh = 0.01
   G.lenv_goals = 0
@@ -217,31 +220,34 @@ if __name__ == '__main__':
   glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()
   #lcds = (lcds - glcds + 1.0) / 2.0
   print('1', time.time() - start)
-  utils.write_gif('test.gif', outproc(lcds), fps=G.fps)
-  utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=G.fps)
+  lcds = outproc(lcds)
+  #for i in range(G.num_envs):
+  #  lcds[50:, 128*i:128*i+10] = [1, 0, 0]
+  utils.write_gif('test.gif', lcds, fps=G.fps)
+  #utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=G.fps)
 
-  obs = env.reset()
-  ostart = time.time()
-  for i in range(200):
-    act = env.action_space.sample()
-    obs, rew, done, info = env.step(act)
-  print('2', time.time() - ostart)
+  #obs = env.reset()
+  #ostart = time.time()
+  #for i in range(200):
+  #  act = env.action_space.sample()
+  #  obs, rew, done, info = env.step(act)
+  #print('2', time.time() - ostart)
 
-  vstart = time.time()
-  venv = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
-  obs = venv.reset(np.arange(G.num_envs))
-  lcds = [obs['lcd']]
-  glcds = [obs['goal:lcd']]
-  for i in range(200):
-    act = venv.action_space.sample()
-    obs, rew, done, info = venv.step(act)
-    lcds += [obs['lcd']]
-    glcds += [obs['goal:lcd']]
-  venv.close()
-  print('3', time.time() - vstart)
-  lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
-  glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
-  lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
-  print('1', time.time() - start)
-  utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)
+  #vstart = time.time()
+  #venv = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
+  #obs = venv.reset(np.arange(G.num_envs))
+  #lcds = [obs['lcd']]
+  #glcds = [obs['goal:lcd']]
+  #for i in range(200):
+  #  act = venv.action_space.sample()
+  #  obs, rew, done, info = venv.step(act)
+  #  lcds += [obs['lcd']]
+  #  glcds += [obs['goal:lcd']]
+  #venv.close()
+  #print('3', time.time() - vstart)
+  #lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
+  #glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
+  #lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
+  #print('1', time.time() - start)
+  #utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)
 

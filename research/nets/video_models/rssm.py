@@ -44,13 +44,16 @@ class RSSM(VideoModel):
   def loss(self, batch):
     flat_batch = tree_map(lambda x: x.flatten(0, 1), batch)
     embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
-    post, prior = self.observe(embed, batch['action'])
+    action = batch['action'][:,:-1]
+    embed = embed[:,1:]
+    post, prior = self.observe(embed, action)
     feat = self.get_feat(post)
     # reconstruction loss
     decoded = self.decoder(feat.flatten(0, 1))
     recon_losses = {}
-    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(flat_batch['proprio']).mean()
-    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(flat_batch['lcd'][:, None]).mean()
+    chop_flat = tree_map(lambda x: x[:,1:].flatten(0, 1), batch)
+    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(chop_flat['proprio']).mean()
+    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(chop_flat['lcd'][:, None]).mean()
     recon_loss = sum(recon_losses.values())
 
     # variational inference loss.
@@ -134,6 +137,7 @@ class RSSM(VideoModel):
         batch = tree_map(lambda x: x[:, :prompt_n], prompts)
         flat_batch = tree_map(lambda x: x.flatten(0,1), batch)
         embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
+        action = th.cat([th.zeros_like(action)[:,:1], action[:,:-1]], 1)
         post, prior = self.observe(embed, action[:,:prompt_n])
         prior = self.imagine(action[:,prompt_n:], state=tree_map(lambda x: x[:,-1], post))
         feat = self.get_feat(prior)

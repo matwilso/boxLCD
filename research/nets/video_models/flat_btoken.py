@@ -74,14 +74,13 @@ class FlatBToken(VideoModel):
     return loss, {'loss/total': loss}
 
   def onestep(self, batch, i, temp=1.0):
-    import ipdb; ipdb.set_trace()
-    logits = self.forward(batch)
-    dist = self.dist_head(logits / temp)
-    sample = dist.sample()
-    batch['lcd'][:, i] = sample[:, i, :self.G.imsize].reshape(batch['lcd'][:, i].shape)
-    proprio_code = sample[:, i, self.G.imsize:]
-    proprio = self.bvae.decoder(proprio_code).mean
-    batch['proprio'][:, i] = proprio
+    z = self.bvae.encode(batch, noise=False)
+    logits = self.forward(z, batch['action'])
+    dist = self.dist_head(logits[:,i:i+1] / temp)
+    z_sample = dist.sample().reshape([-1, self.bvae.G.vqD, 4, self.zW])
+    dist = self.bvae.decoder(z_sample)
+    batch['lcd'][:, i] = 1.0*(dist['lcd'].probs > 0.5)[:, 0]
+    batch['proprio'][:, i] = dist['proprio'].mean
     return batch
 
   def latent_onestep(self, z, a, i, temp=1.0):
@@ -90,9 +89,9 @@ class FlatBToken(VideoModel):
     z[:, i] = dist.sample()[:, i]
     return z
 
-  def latent_sample(self, z, a, start):
+  def latent_sample(self, z, a, start, temp=1.0):
     for i in range(start, self.block_size):
-      z = self.latent_onestep(z, a, i, temp=1.0)
+      z = self.latent_onestep(z, a, i, temp=temp)
     return z
 
   def sample(self, n, action=None, prompts=None, prompt_n=10, temp=1.0):
@@ -115,7 +114,7 @@ class FlatBToken(VideoModel):
       z_sample = th.zeros(n, self.block_size, self.bvae.G.vqD * 4 * self.zW).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
-      z_sample = self.latent_sample(z_sample, action, start)
+      z_sample = self.latent_sample(z_sample, action, start, temp)
       z_sample = z_sample.reshape([n * self.block_size, self.bvae.G.vqD, 4, self.zW])
 
       # DECODE

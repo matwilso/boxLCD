@@ -60,15 +60,15 @@ class FlatRonald(VideoModel):
     return self.out_net(logits)
 
   def loss(self, batch):
-    z = self.ronald.encode(batch, noise=False).detach()
+    z = self.ronald.encode(batch, noise=0.0).detach()
     logits = self.forward(z, batch['action'])
     loss = ((th.tanh(logits) - z)**2).mean()
     return loss, {'loss/total': loss}
 
   def onestep(self, batch, i, temp=1.0):
-    z = self.ronald.encode(batch)
+    z = self.ronald.encode(batch, noise=0.0)
     logits = self.forward(z, batch['action'])
-    z_sample = self.ronald.vq(logits, noise=True)[0][:, i:i+1].reshape([-1, self.ronald.G.vqD, 4, self.zW])
+    z_sample = self.ronald.vq(logits, noise=0.25*temp)[0][:, i:i+1].reshape([-1, self.ronald.G.vqD, 4, self.zW])
     dist = self.ronald.decoder(z_sample)
     batch['lcd'][:, i] = 1.0*(dist['lcd'].probs > 0.5)[:, 0]
     batch['proprio'][:, i] = dist['proprio'].mean
@@ -76,12 +76,12 @@ class FlatRonald(VideoModel):
 
   def latent_onestep(self, z, a, i, temp=1.0):
     logits = self.forward(z, a)
-    z[:,i] = self.ronald.vq(logits, noise=True)[0][:,i]
+    z[:,i] = self.ronald.vq(logits, noise=0.25*temp)[0][:,i]
     return z
 
-  def latent_sample(self, z, a, start):
+  def latent_sample(self, z, a, start, temp):
     for i in range(start, self.block_size):
-      z = self.latent_onestep(z, a, i, temp=1.0)
+      z = self.latent_onestep(z, a, i, temp=temp)
     return z
 
   def sample(self, n, action=None, prompts=None, prompt_n=10, temp=1.0):
@@ -100,11 +100,11 @@ class FlatRonald(VideoModel):
         batch['lcd'][:, :prompt_n] = prompts['lcd'][:, :prompt_n]
         batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
         start = prompt_n
-      z = self.ronald.encode(batch, noise=False)
+      z = self.ronald.encode(batch, noise=0.0)
       z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * self.zW).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
-      z_sample = self.latent_sample(z_sample, action, start)
+      z_sample = self.latent_sample(z_sample, action, start, temp)
       z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD, 4, self.zW])
 
       # DECODE

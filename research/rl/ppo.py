@@ -21,8 +21,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
-from research.rl.buffers import OGRB, ReplayBuffer
-from research.rl.sacnets import ActorCritic
+from buffers import OGRB, ReplayBuffer, PPOBuffer
+from pponets import ActorCritic
 from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
 import boxLCD
@@ -32,7 +32,7 @@ from research import wrappers
 from jax.tree_util import tree_multimap, tree_map
 from research.nets import net_map
 
-def sac(G):
+def ppo(G):
   print(G.full_cmd)
   # th.manual_seed(G.seed)
   # np.random.seed(G.seed)
@@ -52,7 +52,6 @@ def sac(G):
     model = net_map[G.model](tenv, mG)
     model.to(G.device)
     model.eval()
-    model.load(G.weightdir)
     env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
     tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
     obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
@@ -88,80 +87,79 @@ def sac(G):
   q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
 
   # Experience buffer
-  replay_buffer = ReplayBuffer(G, obs_space=obs_space, act_space=act_space)
+  buf = PPOBuffer(G, obs_space=obs_space, act_space=act_space)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
   var_counts = tuple(utils.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
   print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d\n' % var_counts)
   sum_count = sum(var_counts)
 
-  # Set up function for computing SAC Q-losses
-  def compute_loss_q(data):
-    q_info = {}
-    alpha = G.alpha if not G.learned_alpha else th.exp(ac.log_alpha).detach()
-    o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
-    if not G.use_done:
-      d = 0
-    q1 = ac.q1(o, a)
-    q2 = ac.q2(o, a)
-
-    # Bellman backup for Q functions
-    with th.no_grad():
-      # Target actions come from *current* policy
-      a2, logp_a2, ainfo = ac.pi(o2)
-
-      # Target Q-values
-      q1_pi_targ = ac_targ.q1(o2, a2)
-      q2_pi_targ = ac_targ.q2(o2, a2)
-      q_pi_targ = th.min(q1_pi_targ, q2_pi_targ)
-      backup = r + G.gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
-
-    # MSE loss against Bellman backup
-    loss_q1 = ((q1 - backup)**2).mean()
-    loss_q2 = ((q2 - backup)**2).mean()
-    loss_q = loss_q1 + loss_q2
-
-    # Useful info for logging
-    q_info['q1/mean'] = q1.mean()
-    q_info['q2/mean'] = q2.mean()
-    q_info['q1/min'] = q1.min()
-    q_info['q1/max'] = q1.max()
-    q_info['batchR/mean'] = r.mean()
-    q_info['batchR/min'] = r.min()
-    q_info['batchR/max'] = r.max()
-    q_info['residual_variance'] = (q1 - backup).var() / backup.var()
-    q_info['target_min'] = backup.min()
-    q_info['target_max'] = backup.max()
-    return loss_q, q_info
-
-  # Set up function for computing SAC pi loss
   def compute_loss_pi(data):
-    alpha = G.alpha if not G.learned_alpha else th.exp(ac.log_alpha).detach()
-    o = data['obs']
-    pi, logp_pi, ainfo = ac.pi(o)
-    q1_pi = ac.q1(o, pi)
-    q2_pi = ac.q2(o, pi)
-    q_pi = th.min(q1_pi, q2_pi)
+    obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
 
-    # Entropy-regularized policy loss
-    loss_pi = (alpha * logp_pi - q_pi).mean()
+    # Policy loss
+    pi, logp = ac.pi(obs, act)
+    ratio = th.exp(logp - logp_old)
+    clip_adv = th.clamp(ratio, 1 - G.clip_ratio, 1 + G.clip_ratio) * adv
+    loss_pi = -(th.min(ratio * adv, clip_adv)).mean()
 
-    # Useful info for logging
-    pi_info = dict(LogPi=logp_pi.mean().detach().cpu(), action_abs=ainfo['mean'].abs().mean().detach().cpu(), action_std=ainfo['std'].mean().detach().cpu())
+    # Useful extra info
+    approx_kl = (logp_old - logp).mean().item()
+    ent = pi.entropy().mean().item()
+    clipped = ratio.gt(1 + G.clip_ratio) | ratio.lt(1 - G.clip_ratio)
+    clipfrac = th.as_tensor(clipped, dtype=th.float32).mean().item()
+    pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
 
-    if G.learned_alpha:
-      loss_alpha = (-1.0 * (th.exp(ac.log_alpha) * (logp_pi + ac.target_entropy).detach())).mean()
-      #loss_alpha = -(ac.log_alpha * (logp_pi + ac.target_entropy).detach()).mean()
-    else:
-      loss_alpha = 0.0
+    return loss_pi, pi_info
 
-    return loss_pi, loss_alpha, pi_info
+  # Set up function for computing value loss
+  def compute_loss_v(data):
+    obs, ret = data['obs'], data['ret']
+    return ((ac.v(obs) - ret)**2).mean()
 
-  # Set up optimizers for policy and q-function
-  q_optimizer = Adam(q_params, lr=G.lr, betas=(0.9, 0.999), eps=1e-8)
-  pi_optimizer = Adam(ac.pi.parameters(), lr=G.lr, betas=(0.9, 0.999), eps=1e-8)
+  # Set up optimizers for policy and value function
+  pi_optimizer = Adam(ac.pi.parameters(), lr=G.pi_lr, betas=(0.9, 0.999), eps=1e-8)
+  vf_optimizer = Adam(ac.v.parameters(), lr=G.vf_lr, betas=(0.9, 0.999), eps=1e-8)
   if G.learned_alpha:
     alpha_optimizer = Adam([ac.log_alpha], lr=G.alpha_lr)
+
+  def update():
+    data = buf.get()
+
+    pi_l_old, pi_info_old = compute_loss_pi(data)
+    pi_l_old = pi_l_old.item()
+    v_l_old = compute_loss_v(data).item()
+
+    # Train policy with multiple steps of gradient descent
+    for i in range(G.train_pi_iters):
+      idxs = np.random.randint(0, data['obs'].shape[0], G.bs)
+      pi_optimizer.zero_grad()
+      loss_pi, pi_info = compute_loss_pi(nest.map_structure(lambda x: x[idxs], data))
+      kl = pi_info['kl']
+      if kl > 1.5 * G.target_kl:
+        break
+      loss_pi.backward()
+      pi_optimizer.step()
+
+    logger['StopIter'] += [i]
+
+    # Value function learning
+    for i in range(G.train_v_iters):
+      idxs = np.random.randint(0, data['obs'].shape[0], G)
+      vf_optimizer.zero_grad()
+      loss_v = compute_loss_v(nest.map_structure(lambda x: x[idxs], data))
+      loss_v.backward()
+      vf_optimizer.step()
+
+    # Log changes from update
+    kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
+    logger['LossPi'] += [pi_l_old]
+    logger['LossV'] += [v_l_old]
+    logger['KL'] += [kl]
+    logger['Entropy'] += [ent]
+    logger['ClipFrac'] += [cf]
+    logger['DeltaLossPi'] += [loss_pi.item() - pi_l_old]
+    logger['DeltaLossV'] += [loss_v.item() - v_l_old]
 
   def update(data):
     # TODO: optimize this by not requiring the items right away.
@@ -259,7 +257,6 @@ def sac(G):
       if not use_lenv and G.lenv:
         a = a.cpu().numpy()
         q = q.cpu().numpy()
-      #a = _env.action_space.sample()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
       if i != (G.ep_len - 1):
@@ -313,8 +310,8 @@ def sac(G):
           if use_lenv:
             color = yellow if dones[i][j].cpu().numpy() and i != G.ep_len - 1 else white
             draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nQ: {qs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
-            draw.text((G.lcd_w * REP * j + 5, 5), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
-            #draw.text((G.lcd_w * REP * (j+1) - 10, 5), '[]', fill=purple, fnt=fnt)
+            draw.text((G.lcd_w * REP * j + 10, 10), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
+            #draw.text((G.lcd_w * REP * (j+1) - 20, 10), '[]', fill=purple, fnt=fnt)
           else:
             color = yellow if dones[i][j] and i != G.ep_len - 1 else white
             draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j]:.3f}\nQ: {qs[i][j]:.3f}', fill=color, fnt=fnt)
@@ -330,7 +327,7 @@ def sac(G):
   test_agent(-1)
   if G.lenv:
     test_agent(-1, use_lenv=True)
-  #writer.flush()
+  # writer.flush()
 
   # Prepare for interaction with environment
   epoch_time = start_time = time.time()
@@ -417,7 +414,7 @@ def sac(G):
       trans[f'o:{key}'] = o[key]
     for key in o2:
       trans[f'o2:{key}'] = o2[key]
-    replay_buffer.store_n(trans)
+    buf.store_n(trans)
 
     # Super critical, easy to overlook step: make sure to updte
     # most recent observation!
@@ -457,7 +454,7 @@ def sac(G):
     if itr >= G.update_after and itr % G.update_every == 0:
       for j in range(int(G.update_every * 1.0)):
         with utils.Timer(logger, 'sample_batch'):
-          batch = replay_buffer.sample_batch(G.bs)
+          batch = buf.sample_batch(G.bs)
         with utils.Timer(logger, 'updte'):
           update(data=batch)
 
@@ -480,11 +477,11 @@ def sac(G):
             test_agent(itr, use_lenv=True)
 
         if 'vae' in G.net:
-          test_batch = replay_buffer.sample_batch(8)
+          test_batch = buf.sample_batch(8)
           ac.preproc.evaluate(writer, test_batch['obs'], itr)
         #test_agent(video=epoch % 1 == 0)
-        # if replay_buffer.ptr > G.ep_len*4:
-        #  eps = replay_buffer.get_last(4)
+        # if buf.ptr > G.ep_len*4:
+        #  eps = buf.get_last(4)
         #  goal = eps['obs']['goal:lcd']
         #  lcd = eps['obs']['lcd']
         #  goal = goal.reshape([4, -1, *goal.shape[1:]])
@@ -524,8 +521,8 @@ _C.test_n = 1
 _C.save_freq = 10
 _C.gamma = 0.99
 _C.learned_alpha = 1
-_C.alpha_lr = 1e-4  # for SAC w/ learned alpha
-_C.alpha = 0.1  # for SAC w/o learned alpha
+_C.alpha_lr = 1e-4  # for ppo w/ learned alpha
+_C.alpha = 0.1  # for ppo w/o learned alpha
 _C.polyak = 0.995
 _C.num_test_episodes = 2
 _C.update_every = 40
@@ -545,6 +542,9 @@ _C.state_key = 'proprio'
 _C.diff_delt = 0
 _C.goal_thresh = 0.010
 _C.preproc_rew = 0
+_C.clip_ratio = 0.2
+_C.train_pi_iters = 80
+_C.train_v_iters = 80
 # TODO: allow changing default values.
 
 
@@ -567,4 +567,4 @@ if __name__ == '__main__':
   G.lcd_h = G.lcd_base
   G.imsize = G.lcd_w * G.lcd_h
   # RUN
-  sac(G)
+  ppo(G)
