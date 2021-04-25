@@ -341,7 +341,7 @@ def ppo(G):
 
 _G = boxLCD.utils.AttrDict()
 _G.replay_size = int(1e6)
-_G.total_steps = 1000000
+_G.total_steps = 1000000000
 _G.test_n = 1
 _G.save_freq = 10
 _G.gamma = 0.99
