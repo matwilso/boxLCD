@@ -19,7 +19,7 @@ class PreprocVecEnv:
     self.device = device
     self.model.to(device)
     self.model.eval()
-    self.shared_memory = env.shared_memory
+    #self.shared_memory = env.shared_memory
 
   @property
   def action_space(self):
@@ -28,7 +28,7 @@ class PreprocVecEnv:
   @property
   def observation_space(self):
     #import ipdb; ipdb.set_trace()
-    base_space = self._env.observation_space
+    base_space = copy.deepcopy(self._env.observation_space)
     base_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
     if 'goal:full_state' in base_space.spaces:
       base_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))

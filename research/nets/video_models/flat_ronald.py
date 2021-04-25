@@ -29,6 +29,7 @@ class FlatRonald(VideoModel):
 
     self.zW = int(self.ronald.G.wh_ratio*4)
     self.size = self.ronald.G.vqD * 4 * self.zW
+    self.z_size = self.ronald.z_size
     self.block_size = self.G.window
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))

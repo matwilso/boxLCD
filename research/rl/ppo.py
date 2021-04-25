@@ -56,7 +56,21 @@ def ppo(G):
     model.eval()
     env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
     tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
-    obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
+    #obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
+    obs_space = env.observation_space
+    def fx(x):
+      x.shape = x.shape[1:]
+      return x
+    obs_space.spaces = tree_map(fx, env.observation_space.spaces)
+
+    if G.preproc:
+      preproc = model.ronald
+      env = wrappers.PreprocVecEnv(preproc, env, G)
+      tvenv = learned_tvenv = wrappers.PreprocVecEnv(preproc, learned_tvenv, G)
+      real_tvenv = wrappers.PreprocVecEnv(preproc, real_tvenv, G)
+      obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
+      if 'goal:proprio' in obs_space.spaces:
+        obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
   else:
     env = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
     tvenv = real_tvenv
@@ -77,9 +91,13 @@ def ppo(G):
         obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
   # tenv.reset()
   epoch = -1
+  if tenv.__class__.__name__ == 'BodyGoalEnv':
+    goal_key = 'goal:proprio'
+  elif tenv.__class__.__name__ == 'CubeGoalEnv':
+    goal_key = 'goal:object'
 
   # Create actor-critic module and target networks
-  ac = ActorCritic(obs_space, act_space, G=G).to(G.device)
+  ac = ActorCritic(obs_space, act_space, goal_key, G=G).to(G.device)
 
   # Experience buffer
   buf = PPOBuffer(G, obs_space=obs_space, act_space=act_space, size=G.num_envs * G.steps_per_epoch)
@@ -321,7 +339,12 @@ def ppo(G):
     for key in o:
       trans[f'o:{key}'] = o[key]
     if G.lenv:
-      trans = tree_map(lambda x: x.cpu().numpy(), trans)
+      def fx(x):
+        if isinstance(x, np.ndarray):
+          return x
+        else:
+          return x.cpu().numpy()
+      trans = tree_map(fx, trans)
     buf.store_n(trans)
 
     o = next_o

@@ -40,7 +40,6 @@ class LearnedEnv:
     self.model.eval()
     for p in self.model.parameters():
       p.requires_grad = False
-    
 
     def act_sample():
       return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
@@ -51,6 +50,8 @@ class LearnedEnv:
     for key in self.keys:
       val = self.real_env.observation_space.spaces[key]
       spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
+
+    spaces['zstate'] = gym.spaces.Box(-1, +1, (num_envs, self.model.z_size), dtype=val.dtype)
     self.observation_space = gym.spaces.Dict(spaces)
 
   def reset(self, *args, update_window_batch=True, **kwargs):
@@ -104,7 +105,7 @@ class RewardLenv:
     self.goal = {key: th.zeros(space.shape).to(self.G.device).float() for key, space in self.observation_space.spaces.items() if 'goal' in key}
     if self.real_env.__class__.__name__ == 'CubeGoalEnv':
       if self.G.arbiterdir.name != '':
-        arbiter_path = list(G.arbiterdir.glob('*.pt'))
+        arbiter_path = list(self.G.arbiterdir.glob('*.pt'))
         if len(arbiter_path) > 0:
           arbiter_path = arbiter_path[0]
         self.obj_loc = th.jit.load(str(arbiter_path))
@@ -118,15 +119,19 @@ class RewardLenv:
 
   @property
   def observation_space(self):
-    base_space = self.lenv.observation_space
-    base_space.spaces['goal:lcd'] = base_space.spaces['lcd']
-    base_space.spaces['goal:proprio'] = base_space.spaces['proprio']
+    base_space = copy.deepcopy(self.lenv.observation_space)
+    base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
+    base_space.spaces['goal:proprio'] = copy.deepcopy(base_space.spaces['proprio'])
+    base_space.spaces['goal:object'] = copy.deepcopy(base_space.spaces['proprio'])
+    base_space.spaces['goal:object'].shape = (self.lenv.num_envs, 2)
     return base_space
 
   def step(self, act):
     obs, rew, ep_done, info = self.lenv.step(act)
     obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+    if 'goal:object' in self.goal:
+      obs['goal:object'] = self.goal['goal:object'].detach().clone()
 
     rew, goal_done = self.comp_rew_done(obs, info)
     done = th.logical_or(ep_done, goal_done)
@@ -143,12 +148,12 @@ class RewardLenv:
   def _reset_goals(self, mask):
     mask = mask.bool()
     if not self.G.lenv_goals:
-      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio)') for _ in np.arange(self.lenv.num_envs)]
+      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio|object)') for _ in np.arange(self.lenv.num_envs)]
       new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), new_goal[0], *new_goal[1:])
     else:
       #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
       new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
-      new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio)'))
+      new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio|object)'))
     def tileup(x, y):
       while x.ndim != y.ndim:
         y = y[...,None]
@@ -160,6 +165,8 @@ class RewardLenv:
     obs = self.lenv.reset(*args, **kwargs)
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
     obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
+    if 'goal:object' in self.goal:
+      obs['goal:object'] = self.goal['goal:object'].detach().clone()
     self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
     return obs
 
@@ -217,7 +224,7 @@ if __name__ == '__main__':
   G.imsize = G.lcd_w * G.lcd_h
   G.lenv_temp = 1.0
   G.reset_prompt = 1
-  G.diff_delt = 0
+  G.diff_delt = 1
   G.goal_thresh = 0.01
   G.lenv_goals = 0
 
@@ -248,7 +255,7 @@ if __name__ == '__main__':
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     pslcds += [env.reset(proprio=obs['proprio'][0].cpu())['lcd']]
-    rews += [rew.cpu().numpy()]
+    rews += [rew.detach().cpu().numpy()]
     deltas += [info['delta'].cpu().numpy()]
 
   lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
