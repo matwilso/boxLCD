@@ -45,14 +45,17 @@ class RNLDA(SingleStepAE):
                }
     return loss, metrics
 
-  def encode(self, batch, noise, flatten=True):
+  def encode(self, batch, noise, flatten=True, quantize=True):
     shape = batch['lcd'].shape
     if len(shape) == 4:
       batch = {key: val.clone().flatten(0, 1) for key, val in batch.items()}
     batch['lcd'].reshape
     z_e = self.encoder(batch)
     # return z_e.flatten(-3)
-    z_q, idxs = self.vq(z_e, noise=noise)
+    if quantize:
+      z_q, idxs = self.vq(z_e, noise=noise)
+    else:
+      z_q = z_e
     if flatten:
       z_q = z_q.flatten(-3)
       assert z_q.shape[-1] == self.z_size, 'encode shape should equal the z_size. probably forgot to change one.'

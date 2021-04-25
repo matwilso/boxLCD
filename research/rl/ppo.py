@@ -61,19 +61,20 @@ def ppo(G):
     env = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
     tvenv = real_tvenv
     if G.preproc:
-      MC = th.load(G.weightdir / 'bvae.pt').pop('G')
-      preproc = BVAE(tenv, MC)
+      sd = th.load(G.weightdir / f'{G.model}.pt')
+      mG = sd.pop('G')
+      mG.device = G.device
+      preproc = net_map[G.model](tenv, mG)
+      preproc.to(G.device)
       preproc.load(G.weightdir)
       for p in preproc.parameters():
         p.requires_grad = False
       preproc.eval()
-
       env = wrappers.PreprocVecEnv(preproc, env, G)
       real_tvenv = tvenv = wrappers.PreprocVecEnv(preproc, tvenv, G)
       obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
-      # if 'goal:proprio' in obs_space.spaces:
-      #  obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
-
+      if 'goal:proprio' in obs_space.spaces:
+        obs_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
   # tenv.reset()
   epoch = -1
 
@@ -115,8 +116,7 @@ def ppo(G):
   pi_optimizer = Adam(ac.pi.parameters(), lr=G.pi_lr, betas=(0.9, 0.999), eps=1e-8)
   vf_optimizer = Adam(ac.v.parameters(), lr=G.vf_lr, betas=(0.9, 0.999), eps=1e-8)
 
-  def update():
-    data = buf.get()
+  def update(data):
 
     pi_l_old, pi_info_old = compute_loss_pi(data)
     pi_l_old = pi_l_old.cpu()
@@ -253,6 +253,49 @@ def ppo(G):
   # Prepare for interaction with environment
   epoch_time = start_time = time.time()
 
+  if G.lenv and G.lenv_cont_roll:
+    import ipdb; ipdb.set_trace()
+    o = env.reset(np.arange(G.num_envs))
+    for itr in itertools.count(1):
+      o = {key: val for key, val in o.items()}
+      a, v, logp = ac.step(o)
+      # Step the venv
+      next_o, r, d, info = env.step(a)
+      a = get_action(o).detach()
+      o2, rew, done, info = env.step(a)
+      batch = {'obs': o, 'act': a, 'rew': rew, 'obs2': o2, 'done': done}
+      batch = tree_map(lambda x: x.detach(), batch)
+      update(batch)
+      o = o2
+
+      if itr % G.steps_per_epoch == 0:
+        update(data)
+        epoch = itr // G.log_n
+        if epoch % G.test_n == 0:
+          test_agent(itr)
+          if G.lenv:
+            test_agent(itr, use_lenv=True)
+        # Log info about epoch
+        print('=' * 30)
+        print('Epoch', epoch)
+        logger['var_count'] = [sum_count]
+        logger['dt'] = dt = time.time() - epoch_time
+        for key in logger:
+          val = np.mean(logger[key])
+          writer.add_scalar(key, val, itr)
+          print(key, val)
+        writer.flush()
+        print('Time', time.time() - start_time)
+        print('dt', dt)
+        print(G.logdir)
+        print(G.full_cmd)
+        print('=' * 30)
+        logger = defaultdict(lambda: [])
+        epoch_time = time.time()
+        with open(G.logdir / 'hps.yaml', 'w') as f:
+          yaml.dump(G, f, width=1000)
+
+
   if G.lenv:
     o, ep_ret, ep_len = env.reset(np.arange(G.num_envs)), th.zeros(G.num_envs).to(G.device), np.zeros(G.num_envs)#.to(G.device)
     success = th.zeros(G.num_envs).to(G.device)
@@ -309,7 +352,7 @@ def ppo(G):
       if (G.logdir / 'pause.marker').exists():
         import ipdb; ipdb.set_trace()
       epoch = itr // G.steps_per_epoch
-      update()
+      update(buf.get())
       with utils.Timer(logger, 'test_agent'):
         test_agent(itr)
         if G.lenv:

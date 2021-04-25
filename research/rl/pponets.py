@@ -61,7 +61,7 @@ class BaseCNN(nn.Module):
       x = g - s
     else:
       x = th.cat([s, g], -1)
-    x = th.cat([x, obs['goal:proprio'], obs['proprio']], -1)
+    x = th.cat([x, obs['goal:compact'], obs['proprio']], -1)
     x = self.linear(x)
     return x
 
@@ -113,7 +113,7 @@ class Actor(nn.Module):
     super().__init__()
     log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
     self.log_std = th.nn.Parameter(th.as_tensor(log_std))
-    gsize = obs_space['goal:proprio'].shape[0]
+    gsize = obs_space['goal:compact'].shape[0]
     size = obs_space[G.state_key].shape[0] + gsize
     self.size = size
     self.net = BaseMLP(size, act_dim, G)
@@ -130,7 +130,7 @@ class Actor(nn.Module):
     return pi, logp_a
 
   def _distribution(self, obs):
-    x = th.cat([obs[self.G.state_key], obs['goal:proprio']], -1)
+    x = th.cat([obs[self.G.state_key], obs['goal:compact']], -1)
     mu = self.net(x)
     std = th.exp(self.log_std)
     return thd.Normal(mu, std)
@@ -139,12 +139,12 @@ class Critic(nn.Module):
   def __init__(self, obs_space, act_dim, G, preproc=None):
     super().__init__()
     self.G = G
-    gsize = obs_space['goal:proprio'].shape[0]
+    gsize = obs_space['goal:compact'].shape[0]
     size = obs_space[self.G.state_key].shape[0] + gsize
     self.base = BaseMLP(size, 1, G)
 
   def forward(self, obs):
-    x = th.cat([obs[self.G.state_key], obs['goal:proprio']], -1)
+    x = th.cat([obs[self.G.state_key], obs['goal:compact']], -1)
     return self.base(x).squeeze(-1)
 
 class ActorCritic(nn.Module):

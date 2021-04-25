@@ -64,7 +64,7 @@ class BaseCNN(nn.Module):
       x = g - s
     else:
       x = th.cat([s, g], -1)
-    x = th.cat([x, obs['goal:proprio'], obs['proprio']], -1)
+    x = th.cat([x, obs['goal:compact'], obs['proprio']], -1)
     x = self.linear(x)
     return x
 
@@ -116,7 +116,7 @@ class QFunction(nn.Module):
     super().__init__()
     H = G.hidden_size
     self.G = G
-    gsize = obs_space['goal:proprio'].shape[0]
+    gsize = obs_space['goal:compact'].shape[0]
     size = obs_space[self.G.state_key].shape[0] + gsize + act_dim
     if self.G.net == 'mlp':
       self.base = BaseMLP(size, 1, G)
@@ -148,7 +148,7 @@ class QFunction(nn.Module):
 
   def forward(self, obs, act):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:proprio'], act], -1)
+      x = th.cat([obs[self.G.state_key], obs['goal:compact'], act], -1)
       return self.base(x).squeeze(-1)
     elif self.G.net == 'bvae':
       x = self.preproc.encode(obs).detach()
@@ -157,7 +157,7 @@ class QFunction(nn.Module):
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gx = self.preproc.encode(goals).detach()
         #gx = self.goalie(gx)
-        x = th.cat([x, obs['goal:proprio']], -1)
+        x = th.cat([x, obs['goal:compact']], -1)
         #x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
@@ -174,7 +174,7 @@ class SquashedGaussianActor(nn.Module):
   def __init__(self, obs_space, act_dim, G, preproc=None):
     super().__init__()
     self.G = G
-    gsize = obs_space['goal:proprio'].shape[0]
+    gsize = obs_space['goal:compact'].shape[0]
     size = obs_space[self.G.state_key].shape[0] + gsize
     self.size = size
     if self.G.net == 'mlp':
@@ -200,16 +200,16 @@ class SquashedGaussianActor(nn.Module):
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:proprio']], -1)
+      x = th.cat([obs[self.G.state_key], obs['goal:compact']], -1)
     elif self.G.net == 'bvae':
       z = self.preproc.encode(obs).detach()
       x = self.statie(z)
-      if 'goal:proprio' in obs:
+      if 'goal:compact' in obs:
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gz = self.preproc.encode(goals).detach()
         #gx = self.goalie(gz)
         #x = th.cat([x, gx], -1)
-        x = th.cat([x, obs['goal:proprio']], -1)
+        x = th.cat([x, obs['goal:compact']], -1)
         #1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
         #x = x + gx
     else:

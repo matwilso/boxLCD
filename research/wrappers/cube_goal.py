@@ -16,7 +16,6 @@ class CubeGoalEnv:
     #self.obs_keys = self._env.obs_keys
     #self.obs_idxs = self._env.obs_idxs
 
-
   @property
   def action_space(self):
     return self._env.action_space
@@ -26,7 +25,8 @@ class CubeGoalEnv:
     base_space = self._env.observation_space
     base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
     base_space.spaces['goal:proprio'] = copy.deepcopy(base_space.spaces['proprio'])
-    base_space.spaces['goal:proprio'].shape = (2,)
+    base_space.spaces['goal:object'] = copy.deepcopy(base_space.spaces['proprio'])
+    base_space.spaces['goal:object'].shape = (2,)
     base_space.spaces['goal:full_state'] = copy.deepcopy(base_space.spaces['full_state'])
     return base_space
 
@@ -38,7 +38,8 @@ class CubeGoalEnv:
     #self.goal = obs = self._env.reset(*args, **kwargs)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:full_state'] = np.array(self.goal['full_state'])
-    obs['goal:proprio'] = np.array(self.goal['full_state'][..., self.idxs])
+    obs['goal:proprio'] = np.array(self.goal['proprio'])
+    obs['goal:object'] = np.array(self.goal['full_state'][..., self.idxs])
     self.last_obs = copy.deepcopy(obs)
     return obs
 
@@ -49,7 +50,8 @@ class CubeGoalEnv:
     obs, rew, done, info = self._env.step(action)
     obs['goal:lcd'] = np.array(self.goal['lcd'])
     obs['goal:full_state'] = np.array(self.goal['full_state'])
-    obs['goal:proprio'] = np.array(self.goal['full_state'][..., self.idxs])
+    obs['goal:proprio'] = np.array(self.goal['proprio'])
+    obs['goal:object'] = np.array(self.goal['full_state'][..., self.idxs])
     rew, _done = self.comp_rew_done(obs, info)
     done = done or _done
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
@@ -60,34 +62,24 @@ class CubeGoalEnv:
 
   def comp_rew_done(self, obs, info={}):
     done = False
-    if self.G.state_rew:
-      delta = ((obs['goal:proprio'] - obs['full_state'][..., self.idxs])**2).mean()
-      if self.G.diff_delt:
-        last_delta = ((obs['goal:proprio'] - self.last_obs['full_state'][..., self.idxs])**2).mean()
-        # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
-        # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
-        #print(last_delta**0.5 - delta**0.5)
-        rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
-      else:
-        rew = -delta**0.5
-      #rew = -1.0 + 0.5*movement
-      info['delta'] = delta
-      done = False
-      if delta < 0.01:
-        done = True
-        rew += 1.0
-        info['success'] = True
-      # if delta < 0.005:
-      # done = False
+    delta = ((obs['goal:full_state'][...,self.idxs] - obs['full_state'][..., self.idxs])**2).mean()
+    if self.G.diff_delt:
+      last_delta = ((obs['goal:full_state'][...,self.idxs] - self.last_obs['full_state'][..., self.idxs])**2).mean()
+      # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+      # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
+      #print(last_delta**0.5 - delta**0.5)
+      rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
     else:
-      similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
-      rew = -1 + similarity
-      info['delta'] = similarity
-      if similarity > 0.70:
-        info['success'] = True
-        rew = 0
-        #done = False
-        done = True
+      rew = -delta**0.5
+    #rew = -1.0 + 0.5*movement
+    info['delta'] = delta
+    done = False
+    if delta < 0.01:
+      done = True
+      rew += 1.0
+      info['success'] = True
+    # if delta < 0.005:
+    # done = False
     return rew, done
 
   def close(self):

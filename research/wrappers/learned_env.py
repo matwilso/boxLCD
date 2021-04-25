@@ -1,4 +1,5 @@
 import os
+from re import I
 from jax.tree_util import tree_multimap, tree_map
 import time
 from collections import defaultdict
@@ -16,6 +17,8 @@ import research.utils
 import gym
 from boxLCD import env_map
 from research import utils
+from research.wrappers.body_goal import BodyGoalEnv
+from research.wrappers.cube_goal import CubeGoalEnv
 
 def outproc(img):
   return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
@@ -37,6 +40,7 @@ class LearnedEnv:
     self.model.eval()
     for p in self.model.parameters():
       p.requires_grad = False
+    
 
     def act_sample():
       return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
@@ -98,6 +102,15 @@ class RewardLenv:
     self.pobs_keys = self.lenv.pobs_keys
     self.obs_keys = self.lenv.obs_keys
     self.goal = {key: th.zeros(space.shape).to(self.G.device).float() for key, space in self.observation_space.spaces.items() if 'goal' in key}
+    if self.real_env.__class__.__name__ == 'CubeGoalEnv':
+      if self.G.arbiterdir.name != '':
+        arbiter_path = list(G.arbiterdir.glob('*.pt'))
+        if len(arbiter_path) > 0:
+          arbiter_path = arbiter_path[0]
+        self.obj_loc = th.jit.load(str(arbiter_path))
+        self.obj_loc.eval()
+      else:
+        self.obj_loc = None
 
   @property
   def action_space(self):
@@ -114,6 +127,7 @@ class RewardLenv:
     obs, rew, ep_done, info = self.lenv.step(act)
     obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+
     rew, goal_done = self.comp_rew_done(obs, info)
     done = th.logical_or(ep_done, goal_done)
     rew = rew * self.G.rew_scale
@@ -123,16 +137,18 @@ class RewardLenv:
       else:
         if th.any(goal_done):
           self._reset_goals(goal_done)
+    self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
     return obs, rew, done, info
 
   def _reset_goals(self, mask):
     mask = mask.bool()
     if not self.G.lenv_goals:
-      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:') for _ in np.arange(self.lenv.num_envs)]
+      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio)') for _ in np.arange(self.lenv.num_envs)]
       new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), new_goal[0], *new_goal[1:])
     else:
       #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
       new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
+      new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio)'))
     def tileup(x, y):
       while x.ndim != y.ndim:
         y = y[...,None]
@@ -144,6 +160,7 @@ class RewardLenv:
     obs = self.lenv.reset(*args, **kwargs)
     obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
     obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
+    self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
     return obs
 
   def render(self, *args, **kwargs):
@@ -151,25 +168,32 @@ class RewardLenv:
 
   def comp_rew_done(self, obs, info={}):
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
-    if self.G.state_rew:
+    if self.real_env.__class__.__name__ == 'BodyGoalEnv':
       delta = ((obs['goal:proprio'] - obs['proprio'])**2)
       keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
       idxs = [self.pobs_keys.index(x) for x in keys]
       delta = delta[..., idxs].mean(-1)
       rew = -delta**0.5
-      info['simi'] = delta
+      info['delta'] = delta
       #rew[delta < 0.010] = 0
       done[delta < self.G.goal_thresh] = 1
       info['success'] = done
-    else:
-      import ipdb; ipdb.set_trace()
-      similarity = (np.logical_and(obs['lcd'] == 0, obs['lcd'] == obs['goal:lcd']).mean() / (obs['lcd'] == 0).mean())
-      rew = -1 + similarity
-      info['simi'] = similarity
-      if similarity > 0.70:
-        rew = 0
-        #done = False
-        done = True
+    elif self.real_env.__class__.__name__ == 'CubeGoalEnv':
+      if self.obj_loc is None:
+        import ipdb; ipdb.set_trace()
+      else:
+        obj = self.obj_loc(obs).detach()
+        goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
+        delta = ((obj-goal)**2).mean(-1)
+        if self.G.diff_delt:
+          last_obj = self.obj_loc(self.last_obs)
+          last_delta = ((goal - last_obj)**2).mean(-1)
+          rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+        else:
+          rew = -delta**0.5
+        done[delta < 0.01] = 1
+        rew[delta < 0.01] += 1.0
+        info['delta'] = delta
     return rew, done
 
 if __name__ == '__main__':
@@ -177,6 +201,7 @@ if __name__ == '__main__':
   import argparse
   from boxLCD import env_map
   from research.define_config import config, args_type, env_fn
+  from PIL import Image, ImageDraw, ImageFont
   from research.wrappers.async_vector_env import AsyncVectorEnv
   parser = argparse.ArgumentParser()
   for key, value in config().items():
@@ -215,21 +240,38 @@ if __name__ == '__main__':
   lcds = [obs['lcd']]
   glcds = [obs['goal:lcd']]
   pslcds = [env.reset(proprio=obs['proprio'][0].cpu())['lcd']]
+  rews = [np.zeros(8)]
+  deltas = [np.zeros(8)]
   for i in range(200):
     act = lenv.action_space.sample()
     obs, rew, done, info = lenv.step(act)
     lcds += [obs['lcd']]
     glcds += [obs['goal:lcd']]
     pslcds += [env.reset(proprio=obs['proprio'][0].cpu())['lcd']]
+    rews += [rew.cpu().numpy()]
+    deltas += [info['delta'].cpu().numpy()]
 
   lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
   glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()
-  #lcds = (lcds - glcds + 1.0) / 2.0
+  lcds = (lcds - glcds + 1.0) / 2.0
   print('1', time.time() - start)
   lcds = outproc(lcds)
+
+  dframes = []
+  white = (255, 255, 255)
+  for i in range(len(lcds)):
+    frame = lcds[i]
+    pframe = Image.fromarray(frame.astype(np.uint8))
+    # get a drawing context
+    draw = ImageDraw.Draw(pframe)
+    fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
+    for j in range(8):
+      draw.text((10, G.lcd_h * 8 * j + 10), f't: {i} r:{rews[i][j]:.3f}', fill=white, fnt=fnt)
+    dframes += [np.array(pframe)]
+  dframes = np.stack(dframes)
   #for i in range(G.num_envs):
   #  lcds[50:, 128*i:128*i+10] = [1, 0, 0]
-  utils.write_gif('test.gif', lcds, fps=G.fps)
+  utils.write_gif('test.gif', dframes, fps=G.fps)
   #utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=G.fps)
 
   #obs = env.reset()

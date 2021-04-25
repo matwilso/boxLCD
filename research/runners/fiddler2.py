@@ -21,7 +21,7 @@ import ignite
 from jax.tree_util import tree_multimap, tree_map
 from research.nets import net_map
 
-class Fiddler:
+class Fiddler2:
   def __init__(self, model, env, G):
     super().__init__()
     self.env = env
