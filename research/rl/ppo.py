@@ -100,6 +100,7 @@ def ppo(G):
   ac = ActorCritic(obs_space, act_space, goal_key, G=G).to(G.device)
 
   # Experience buffer
+
   buf = PPOBuffer(G, obs_space=obs_space, act_space=act_space, size=G.num_envs * G.steps_per_epoch)
 
   # Count variables (protip: try to get a feel for how different size networks behave!)
@@ -194,8 +195,8 @@ def ppo(G):
       # Take deterministic actions at test time
       a, v, logp = ac.step(o)
       if not use_lenv and G.lenv:
-        a = a.cpu().numpy()
-        v = v.cpu().numpy()
+        a = a.detach().cpu().numpy()
+        v = v.detach().cpu().numpy()
       o, r, d, info = _env.step(a)
       all_done = pf.logical_or(all_done, d)
       if i != (G.ep_len - 1):
@@ -222,7 +223,7 @@ def ppo(G):
     if len(frames) != 0:
       if use_lenv:
         frames = th.stack(frames)
-        frames = frames.cpu().numpy()
+        frames = frames.detach().cpu().numpy()
       else:
         frames = np.stack(frames)
       frames = frames[..., None].repeat(REP, -3).repeat(REP, -2).repeat(3, -1)
@@ -247,9 +248,9 @@ def ppo(G):
         fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 60)
         for j in range(TN):
           if use_lenv:
-            color = yellow if dones[i][j].cpu().numpy() and i != G.ep_len - 1 else white
-            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].cpu().numpy():.3f}\nV: {vs[i][j].cpu().numpy():.3f}', fill=color, fnt=fnt)
-            draw.text((G.lcd_w * REP * j + 5, 5), f'{"*"*int(success[j].cpu().numpy())}', fill=yellow, fnt=fnt)
+            color = yellow if dones[i][j].detach().cpu().numpy() and i != G.ep_len - 1 else white
+            draw.text((G.lcd_w * REP * j + 10, 10), f't: {i} r:{rs[i][j].detach().cpu().numpy():.3f}\nV: {vs[i][j].detach().cpu().numpy():.3f}', fill=color, fnt=fnt)
+            draw.text((G.lcd_w * REP * j + 5, 5), f'{"*"*int(success[j].detach().cpu().numpy())}', fill=yellow, fnt=fnt)
             #draw.text((G.lcd_w * REP * (j+1) - 20, 10), '[]', fill=purple, fnt=fnt)
           else:
             color = yellow if dones[i][j] and i != G.ep_len - 1 else white
@@ -343,7 +344,7 @@ def ppo(G):
         if isinstance(x, np.ndarray):
           return x
         else:
-          return x.cpu().numpy()
+          return x.detach().cpu().numpy()
       trans = tree_map(fx, trans)
     buf.store_n(trans)
 

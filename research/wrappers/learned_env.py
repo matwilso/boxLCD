@@ -181,10 +181,10 @@ class RewardLenv:
       idxs = [self.pobs_keys.index(x) for x in keys]
       delta = delta[..., idxs].mean(-1)
       rew = -delta**0.5
-      info['delta'] = delta
+      info['delta'] = delta.detach()
       #rew[delta < 0.010] = 0
       done[delta < self.G.goal_thresh] = 1
-      info['success'] = done
+      info['success'] = done.detach()
     elif self.real_env.__class__.__name__ == 'CubeGoalEnv':
       if self.obj_loc is None:
         import ipdb; ipdb.set_trace()
@@ -193,15 +193,15 @@ class RewardLenv:
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
         delta = ((obj-goal)**2).mean(-1)
         if self.G.diff_delt:
-          last_obj = self.obj_loc(self.last_obs)
+          last_obj = self.obj_loc(self.last_obs).detach()
           last_delta = ((goal - last_obj)**2).mean(-1)
           rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
         else:
           rew = -delta**0.5
         done[delta < 0.01] = 1
         rew[delta < 0.01] += 1.0
-        info['delta'] = delta
-    return rew, done
+        info['delta'] = delta.detach()
+    return rew.detach(), done.detach()
 
 if __name__ == '__main__':
   from research.nets import net_map
