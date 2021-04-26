@@ -54,6 +54,8 @@ def ppo(G):
     model = net_map[G.model](tenv, mG)
     model.to(G.device)
     model.eval()
+    for p in model.parameters():
+      p.requires_grad = False
     env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
     tvenv = learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
     #obs_space.spaces = utils.subdict(obs_space.spaces, env.observation_space.spaces.keys())
@@ -361,7 +363,10 @@ def ppo(G):
     terminal_epoch = np.logical_or(terminal, epoch_ended)
     timeout_epoch = np.logical_or(timeout, epoch_ended)
     mask = ~timeout_epoch
-
+    if G.learned_rew:
+      logger['preproc_rew'] += [info['preproc_rew']] 
+      logger['learned_rew'] += [info['learned_rew']] 
+      logger['og_rew'] += [info['og_rew']] 
     # if trajectory didn't reach terminal state, bootstrap value target
     _, v, _ = ac.step(o)
     v[mask] *= 0
@@ -435,6 +440,7 @@ _G.state_key = 'proprio'
 _G.diff_delt = 0
 _G.goal_thresh = 0.010
 _G.preproc_rew = 0
+_G.learned_rew = 0
 _G.clip_ratio = 0.2
 _G.train_pi_iters = 80
 _G.train_v_iters = 80

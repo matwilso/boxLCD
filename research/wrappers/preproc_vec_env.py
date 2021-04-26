@@ -6,6 +6,7 @@ import numpy as np
 from gym.utils import seeding, EzPickle
 from research import utils
 from scipy.spatial.distance import cosine
+from jax.tree_util import tree_multimap, tree_map
 
 class PreprocVecEnv:
   """
@@ -20,6 +21,16 @@ class PreprocVecEnv:
     self.model.to(device)
     self.model.eval()
     #self.shared_memory = env.shared_memory
+    if self.G.learned_rew and 'Cube' in self.G.env:
+      if self.G.arbiterdir.name != '':
+        arbiter_path = list(self.G.arbiterdir.glob('*.pt'))
+        if len(arbiter_path) > 0:
+          arbiter_path = arbiter_path[0]
+        self.obj_loc = th.jit.load(str(arbiter_path))
+        self.obj_loc.eval()
+        print('LOADED OBJECT LOCALIZER')
+      else:
+        self.obj_loc = None
 
   @property
   def action_space(self):
@@ -46,6 +57,8 @@ class PreprocVecEnv:
 
   def reset(self, *args, **kwargs):
     obs = self._env.reset(*args, **kwargs)
+    self.last_obs = tree_map(lambda x: np.array(x), obs)
+    self.last_done = np.zeros(self.G.num_envs)
     return self._preproc_obs(obs)
 
   def render(self, *args, **kwargs):
@@ -54,14 +67,41 @@ class PreprocVecEnv:
   def comp_rew(self, z, gz):
     cos = np.zeros(z.shape[0])
     for i in range(len(z)):
-      cos[i] = -cosine(z[i],gz[i])
+      cos[i] = -cosine(z[i], gz[i])
     return cos
+
+  def learned_rew(self, obs, info={}):
+    assert 'Cube' in self.G.env, 'ya gotta'
+    done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
+    obs = tree_map(lambda x: th.as_tensor(1.0*x).float().to(self.G.device), obs)
+    obj = self.obj_loc(obs).detach()
+    goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
+    delta = ((obj - goal)**2).mean(-1)
+    info['goal_delta'] = ((obs['goal:object'] - goal)**2).mean(-1)
+    if self.G.diff_delt:
+      last_obs = tree_map(lambda x: th.as_tensor(1.0*x).float().to(self.G.device), self.last_obs)
+      last_obj = self.obj_loc(last_obs).detach()
+      last_delta = ((goal - last_obj)**2).mean(-1)
+      rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+    else:
+      rew = -delta**0.5
+    done[delta < 0.01] = 1
+    #rew[delta < 0.01] += 1.0
+    return rew.detach().cpu().numpy(), done.detach().cpu().numpy().astype(np.bool)
 
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     obs = self._preproc_obs(obs)
     if self.G.preproc_rew:
       rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+    elif self.G.learned_rew:
+      info = {}
+      preproc_rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+      info['og_rew'] = rew
+      rew, _ = self.learned_rew(obs, info)
+      info['preproc_rew'] = preproc_rew
+      info['learned_rew'] = rew
+    self.last_obs = tree_map(lambda x: np.array(x), obs)
     return obs, rew, done, info
 
   def close(self):
@@ -91,7 +131,7 @@ if __name__ == '__main__':
   G.lr = 1e-3
   #G.lcd_base = 32
   G.rew_scale = 1.0
-  G.diff_delt = 1 
+  G.diff_delt = 1
   G.fps = 10
   G.hidden_size = 128
   G.nfilter = 128
@@ -138,6 +178,6 @@ if __name__ == '__main__':
   env.close()
   lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
   glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
-  lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
+  lcds = (1.0 * lcds - 1.0 * glcds + 1.0) / 2.0
   print('dt', time.time() - start)
   utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)

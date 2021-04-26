@@ -65,19 +65,19 @@ class LearnedEnv:
 
     # TODO: do more than one step.
     if self.G.reset_prompt:
-      #with th.no_grad():
+      # with th.no_grad():
       #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
       self.ptr = 1
     else:
       window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
       with th.no_grad():
-       for self.ptr in range(10):
-         window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
-       window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
-       self.ptr = 4
-      
-    obs = {key: val[:, self.ptr-1] for key, val in window_batch.items() if key in self.keys}
-    if update_window_batch: # False if we want to preserve the simulator state
+        for self.ptr in range(10):
+          window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
+        window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
+        self.ptr = 4
+
+    obs = {key: val[:, self.ptr - 1] for key, val in window_batch.items() if key in self.keys}
+    if update_window_batch:  # False if we want to preserve the simulator state
       self.window_batch = window_batch
     return obs
 
@@ -110,6 +110,7 @@ class RewardLenv:
           arbiter_path = arbiter_path[0]
         self.obj_loc = th.jit.load(str(arbiter_path))
         self.obj_loc.eval()
+        print('LOADED OBJECT LOCALIZER')
       else:
         self.obj_loc = None
 
@@ -154,11 +155,12 @@ class RewardLenv:
       #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
       new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
       new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio|object)'))
+
     def tileup(x, y):
       while x.ndim != y.ndim:
-        y = y[...,None]
+        y = y[..., None]
       return y
-    self.goal = tree_multimap(lambda x, y: x*tileup(x,mask) + y*~tileup(y,mask), new_goal, self.goal)
+    self.goal = tree_multimap(lambda x, y: x * tileup(x, mask) + y * ~tileup(y, mask), new_goal, self.goal)
 
   def reset(self, *args, **kwargs):
     self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device))
@@ -191,7 +193,7 @@ class RewardLenv:
       else:
         obj = self.obj_loc(obs).detach()
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
-        delta = ((obj-goal)**2).mean(-1)
+        delta = ((obj - goal)**2).mean(-1)
         if self.G.diff_delt:
           last_obj = self.obj_loc(self.last_obs).detach()
           last_delta = ((goal - last_obj)**2).mean(-1)
@@ -276,14 +278,14 @@ if __name__ == '__main__':
       draw.text((10, G.lcd_h * 8 * j + 10), f't: {i} r:{rews[i][j]:.3f}', fill=white, fnt=fnt)
     dframes += [np.array(pframe)]
   dframes = np.stack(dframes)
-  #for i in range(G.num_envs):
+  # for i in range(G.num_envs):
   #  lcds[50:, 128*i:128*i+10] = [1, 0, 0]
   utils.write_gif('test.gif', dframes, fps=G.fps)
   #utils.write_gif('pstest.gif', outproc(np.stack(pslcds)), fps=G.fps)
 
   #obs = env.reset()
   #ostart = time.time()
-  #for i in range(200):
+  # for i in range(200):
   #  act = env.action_space.sample()
   #  obs, rew, done, info = env.step(act)
   #print('2', time.time() - ostart)
@@ -293,16 +295,15 @@ if __name__ == '__main__':
   #obs = venv.reset(np.arange(G.num_envs))
   #lcds = [obs['lcd']]
   #glcds = [obs['goal:lcd']]
-  #for i in range(200):
+  # for i in range(200):
   #  act = venv.action_space.sample()
   #  obs, rew, done, info = venv.step(act)
   #  lcds += [obs['lcd']]
   #  glcds += [obs['goal:lcd']]
-  #venv.close()
+  # venv.close()
   #print('3', time.time() - vstart)
   #lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
   #glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
   #lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
   #print('1', time.time() - start)
   #utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)
-

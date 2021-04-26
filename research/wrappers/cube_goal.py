@@ -72,12 +72,12 @@ class CubeGoalEnv:
     else:
       rew = -delta**0.5
     #rew = -1.0 + 0.5*movement
-    info['delta'] = delta
+    #info['delta'] = delta
     done = False
     if delta < 0.01:
       done = True
       rew += 1.0
-      info['success'] = True
+      #info['success'] = True
     # if delta < 0.005:
     # done = False
     return rew, done
