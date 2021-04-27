@@ -8,7 +8,6 @@ import torch.nn as nn
 from research.nets._base import Net
 from research import utils
 from research.wrappers.async_vector_env import AsyncVectorEnv
-from research.define_config import env_fn
 from jax.tree_util import tree_map
 A = utils.A
 RED, GREEN = A[0.9, 0.2, 0.2], A[0.2, 0.9, 0.2]
@@ -21,6 +20,7 @@ class VideoModel(Net):
     self.observation_space = env.observation_space
     self.action_space = env.action_space
     self.proprio_n = env.observation_space.spaces['proprio'].shape[0]
+    from research.define_config import env_fn
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.video_n)])
 
   def onestep(self):

@@ -178,11 +178,11 @@ class RewardLenv:
   def comp_rew_done(self, obs, info={}):
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
     if self.real_env.__class__.__name__ == 'BodyGoalEnv':
-      delta = ((obs['goal:proprio'] - obs['proprio'])**2)
+      delta = (obs['goal:proprio'] - obs['proprio']).abs()
       keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
       idxs = [self.pobs_keys.index(x) for x in keys]
       delta = delta[..., idxs].mean(-1)
-      rew = -delta**0.5
+      rew = -delta
       info['delta'] = delta.detach()
       #rew[delta < 0.010] = 0
       done[delta < self.G.goal_thresh] = 1
@@ -193,15 +193,15 @@ class RewardLenv:
       else:
         obj = self.obj_loc(obs).detach()
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
-        delta = ((obj - goal)**2).mean(-1)
+        delta = (obj - goal).abs().mean(-1)
         if self.G.diff_delt:
           last_obj = self.obj_loc(self.last_obs).detach()
-          last_delta = ((goal - last_obj)**2).mean(-1)
-          rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+          last_delta = (last_obj - goal).abs().mean(-1)
+          rew = -0.05 + 10 * (last_delta - delta)
         else:
-          rew = -delta**0.5
-        done[delta < 0.01] = 1
-        rew[delta < 0.01] += 1.0
+          rew = -delta
+        done[delta < 0.05] = 1
+        rew[delta < 0.05] += 1.0
         info['delta'] = delta.detach()
     return rew.detach(), done.detach()
 

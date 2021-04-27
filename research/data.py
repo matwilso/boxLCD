@@ -172,6 +172,6 @@ def load_ds(G):
   #  pass
   train_dset = RolloutDataset(G.datapath / 'train', G.window, refresh_data=G.refresh_data)
   test_dset = RolloutDataset(G.datapath / 'test', G.window, infinite=False)
-  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=0, drop_last=True)
-  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=0, drop_last=True)
+  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
   return train_loader, test_loader

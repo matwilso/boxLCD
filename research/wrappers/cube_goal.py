@@ -57,24 +57,27 @@ class CubeGoalEnv:
     #similarity = (obs['goal:lcd'] == obs['lcd']).mean()
     #rew = self.simi2rew(similarity)
     rew = rew * self.G.rew_scale
+    #info['last_obs'] = self.last_obs
     self.last_obs = copy.deepcopy(obs)
     return obs, rew, done, info
 
   def comp_rew_done(self, obs, info={}):
     done = False
-    delta = ((obs['goal:full_state'][...,self.idxs] - obs['full_state'][..., self.idxs])**2).mean()
+    delta = np.abs(obs['goal:full_state'][...,self.idxs] - obs['full_state'][..., self.idxs]).mean()
     if self.G.diff_delt:
-      last_delta = ((obs['goal:full_state'][...,self.idxs] - self.last_obs['full_state'][..., self.idxs])**2).mean()
+      last_delta = np.abs(obs['goal:full_state'][...,self.idxs] - self.last_obs['full_state'][..., self.idxs]).mean()
       # rew = 1*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
       # rew = -0.1 + 5*(last_delta**0.5 - delta**0.5) # reward should be proportional to how much closer we got.
       #print(last_delta**0.5 - delta**0.5)
-      rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+      info['last_delta'] = last_delta
+      info['delta'] = delta
+      rew = -0.05 + 10 * (last_delta - delta)
     else:
-      rew = -delta**0.5
+      rew = -delta
     #rew = -1.0 + 0.5*movement
     #info['delta'] = delta
     done = False
-    if delta < 0.01:
+    if delta < 0.05:
       done = True
       rew += 1.0
       #info['success'] = True

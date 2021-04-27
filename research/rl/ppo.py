@@ -364,9 +364,11 @@ def ppo(G):
     timeout_epoch = np.logical_or(timeout, epoch_ended)
     mask = ~timeout_epoch
     if G.learned_rew:
-      logger['preproc_rew'] += [info['preproc_rew']] 
-      logger['learned_rew'] += [info['learned_rew']] 
-      logger['og_rew'] += [info['og_rew']] 
+      logger['preproc_rew'] += [info['preproc_rew'].mean()] 
+      logger['learned_rew'] += [info['learned_rew'].mean()] 
+      logger['og_rew'] += [info['og_rew'].mean()] 
+      logger['goal_delta'] += [info['goal_delta'].mean()] 
+      logger['rew_delta'] += [info['rew_delta'].mean()] 
     # if trajectory didn't reach terminal state, bootstrap value target
     _, v, _ = ac.step(o)
     v[mask] *= 0

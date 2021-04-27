@@ -1,3 +1,4 @@
+from research.nets.autoencoders import quantize
 import torch as th
 import copy
 from re import I
@@ -47,7 +48,7 @@ class PreprocVecEnv:
 
   def _preproc_obs(self, obs):
     batch_obs = {key: th.as_tensor(1.0 * val).float().to(self.device) for key, val in obs.items()}
-    zstate = self.model.encode(batch_obs, noise=False)
+    zstate = self.model.encode(batch_obs, noise=False, quantize=False)
     obs['zstate'] = zstate.detach().cpu().numpy()
     if 'goal:full_state' in batch_obs:
       goal = utils.filtdict(batch_obs, 'goal:', fkey=lambda x: x[5:])
@@ -73,34 +74,47 @@ class PreprocVecEnv:
   def learned_rew(self, obs, info={}):
     assert 'Cube' in self.G.env, 'ya gotta'
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
-    obs = tree_map(lambda x: th.as_tensor(1.0*x).float().to(self.G.device), obs)
+    obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), obs)
     obj = self.obj_loc(obs).detach()
     goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
-    delta = ((obj - goal)**2).mean(-1)
-    info['goal_delta'] = ((obs['goal:object'] - goal)**2).mean(-1)
+    delta = (obj - goal).abs().mean(-1)
+    info['goal_delta'] = (obs['goal:object'] - goal).abs().mean().cpu().detach()
     if self.G.diff_delt:
-      last_obs = tree_map(lambda x: th.as_tensor(1.0*x).float().to(self.G.device), self.last_obs)
+      last_obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs)
       last_obj = self.obj_loc(last_obs).detach()
-      last_delta = ((goal - last_obj)**2).mean(-1)
-      rew = -0.05 + 10 * (last_delta**0.5 - delta**0.5)
+      last_delta = (last_obj - goal).abs().mean(-1)
+      rew = -0.05 + 10 * (last_delta - delta)
     else:
-      rew = -delta**0.5
-    done[delta < 0.01] = 1
-    #rew[delta < 0.01] += 1.0
+      rew = -delta
+    done[delta < 0.04] = 1
+    rew[delta < 0.04] += 1.0
     return rew.detach().cpu().numpy(), done.detach().cpu().numpy().astype(np.bool)
 
   def step(self, action):
-    obs, rew, done, info = self._env.step(action)
+    obs, rew, done, _info = self._env.step(action)
     obs = self._preproc_obs(obs)
     if self.G.preproc_rew:
       rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
     elif self.G.learned_rew:
+      #self.info = info
       info = {}
       preproc_rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
       info['og_rew'] = rew
+      #if np.any(done):
+      #  import ipdb; ipdb.set_trace()
       rew, _ = self.learned_rew(obs, info)
       info['preproc_rew'] = preproc_rew
+      timeout = []
+      for inf in _info:
+        if 'timeout' in inf and inf['timeout']:
+          timeout += [True]
+        else:
+          timeout += [False]
+      timeout = np.array(timeout)
+      success = np.logical_and(done, ~timeout)
+      rew[success] = 1.0
       info['learned_rew'] = rew
+      info['rew_delta'] = info['og_rew'] - rew
     self.last_obs = tree_map(lambda x: np.array(x), obs)
     return obs, rew, done, info
 

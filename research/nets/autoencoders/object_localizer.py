@@ -55,8 +55,9 @@ class Encoder(nn.Module):
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Flatten(-3),
-        nn.Linear(size * nf, out_size),
-
+        nn.Linear(size * nf, G.hidden_size),
+        nn.ReLU(),
+        nn.Linear(G.hidden_size, out_size),
     ])
 
   def forward(self, batch):
