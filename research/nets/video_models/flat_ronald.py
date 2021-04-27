@@ -18,8 +18,9 @@ class FlatRonald(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
     # <LOAD ronald>
-    sd = th.load(G.weightdir / 'RNLDA.pt')
+    sd = th.load(G.weightdir / 'RNLDA.pt', map_location=th.device(G.device))
     ronaldG = sd.pop('G')
+    ronaldG.device = G.device
     self.ronald = RNLDA(env, ronaldG)
     self.ronald.load(G.weightdir)
     for p in self.ronald.parameters():

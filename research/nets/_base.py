@@ -31,9 +31,9 @@ class Net(nn.Module):
     th.save(sd, path)
     print(path)
 
-  def load(self, dir):
+  def load(self, dir, device=None):
     path = dir / f'{self.name}.pt'
-    sd = th.load(path)
+    sd = th.load(path, map_location=self.G.device)
     G = sd.pop('G')
     self.load_state_dict(sd)
     print(f'LOADED {path}')

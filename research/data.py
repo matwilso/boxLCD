@@ -174,4 +174,6 @@ def load_ds(G):
   test_dset = RolloutDataset(G.datapath / 'test', G.window, infinite=False)
   train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
+  train_loader.nbarrels = train_dset.nbarrels
+  test_loader.nbarrels = test_dset.nbarrels
   return train_loader, test_loader

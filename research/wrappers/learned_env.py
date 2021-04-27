@@ -135,6 +135,8 @@ class RewardLenv:
       obs['goal:object'] = self.goal['goal:object'].detach().clone()
 
     rew, goal_done = self.comp_rew_done(obs, info)
+    success = th.logical_and(goal_done, ~ep_done)
+    rew[success] += 1.0
     done = th.logical_or(ep_done, goal_done)
     rew = rew * self.G.rew_scale
     if self.G.autoreset:
@@ -201,7 +203,6 @@ class RewardLenv:
         else:
           rew = -delta
         done[delta < 0.05] = 1
-        rew[delta < 0.05] += 1.0
         info['delta'] = delta.detach()
     return rew.detach(), done.detach()
 

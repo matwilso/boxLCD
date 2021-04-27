@@ -328,7 +328,7 @@ def ppo(G):
     time_to_succ = G.ep_len * np.ones(G.num_envs)
     pf = np
   # Main loop: collect experience in venv and updte/log each epoch
-  for itr in range(1, G.total_steps):
+  for itr in range(1, G.total_steps+1):
     with utils.Timer(logger, 'action'):
       o = {key: val for key, val in o.items()}
       a, v, logp = ac.step(o)
@@ -436,11 +436,11 @@ _G.lenv_mode = 'swap'
 _G.lenv_temp = 1.0
 _G.lenv_cont_roll = 0
 _G.lenv_goals = 0
-_G.reset_prompt = 0
+_G.reset_prompt = 1
 _G.succ_reset = 1  # between lenv and normal env
 _G.state_key = 'proprio'
 _G.diff_delt = 0
-_G.goal_thresh = 0.010
+_G.goal_thresh = 0.005
 _G.preproc_rew = 0
 _G.learned_rew = 0
 _G.clip_ratio = 0.2

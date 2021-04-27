@@ -21,8 +21,8 @@ if __name__ == '__main__':
   G = parser.parse_args()
   G.device = 'cpu'
   env = env_fn(G)()
-
-  sd = th.load(G.weightdir / f'{G.model}.pt')
+  device = th.device(G.device)
+  sd = th.load(G.weightdir / f'{G.model}.pt', map_location=device)
   mG = sd.pop('G')
   mG.device = G.device
   model = net_map[G.model](env, mG)
@@ -32,13 +32,15 @@ if __name__ == '__main__':
     p.requires_grad = False
   print('LOADED MODEL', G.weightdir)
   # model.to(G.device)
-  env.seed(5)
+  #env.seed(5)
+  env.seed(1)
+  #env.seed(7)
   np_random = np.random.RandomState(5)
   # TODO: burn in the env for a few steps first.
   obses = tree_map(lambda x: th.as_tensor(x).float()[None, None], env.reset())
   actions = []
   for i in range(mG.window - 1):
-  #for i in range(mG.ep_len - 1):
+    # for i in range(mG.ep_len - 1):
     action = np_random.uniform(-1, 1, env.action_space.shape[0])
     actions += [action]
     obs = env.step(action)[0]
@@ -47,7 +49,8 @@ if __name__ == '__main__':
   actions += [action]
   action = th.as_tensor(np.stack(actions)).float()[None]
   obses['action'] = action
-  sample = model.sample(1, action=action, prompts=obses, prompt_n=mG.prompt_n)
+  PN = 3
+  sample = model.sample(1, action=action, prompts=obses, prompt_n=PN)
   #obses = tree_map(lambda x: x.cpu().numpy(), obses)
   imgs = []
   for i in range(0, 20, 1):
@@ -57,5 +60,11 @@ if __name__ == '__main__':
     blank = np.zeros_like(x)[:1]
     xt = np.cat([t, blank, x, blank, error], 0)[..., None].repeat(3, -1)
     imgs += [xt]
-    imgs += [np.zeros_like(xt)[:, :1]]
-  plt.imsave(f'test3.png', np.cat(imgs[:-1], 1).repeat(4,0).repeat(4,1))
+    col_blank = np.zeros_like(xt)[:, :1]
+    if i == PN-1:
+      col_blank[..., 0] = 1.0
+    imgs += [col_blank]
+
+  img = np.cat(imgs[:-1], 1).repeat(4, 0).repeat(4, 1)
+  img = np.cat([img, np.ones_like(img)[::4]], 0)
+  plt.imsave(f'{mG.env}_frames.png', img)

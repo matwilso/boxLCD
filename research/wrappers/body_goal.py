@@ -18,6 +18,9 @@ class BodyGoalEnv:
     self.SCALE = 2
     self.G = G
 
+  def seed(self, *args):
+    self._env.seed(*args)
+
   @property
   def action_space(self):
     return self._env.action_space

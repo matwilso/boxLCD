@@ -55,7 +55,7 @@ if __name__ == '__main__':
   G.imsize = G.lcd_w * G.lcd_h
   #assert G.lcd_w == data_cfg.lcd_w and G.lcd_h == data_cfg.lcd_w, "mismatch of env dims"
   env = env_fn(G)()
-  if G.mode not in ['collect']:
+  if G.mode not in ['collect', 'eval']:
     if G.model in net_map:
       model = net_map[G.model](env, G)
     else:
@@ -66,7 +66,7 @@ if __name__ == '__main__':
   if G.mode == 'train':
     runner = runners.Trainer(model, env, G)
   elif G.mode == 'eval':
-    runner = runners.Evaler(model, env, G)
+    runner = runners.Evaler(None, env, G)
   elif G.mode == 'viz':
     runner = runners.Vizer(model, env, G)
   elif G.mode == 'collect':

@@ -21,21 +21,28 @@ from research.utils import Timer
 from research.define_config import env_fn
 from research.wrappers import AsyncVectorEnv
 from jax.tree_util import tree_map
+from research.nets import net_map
 
 class Evaler:
   def __init__(self, model, env, G):
     super().__init__()
     print('wait dataload')
     self.train_ds, self.test_ds = data.load_ds(G)
-    import ipdb; ipdb.set_trace() # DO a check here to make sure we are using approximately the right amount of data.
-    # usually we assume 10 barrels of test data to run this.
+    assert self.test_ds.nbarrels == 10, "usually we assume 10 barrels of test data to run this."
     print('dataloaded')
     self.env = env
+    sd = th.load(G.weightdir / f'{G.model}.pt')
+    mG = sd.pop('G')
+    mG.device = G.device
+    model = net_map[G.model](env, mG)
+    model.load(G.weightdir)
+    model.eval()
+    model.to(G.device)
     self.model = model
     self.G = G
     self.b = lambda x: {key: val.to(G.device) for key, val in x.items()}
-    arbiter_path = list(G.arbiterdir.glob('*.pt'))
-    if len(arbiter_path) > 0:
+    if G.arbiterdir.name != '':
+      arbiter_path = list(G.arbiterdir.glob('*.pt'))
       arbiter_path = arbiter_path[0]
       self.arbiter = th.jit.load(str(arbiter_path))
       with (arbiter_path.parent / 'hps.yaml').open('r') as f:
