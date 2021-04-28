@@ -41,57 +41,59 @@ class LearnedEnv:
     for p in self.model.parameters():
       p.requires_grad = False
 
-    def act_sample():
-      return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
+    def act_sample(): return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
     self.action_space.sample = act_sample
-
     spaces = {}
     self.keys = ['lcd', 'proprio']
     for key in self.keys:
       val = self.real_env.observation_space.spaces[key]
       spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
-
     spaces['zstate'] = gym.spaces.Box(-1, +1, (num_envs, self.model.z_size), dtype=val.dtype)
     self.observation_space = gym.spaces.Dict(spaces)
 
   def reset(self, *args, update_window_batch=True, **kwargs):
-    prompts = [self.real_env.reset() for _ in range(self.num_envs)]
-    prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
-    window_batch = {key: th.zeros([self.model.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
-    window_batch['action'] = th.zeros([self.model.G.window, *self.action_space.shape]).to(self.G.device)
-    window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
-    for key in self.keys:
-      window_batch[key][:, 0] = prompts[key]
+    with th.no_grad():
+      prompts = [self.real_env.reset() for _ in range(self.num_envs)]
+      prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device), prompts[0], *prompts[1:])
+      window_batch = {key: th.zeros([self.model.G.window, *val.shape], dtype=th.float32).to(self.G.device) for key, val in self.observation_space.spaces.items()}
+      window_batch['action'] = th.zeros([self.model.G.window, *self.action_space.shape]).to(self.G.device)
+      window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
+      for key in self.keys:
+        window_batch[key][:, 0] = prompts[key]
 
-    # TODO: do more than one step.
-    if self.G.reset_prompt:
-      # with th.no_grad():
-      #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
-      self.ptr = 1
-    else:
-      window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
-      with th.no_grad():
-        for self.ptr in range(10):
-          window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
-        window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
-        self.ptr = 4
+      # TODO: do more than one step.
+      if self.G.reset_prompt:
+        # with th.no_grad():
+        #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
+        self.ptr = 1
+      else:
+        window_batch['action'] += 2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
+        with th.no_grad():
+          for self.ptr in range(10):
+            window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
+          window_batch = {key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1) for key, val in window_batch.items()}
+          self.ptr = 4
 
-    obs = {key: val[:, self.ptr - 1] for key, val in window_batch.items() if key in self.keys}
-    if update_window_batch:  # False if we want to preserve the simulator state
-      self.window_batch = window_batch
-    return obs
+      obs = {key: val[:, self.ptr - 1] for key, val in window_batch.items() if key in self.keys}
+      if update_window_batch:  # False if we want to preserve the simulator state
+        self.window_batch = window_batch
+      self.ep_t = 0
+      return obs
 
   def step(self, act):
     with th.no_grad():
-      self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
-      self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
-      obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
-      self.ptr = min(1 + self.ptr, self.model.G.window - 1)
-      if self.ptr == self.model.G.window - 1:
-        self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
-        self.ptr -= 1
-    rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
-    return obs, rew, done, {}
+      self.ep_t += 1
+      with th.no_grad():
+        self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(self.G.device)
+        self.window_batch = self.model.onestep(self.window_batch, self.ptr, temp=self.G.lenv_temp)
+        obs = {key: val[:, self.ptr] for key, val in self.window_batch.items() if key in self.keys}
+        self.ptr = min(1 + self.ptr, self.model.G.window - 1)
+        if self.ptr == self.model.G.window - 1:
+          self.window_batch = {key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1) for key, val in self.window_batch.items()}
+          self.ptr -= 1
+      rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
+      done[:] = self.ep_t >= self.G.ep_len
+      return obs, rew, done, {}
 
 class RewardLenv:
   def __init__(self, env):
@@ -123,67 +125,78 @@ class RewardLenv:
     base_space = copy.deepcopy(self.lenv.observation_space)
     base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
     base_space.spaces['goal:proprio'] = copy.deepcopy(base_space.spaces['proprio'])
-    base_space.spaces['goal:object'] = copy.deepcopy(base_space.spaces['proprio'])
-    base_space.spaces['goal:object'].shape = (self.lenv.num_envs, 2)
+    if 'Cube' in self.real_env.__class__.__name__:
+      base_space.spaces['goal:object'] = copy.deepcopy(base_space.spaces['proprio'])
+      base_space.spaces['goal:object'].shape = (self.lenv.num_envs, 2)
     return base_space
 
-  def step(self, act):
-    obs, rew, ep_done, info = self.lenv.step(act)
-    obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
-    obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
-    if 'goal:object' in self.goal:
-      obs['goal:object'] = self.goal['goal:object'].detach().clone()
+  def step(self, act, logger=defaultdict(lambda: [])):
+    with th.no_grad():
+      with utils.Timer(logger, 'lenv_step'):
+        obs, rew, ep_done, info = self.lenv.step(act)
+      obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
+      obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+      if 'goal:object' in self.goal:
+        obs['goal:object'] = self.goal['goal:object'].detach().clone()
 
-    rew, goal_done = self.comp_rew_done(obs, info)
-    success = th.logical_and(goal_done, ~ep_done)
-    rew[success] += 1.0
-    done = th.logical_or(ep_done, goal_done)
-    rew = rew * self.G.rew_scale
-    if self.G.autoreset:
-      if th.all(ep_done):
-        obs = self.reset()
+      with utils.Timer(logger, 'comp_rew_done'):
+        rew, goal_done = self.comp_rew_done(obs, info)
+      success = th.logical_and(goal_done.bool(), ~ep_done.bool())
+      rew[success] += 1.0
+      done = th.logical_or(ep_done.bool(), goal_done.bool())
+      with utils.Timer(logger, 'post_proc'):
+        rew = rew * self.G.rew_scale
+        if self.G.autoreset:
+          if th.all(ep_done):
+            with utils.Timer(logger, 'reset_env'):
+              obs = self.reset()
+          else:
+            with utils.Timer(logger, 'reset_goals'):
+              if th.any(goal_done):
+                self._reset_goals(goal_done, logger)
+      self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
+      return obs, rew, done, info
+
+  def _reset_goals(self, mask, logger=defaultdict(lambda: [])):
+    with th.no_grad():
+      mask = mask.bool()
+      if self.G.lenv_goals:
+        #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
+        new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
+        new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio|object)'))
       else:
-        if th.any(goal_done):
-          self._reset_goals(goal_done)
-    self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
-    return obs, rew, done, info
+        with utils.Timer(logger, 'set_goal'):
+          new_goal = [utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio|object)') for _ in np.arange(self.lenv.num_envs)]
+          new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), new_goal[0], *new_goal[1:])
 
-  def _reset_goals(self, mask):
-    mask = mask.bool()
-    if not self.G.lenv_goals:
-      new_goal = [utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio|object)') for _ in np.arange(self.lenv.num_envs)]
-      new_goal = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), new_goal[0], *new_goal[1:])
-    else:
-      #assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
-      new_goal = utils.prefix_dict('goal:', self.lenv.reset(update_window_batch=False))
-      new_goal = utils.prefix_dict('goal:', utils.filtdict(self.lenv.reset(update_window_batch=False), '(lcd|proprio|object)'))
-
-    def tileup(x, y):
-      while x.ndim != y.ndim:
-        y = y[..., None]
-      return y
-    self.goal = tree_multimap(lambda x, y: x * tileup(x, mask) + y * ~tileup(y, mask), new_goal, self.goal)
+      with utils.Timer(logger, 'tileup'):
+        def tileup(x, y):
+          while x.ndim != y.ndim:
+            y = y[..., None]
+          return y
+        self.goal = tree_multimap(lambda x, y: (x * tileup(x, mask) + y * ~tileup(y, mask)).detach(), new_goal, self.goal)
 
   def reset(self, *args, **kwargs):
-    self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device))
-    obs = self.lenv.reset(*args, **kwargs)
-    obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
-    obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
-    if 'goal:object' in self.goal:
-      obs['goal:object'] = self.goal['goal:object'].detach().clone()
-    self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
-    return obs
+    with th.no_grad():
+      self._reset_goals(th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device))
+      obs = self.lenv.reset(*args, **kwargs)
+      obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
+      obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
+      if 'goal:object' in self.goal:
+        obs['goal:object'] = self.goal['goal:object'].detach().clone()
+      self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
+      return obs
 
   def render(self, *args, **kwargs):
     self.lenv.render(*args, **kwargs)
 
   def comp_rew_done(self, obs, info={}):
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
-    if self.real_env.__class__.__name__ == 'BodyGoalEnv':
-      delta = (obs['goal:proprio'] - obs['proprio']).abs()
+    if 'BodyGoal' in self.real_env.__class__.__name__:
       keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
       idxs = [self.pobs_keys.index(x) for x in keys]
-      delta = delta[..., idxs].mean(-1)
+      delta = (obs['goal:proprio'][..., idxs] - obs['proprio'][..., idxs]).abs()
+      delta = delta.mean(-1)
       rew = -delta
       info['delta'] = delta.detach()
       #rew[delta < 0.010] = 0
@@ -204,6 +217,8 @@ class RewardLenv:
           rew = -delta
         done[delta < 0.05] = 1
         info['delta'] = delta.detach()
+    else:
+      import ipdb; ipdb.set_trace()
     return rew.detach(), done.detach()
 
 if __name__ == '__main__':

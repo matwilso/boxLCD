@@ -32,8 +32,8 @@ if __name__ == '__main__':
     p.requires_grad = False
   print('LOADED MODEL', G.weightdir)
   # model.to(G.device)
-  #env.seed(5)
-  env.seed(1)
+  env.seed(7)
+  #env.seed(1)
   #env.seed(7)
   np_random = np.random.RandomState(5)
   # TODO: burn in the env for a few steps first.
@@ -49,7 +49,7 @@ if __name__ == '__main__':
   actions += [action]
   action = th.as_tensor(np.stack(actions)).float()[None]
   obses['action'] = action
-  PN = 3
+  PN = 1
   sample = model.sample(1, action=action, prompts=obses, prompt_n=PN)
   #obses = tree_map(lambda x: x.cpu().numpy(), obses)
   imgs = []
@@ -65,6 +65,6 @@ if __name__ == '__main__':
       col_blank[..., 0] = 1.0
     imgs += [col_blank]
 
-  img = np.cat(imgs[:-1], 1).repeat(4, 0).repeat(4, 1)
+  img = np.cat(imgs[:-1], 1).repeat(8, 0).repeat(8, 1)
   img = np.cat([img, np.ones_like(img)[::4]], 0)
   plt.imsave(f'{mG.env}_frames.png', img)

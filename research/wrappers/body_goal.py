@@ -58,16 +58,17 @@ class BodyGoalEnv:
   def comp_rew_done(self, obs, info={}):
     done = False
     if self.G.state_rew:
-      delta = ((obs['goal:proprio'] - obs['proprio'])**2)
+      delta = np.abs(obs['goal:proprio'] - obs['proprio'])
       #keys = utils.filtlist(self._env.pobs_keys, '.*x:p')
       keys = utils.filtlist(self._env.pobs_keys, '.*(x|y):p')
       idxs = [self._env.pobs_keys.index(x) for x in keys]
       delta = delta[idxs].mean()
       if self.G.diff_delt:
-        last_delta = ((self.last_obs['goal:proprio'] - self.last_obs['proprio'])**2)[idxs].mean()
-        rew = -0.05 + 10*(last_delta**0.5 - delta**0.5)
+        last_delta = np.abs(self.last_obs['goal:proprio'] - self.last_obs['proprio'])
+        last_delta = last_delta[idxs].mean()
+        rew = -0.05 + 10*(last_delta - delta)
       else:
-        rew = -delta**0.5
+        rew = -delta
 
       info['delta'] = delta
       if delta < self.G.goal_thresh:

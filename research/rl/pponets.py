@@ -172,3 +172,18 @@ class ActorCritic(nn.Module):
 
   def act(self, obs):
     return self.step(obs)[0]
+
+  def save(self, dir):
+    print("SAVED PPO", dir)
+    path = dir / f'ppo_ac.pt'
+    sd = self.state_dict()
+    sd['G'] = self.G
+    th.save(sd, path)
+    print(path)
+
+  def load(self, dir):
+    path = dir / f'ppo_ac.pt'
+    sd = th.load(path, map_location=self.G.device)
+    G = sd.pop('G')
+    self.load_state_dict(sd)
+    print(f'LOADED PPO {path}')

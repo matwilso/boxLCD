@@ -21,8 +21,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
-from buffers import OGRB, ReplayBuffer, PPOBuffer
-from pponets import ActorCritic
+from research.rl.buffers import OGRB, ReplayBuffer, PPOBuffer
+from research.rl.pponets import ActorCritic
 from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
 import boxLCD
@@ -296,6 +296,8 @@ def ppo(G):
           test_agent(itr)
           if G.lenv:
             test_agent(itr, use_lenv=True)
+        if epoch % G.save_n == 0:
+          ac.save(G.logdir)
         # Log info about epoch
         print('=' * 30)
         print('Epoch', epoch)
@@ -333,7 +335,8 @@ def ppo(G):
       o = {key: val for key, val in o.items()}
       a, v, logp = ac.step(o)
     # Step the venv
-    next_o, r, d, info = env.step(a)
+    with utils.Timer(logger, 'step'):
+      next_o, r, d, info = env.step(a, logger)
     ep_ret += r
     ep_len += 1
 
@@ -389,6 +392,9 @@ def ppo(G):
         if G.lenv:
           test_agent(itr, use_lenv=True)
 
+      # save it
+      ac.save(G.logdir)
+
       # Log info about epoch
       print('=' * 30)
       print('Epoch', epoch)
@@ -440,7 +446,7 @@ _G.reset_prompt = 1
 _G.succ_reset = 1  # between lenv and normal env
 _G.state_key = 'proprio'
 _G.diff_delt = 0
-_G.goal_thresh = 0.005
+_G.goal_thresh = 0.05
 _G.preproc_rew = 0
 _G.learned_rew = 0
 _G.clip_ratio = 0.2
