@@ -192,9 +192,9 @@ class WorldEnv(gym.Env, EzPickle):
       self.b2_world.DestroyBody(body)
     self.statics = {}
     self.dynbodies = {}
+    self.b2_world = Box2D.b2World(gravity=self.world_def.gravity)
 
   def _reset_bodies(self):
-    self.dynbodies = {}
     self.joints = {}
     # ROBOT
     for robot in self.world_def.robots:
@@ -304,9 +304,8 @@ class WorldEnv(gym.Env, EzPickle):
       self.dynbodies[obj.name] = body
 
   def reset(self, full_state=None, proprio=None):
-    self.ep_t = 0
     self._destroy()
-    self.statics = {}
+    self.ep_t = 0
     if self.G.walls:
       X = 0.0
       self.statics['wall1'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, 0), (self.WIDTH + X, 0)]))
@@ -316,7 +315,7 @@ class WorldEnv(gym.Env, EzPickle):
     else:
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
-    #self.b2_world.Step(0.001/FPS, 6*30, 2*30)
+
     if proprio is not None:
       assert proprio.shape[-1] == self.observation_space.spaces['proprio'].shape[-1], f'invalid shape for proprio {proprio.shape} {self.observation_space.spaces["proprio"]}'
       full_state = np.zeros(self.observation_space.spaces['full_state'].shape)
@@ -381,7 +380,9 @@ class WorldEnv(gym.Env, EzPickle):
           self.dynbodies[name].angle = offset_angle
     if not self.G.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
-    return self._get_obs()
+
+    obs =  self._get_obs()
+    return obs
 
   def _get_obs(self):
     full_state = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
