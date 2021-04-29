@@ -336,7 +336,7 @@ def ppo(G):
       a, v, logp = ac.step(o)
     # Step the venv
     with utils.Timer(logger, 'step'):
-      next_o, r, d, info = env.step(a, logger)
+      next_o, r, d, info = env.step(a)#, logger)
     ep_ret += r
     ep_len += 1
 
@@ -367,7 +367,7 @@ def ppo(G):
     timeout_epoch = np.logical_or(timeout, epoch_ended)
     mask = ~timeout_epoch
     if G.learned_rew:
-      logger['preproc_rew'] += [info['preproc_rew'].mean()] 
+      #logger['preproc_rew'] += [info['preproc_rew'].mean()] 
       logger['learned_rew'] += [info['learned_rew'].mean()] 
       logger['og_rew'] += [info['og_rew'].mean()] 
       logger['goal_delta'] += [info['goal_delta'].mean()] 

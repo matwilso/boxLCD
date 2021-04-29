@@ -93,7 +93,7 @@ class LearnedEnv:
           self.ptr -= 1
       rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
       done[:] = self.ep_t >= self.G.ep_len
-      return obs, rew, done, {}
+      return obs, rew, done, {'timeout': done.clone()}
 
 class RewardLenv:
   def __init__(self, env):
@@ -215,7 +215,7 @@ class RewardLenv:
           rew = -0.05 + 10 * (last_delta - delta)
         else:
           rew = -delta
-        done[delta < 0.05] = 1
+        done[delta < self.G.goal_thresh] = 1
         info['delta'] = delta.detach()
     else:
       import ipdb; ipdb.set_trace()

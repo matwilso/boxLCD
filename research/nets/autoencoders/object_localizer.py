@@ -30,8 +30,10 @@ class ObjectLocalizer(SingleStepAE):
     print(path)
 
   def loss(self, batch):
-    z = self.encoder(batch)
-    loss = ((batch['full_state'][...,self.idxs] - z)**2).mean()
+    z, z_std = self.encoder(batch)
+    norm = thd.Normal(z, z_std)
+    loss = -norm.log_prob(batch['full_state'][...,self.idxs]).mean()
+    #loss = ((batch['full_state'][...,self.idxs] - z)**2).mean()
     return loss, {'loss': loss}
 
 class Encoder(nn.Module):
@@ -57,7 +59,7 @@ class Encoder(nn.Module):
         nn.Flatten(-3),
         nn.Linear(size * nf, G.hidden_size),
         nn.ReLU(),
-        nn.Linear(G.hidden_size, out_size),
+        nn.Linear(G.hidden_size, 2*out_size),
     ])
 
   def forward(self, batch):
@@ -70,5 +72,6 @@ class Encoder(nn.Module):
         x = layer(x, emb)
       else:
         x = layer(x)
-    return x
+    mean, log_std = x.chunk(2, -1)
+    return mean, th.exp(log_std)
 

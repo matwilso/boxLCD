@@ -38,7 +38,6 @@ class Object2(WorldEnv):
     w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8) for i in range(2)])
     super().__init__(w, G)
 
-
 @cc(ep_len=50, wh_ratio=1.0)
 class Object3(WorldEnv):
   def __init__(self, G={}):

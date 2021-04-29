@@ -23,7 +23,7 @@ envs = ['Luxo', 'Urchin']
 modes = ['real','lenv']
 tags = ['eplen', 'epret', 'succreal'][1:]
 mode_map = {'real': 'Real Simulator', 'lenv': 'Learned Simulator'}
-tag_map = {'eplen': 'Ep Length', 'epret': 'Ep Return', 'succreal': 'Success Rate (on real)'}
+tag_map = {'eplen': 'Ep Length', 'epret': 'Ep Return (training)', 'succreal': 'Success Rate (on real)'}
 smooth_map = {'eplen': 0.6, 'epret': 0.6, 'succreal': 0.8}
 
 LuxoReal = dict(
@@ -88,7 +88,7 @@ for env in envs:
         plt.clf()
     arr = [plt.imread(fname) for fname in files]
     arr = np.cat(arr, 1)
-    plt.imsave('test.png', arr)
+    plt.imsave(f'{env}_rl.png', arr)
     #plt.imshow(arr)
     #plt.title('Luxo')
     #plt.axis('off')

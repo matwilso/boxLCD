@@ -67,5 +67,5 @@ if __name__ == '__main__':
   print(f'N = {N*10}')
   print('dict(')
   for key in logger:
-    print(f'{key}={np.mean(logger[key])}', env=',')
+    print(f'{key}={np.mean(logger[key])}', end=',')
   print(')')

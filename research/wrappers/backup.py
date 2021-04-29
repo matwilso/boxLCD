@@ -58,11 +58,11 @@ class PreprocVecEnv:
 
   def reset(self, *args, **kwargs):
     obs = self._env.reset(*args, **kwargs)
-    if 'RewardLenv' in self._env.__class__.__name__:
-      self.last_obs = tree_map(lambda x: np.array(x.cpu().numpy()), obs)
-    else:
-      self.last_obs = tree_map(lambda x: np.array(x), obs)
-    self.last_done = np.zeros(self.G.num_envs)
+    self.last_obs = tree_map(lambda x: np.array(x), obs)
+    self.last_done = np.zeros(self._env.num_envs)
+    self.reset_smooth = np.ones([self._env.num_envs, 2])
+    self.smoothed_mean = np.zeros([self._env.num_envs, 2])
+    self.smoothed_std = np.zeros([self._env.num_envs, 2])
     return self._preproc_obs(obs)
 
   def render(self, *args, **kwargs):
@@ -77,62 +77,88 @@ class PreprocVecEnv:
   def learned_rew(self, obs, info={}):
     assert 'Cube' in self.G.env, 'ya gotta'
     done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
-    obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), obs)
-    obj = self.obj_loc(obs).detach()
-    goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
-    delta = (obj - goal).abs().mean(-1)
-    info['goal_delta'] = (obs['goal:object'] - goal).abs().mean().cpu().detach()
+    goal_obs = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:], fval=lambda x: th.as_tensor(1.0*x).float().to(self.G.device))
+    goal_mean, goal_std = self.obj_loc(goal_obs)
+    goal = goal_mean.detach().cpu().numpy()
+    delta = np.abs(self.smoothed_mean - goal).mean(-1)
+    #info['goal_delta'] = (obs['goal:object'] - goal).abs().mean().cpu().detach()
     if self.G.diff_delt:
-      last_obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs)
-      last_obj = self.obj_loc(last_obs).detach()
-      last_delta = (last_obj - goal).abs().mean(-1)
+      #last_obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs)
+      #last_obj = self.obj_loc(last_obs).detach()
+      last_delta = np.abs(self.last_mean - goal).mean(-1)
       rew = -0.05 + 10 * (last_delta - delta)
     else:
       rew = -delta
     done[delta < 0.04] = 1
     rew[delta < 0.04] += 1.0
-    return rew.detach().cpu().numpy(), done.detach().cpu().numpy().astype(np.bool)
+    return rew, done
+
+  def smooth_obj(self, obs):
+    self.last_mean = np.array(self.smoothed_mean)
+    w1 = 0.5
+    w2 = 0.5
+    obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), obs)
+    obj_mean, obj_std = self.obj_loc(obs)
+    obj_mean = obj_mean.detach().cpu().numpy()
+    obj_std = obj_std.detach().cpu().numpy()
+    mu = w1 * self.smoothed_mean + w2 * obj_mean
+    std = (w1**2 * obj_std**2 + w2**2 * self.smoothed_std**2)**0.5
+
+    mu = obj_mean*self.reset_smooth + mu*(1-self.reset_smooth)
+    std = obj_std*self.reset_smooth + std*(1-self.reset_smooth)
+    self.reset_smooth[:] = 0
+    self.smoothed_mean = mu
+    self.smoothed_std = std
+    print(obj_mean[0], mu[0])
 
   def step(self, action):
     obs, rew, done, _info = self._env.step(action)
+    self.smooth_obj(obs)
+
     obs = self._preproc_obs(obs)
     if self.G.preproc_rew:
       rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
     elif self.G.learned_rew:
       #self.info = info
       info = {}
-      #preproc_rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+      preproc_rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
       info['og_rew'] = rew
-      #if np.any(done):
+      # if np.any(done):
       #  import ipdb; ipdb.set_trace()
       rew, _ = self.learned_rew(obs, info)
-      #info['preproc_rew'] = preproc_rew
-      if 'RewardLenv' in self._env.__class__.__name__:
-        info['og_rew'] = info['og_rew'].cpu().detach()
-        success = th.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
-        def fx(x):
-          if isinstance(x, np.ndarray):
-            return x
-          else:
-            return x.cpu().numpy()
-        obs = tree_map(fx, obs)
-      else:
-        timeout = []
-        for inf in _info:
-          if 'timeout' in inf and inf['timeout']:
-            timeout += [True]
-          else:
-            timeout += [False]
-        timeout = np.array(timeout)
-        success = np.logical_and(done, ~timeout)
+      info['preproc_rew'] = preproc_rew
+    self.reset_smooth[:] = 0
+
+  def step(self, action):
+    obs, rew, done, _info = self._env.step(action)
+    self.smooth_obj(obs)
+
+    obs = self._preproc_obs(obs)
+    if self.G.preproc_rew:
+      rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+    elif self.G.learned_rew:
+      #self.info = info
+      info = {}
+      preproc_rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
+      info['og_rew'] = rew
+      # if np.any(done):
+      #  import ipdb; ipdb.set_trace()
+      rew, _ = self.learned_rew(obs, info)
+      info['preproc_rew'] = preproc_rew
+      timeout = []
+      for inf in _info:
+        if 'timeout' in inf and inf['timeout']:
+          timeout += [True]
+        else:
+          timeout += [False]
+      timeout = np.array(timeout)
+      self.reset_smooth[timeout] = 1.0
+
+      success = np.logical_and(done, ~timeout)
       rew[success] = 1.0
       info['learned_rew'] = rew
       info['rew_delta'] = info['og_rew'] - rew
     self.last_obs = tree_map(lambda x: np.array(x), obs)
-    if 'RewardLenv' in self._env.__class__.__name__:
-      rew = th.as_tensor(rew).to(self.G.device)
-      done = th.as_tensor(done).to(self.G.device)
-      obs = tree_map(lambda x: th.as_tensor(x).to(self.G.device), obs)
     return obs, rew, done, info
 
   def close(self):
