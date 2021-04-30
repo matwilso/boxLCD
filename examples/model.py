@@ -12,7 +12,7 @@ from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
 
-# GPT IMPLEMENTATION TAKEN FROM https://github.com/karpathy/minGPT AND THEN HACKED TO BITS
+# GPT IMPLEMENTATION TAKEN FROM https://github.com/karpathy/minGPT AND THEN HACKED A BIT
 
 class CausalSelfAttention(nn.Module):
   """
@@ -97,14 +97,14 @@ class GPT(nn.Module):
     BS, LEN, *HW = batch['lcd'].shape
     E = np.prod(HW)
     x = batch['lcd'].reshape(BS, LEN, E) # flatten lcd to make a single flat frame a token
-    act = batch['act']
+    action = batch['action']
 
     # SHIFT RIGHT (add a padding on the left) so you can't see yourself 
     x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
     # forward the GPT model
     x = self.embed(x)
-    cin = self.act_condition(act)
-    if act.ndim == 2:
+    cin = self.act_condition(action)
+    if action.ndim == 2:
       x = th.cat([x, cin[:,None].repeat_interleave(self.block_size, 1)], -1)
     else:
       x = th.cat([x, cin], -1)
@@ -120,14 +120,14 @@ class GPT(nn.Module):
     lcd_loss = -dist.log_prob(batch['lcd'].reshape(dist.logits.shape)).mean()
     return lcd_loss
 
-  def sample(self, n, act=None, prompts=None):
+  def sample(self, n, action=None, prompts=None):
     # TODO: feed act_n
     with th.no_grad():
-      if act is not None:
-        n = act.shape[0]
+      if action is not None:
+        n = action.shape[0]
       batch = {}
       batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
-      batch['act'] = act if act is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+      batch['action'] = action if action is not None else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
       start = 0
       if prompts is not None:
         lcd = prompts['lcd'].flatten(-2).type(batch['lcd'].dtype)

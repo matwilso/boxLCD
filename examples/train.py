@@ -22,7 +22,7 @@ import argparse
 
 from boxLCD.utils import A
 from model import GPT
-from research import utils
+import utils
 from utils import parse_args
 
 class Trainer:
@@ -59,7 +59,7 @@ class Trainer:
     self.logger['sample_loss'] += [sample_loss]
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=self.G.fps)
+    self.writer.add_video('unprompted_samples', utils.force_shape(lcd), i, fps=self.G.fps)
     # EVAL
     if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
       if 'BoxOrCircle' == self.G.env:

@@ -14,6 +14,12 @@ Similar to basic, but allows you to set the env from cmd line, and it enables so
 python less_basic.py --env=UrchinBall
 ```
 
+or 
+
+```
+python less_basic.py --env=LuxoBall --lcd_mode=rgb # experimental visualization mode
+```
+
 ## Training
 
 Simple naive training approach using a Tranformer, where LCD (~16x16) frames are flattened and used directly as

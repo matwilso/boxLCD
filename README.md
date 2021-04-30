@@ -51,6 +51,10 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
+To get started, I would check out the [`examples`](./examples/) folder.
+
+And later the [`research`](./research/) folder for more complex examples.
+
 ## Environment demos ⚽
 
 ```python
@@ -106,8 +110,8 @@ Flat Binary Transformer Predictions |  - |
 
 ### Reinforcement learning 📈
 
-We use the Flat Binary Transformer above as a reinforcement learning environment (blue lines)
-and compare it to learning directly in the base simulator (red lines).
+We use the Flat Binary Transformer above as a reinforcement learning environment 
+and compare it to learning directly in the base simulator.
 The goal is to reach the body goal shown in white.
 We find that policies trained in the learned simulator do nearly as well
 in the base simulator as policies trained in the base simulator.
@@ -124,14 +128,14 @@ Urchin Learned Env Policy |
 :-------------------------:|
 Running In the Learned Env | 
 ![](./assets/rl/Urchin_lenv.gif)  | 
-Transferring Directly to the Base Simulator | 
+Transferring Directly to the Base Simulator (0.955 success rate) | 
 ![](./assets/rl/Urchin_real.gif)  | 
 
 Luxo Learned Env Policy | 
 :-------------------------:|
 Running In the Learned Env | 
 ![](./assets/rl/Luxo_lenv.gif)  | 
-Transferring Directly to the Base Simulator | 
+Transferring Directly to the Base Simulator (0.988 success rate) | 
 ![](./assets/rl/Luxo_real.gif)  | 
 
 

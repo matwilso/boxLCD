@@ -61,7 +61,6 @@ class RolloutDataset(Dataset):
 
   def __getitem__(self, idx):
     elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in self.bufs.items()}
-    elem['lcd'] /= 255.0
     return elem
 
 def load_ds(G):
