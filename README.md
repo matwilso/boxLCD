@@ -63,20 +63,22 @@ while True:
     env.render(mode='human')
 ```
 
-Tier 0: Basic Passive Objects |  Tier 1: Simple Robots and Manipulation |  
+Tier 0: Basic Passive Objects |  - |  
 :-------------------------:|:------:|
-`envs.Dropbox()` (16x16) | `envs.Urchin()` (16x32) | 
-![](./assets/envs/Dropbox.gif)  |  ![](./assets/envs/Urchin.gif)  |  
-`envs.Bounce()` (16x16) | `envs.Luxo()` (16x32) | 
-![](./assets/envs/Bounce.gif)  |  ![](./assets/envs/Luxo.gif)  |  
-`envs.Bounce2()` (16x16) | `envs.UrchinCube()` (16x24) | 
-![](./assets/envs/Bounce2.gif)  |  ![](./assets/envs/UrchinCube.gif)  |  
-`envs.Object2()` (16x16) | `envs.LuxoCube()` (16x24) | 
-![](./assets/envs/Object2.gif)  |  ![](./assets/envs/LuxoCube.gif)  |  
-\- | `envs.UrchinBall()` (16x24) | 
-\- | ![](./assets/envs/UrchinBall.gif)  |  
-\- | `envs.LuxoBall()` (16x24) | 
-\- | ![](./assets/envs/LuxoBall.gif)  |  
+`envs.Dropbox()` (16x16) | `envs.Bounce()` (16x16) | 
+![](./assets/envs/Dropbox.gif)  | ![](./assets/envs/Bounce.gif)  |
+`envs.Bounce2()` (16x16) | `envs.Object2()` (16x16) |
+![](./assets/envs/Bounce2.gif)  | ![](./assets/envs/Object2.gif)  | 
+
+
+Tier 1: Simple Robots and Manipulation |  - |  
+:-------------------------:|:------:|
+`envs.Urchin()` (16x32) | `envs.Luxo()` (16x32) | 
+  ![](./assets/envs/Urchin.gif)  |  ![](./assets/envs/Luxo.gif)  |  
+`envs.UrchinCube()` (16x24) | `envs.LuxoCube()` (16x24) | 
+ ![](./assets/envs/UrchinCube.gif)  |  ![](./assets/envs/LuxoCube.gif)  |  
+`envs.UrchinBall()` (16x24) | `envs.LuxoBall()` (16x24) | 
+![](./assets/envs/UrchinBall.gif)  |  ![](./assets/envs/LuxoBall.gif)  |  
 
 
 ## Model learning 📉
@@ -88,27 +90,19 @@ RSSM is from modified from [Dreamer v1](https://danijar.com/project/dreamer/) co
 Flat Binary Transformer pre-trains a binary autoencoder latent vectorl.
 Then each of those vectors is a token in a transformer that is trained to predict the next token autoregressively.
  
-RSSM Predictions | 
-:-------------------------:|
-`envs.Dropbox()` (16x16) | 
-![](./assets/model_preds/Dropbox.gif)  | 
-`envs.Bounce()` (16x16) |
-![](./assets/model_preds/Bounce.gif)  | 
-`envs.Bounce2()` (16x16) |
-![](./assets/model_preds/Bounce2.gif)  |
-`envs.Object2()` (16x16) |
-![](./assets/model_preds/Object2.gif)  | 
+Tier 0 RSSM Predictions | -|
+:-------------------------:|:----:|
+`envs.Dropbox()` (16x16) | `envs.Bounce()` (16x16) |
+![](./assets/model_preds/Dropbox.gif)  | ![](./assets/model_preds/Bounce.gif)  | 
+`envs.Bounce2()` (16x16) | `envs.Object2()` (16x16) |
+![](./assets/model_preds/Bounce2.gif)  | ![](./assets/model_preds/Object2.gif)  | 
 
-Flat Binary Transformer Predictions | 
-:-------------------------:|
-`envs.Urchin()` (16x32) | 
-![](./assets/model_preds/Urchin.gif)  | 
-`envs.Luxo()` (16x32) |
-![](./assets/model_preds/Luxo.gif)  | 
-`envs.UrchinCube()` (16x24) |
-![](./assets/model_preds/UrchinCube.gif)  |
-`envs.LuxoCube()` (16x24) |
-![](./assets/model_preds/LuxoCube.gif)  | 
+Flat Binary Transformer Predictions |  - |
+:-------------------------:|:----:|
+`envs.Urchin()` (16x32) | `envs.Luxo()` (16x32) |
+![](./assets/model_preds/Urchin.gif)  | ![](./assets/model_preds/Luxo.gif)  | 
+`envs.UrchinCube()` (16x24) | `envs.LuxoCube()` (16x24) |
+![](./assets/model_preds/UrchinCube.gif)  | ![](./assets/model_preds/LuxoCube.gif)  | 
 
 ### Reinforcement learning 📈
 
