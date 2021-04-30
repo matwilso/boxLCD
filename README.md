@@ -3,7 +3,7 @@
 boxLCD 📟
 =================
 
-**[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Training examples 📉](#training-examples-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
+**[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Model learning 📉](#model-learning-)** | **[Reinforcement learning 📈 ](#reinforcement-learning-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
 
 boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
 environments and an API for defining and rendering custom environments.
@@ -14,11 +14,13 @@ Eventually we care about predictive models that are trained on real world data a
 However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-future/),
 and that small scale testbeds are very useful for making progress.
 
-
 boxLCD is meant to vary from extremely simple environments with low resolution, binarized rendering, and
 low frames per second (FPS) / frequency (Hz) for getting started, to increasingly complicated environments that push
-the frontiers more.
+the capabilities of current methods more. You can think of it kind of like a video game skill tree, which
+starts with the challenge of predicting video of simple physics environments and expands outwards from there in several directions.
+For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
 
+<!--
 It is designed around a skill tree, progressive difficulty setup. 
 Each step in the tree represents increased difficulty of task.
 For getting started, you begin at the base. Or if you have some specific task in mind,
@@ -26,6 +28,7 @@ you can skip to that point in the tree and work on it.
 You can see the tree and the increasing difficulty here: TODO.
 
 (maybe include the skill tree right here. idk.)
+--->
 
 <!--
 boxLCD can be thought of as something akin to MNIST, but for learning dynamics models in robotics.
@@ -36,7 +39,6 @@ compared to learning models of the real world.
 But it provides a much more tractable starting point, both for the field as a whole, as well as individuals starting out in the area.
 -->
 
-For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
 
 ## Installation ‍💻
 
@@ -64,75 +66,80 @@ while True:
 Tier 0: Basic Passive Objects |  Tier 1: Simple Robots and Manipulation |  
 :-------------------------:|:------:|
 `envs.Dropbox()` (16x16) | `envs.Urchin()` (16x32) | 
-![](./assets/Dropbox.gif)  |  ![](./assets/Urchin.gif)  |  
+![](./assets/envs/Dropbox.gif)  |  ![](./assets/envs/Urchin.gif)  |  
 `envs.Bounce()` (16x16) | `envs.Luxo()` (16x32) | 
-![](./assets/Bounce.gif)  |  ![](./assets/Luxo.gif)  |  
+![](./assets/envs/Bounce.gif)  |  ![](./assets/envs/Luxo.gif)  |  
 `envs.Bounce2()` (16x16) | `envs.UrchinCube()` (16x24) | 
-![](./assets/Bounce2.gif)  |  ![](./assets/UrchinCube.gif)  |  
+![](./assets/envs/Bounce2.gif)  |  ![](./assets/envs/UrchinCube.gif)  |  
 `envs.Object2()` (16x16) | `envs.LuxoCube()` (16x24) | 
-![](./assets/Object2.gif)  |  ![](./assets/LuxoCube.gif)  |  
+![](./assets/envs/Object2.gif)  |  ![](./assets/envs/LuxoCube.gif)  |  
 \- | `envs.UrchinBall()` (16x24) | 
-\- | ![](./assets/UrchinBall.gif)  |  
+\- | ![](./assets/envs/UrchinBall.gif)  |  
 \- | `envs.LuxoBall()` (16x24) | 
-\- | ![](./assets/LuxoBall.gif)  |  
+\- | ![](./assets/envs/LuxoBall.gif)  |  
 
 
+## Model learning 📉
+
+After 100k iterations on a datset of 100k rollouts.
+Green is prompt, red is model prediction. Top is ground truth, middle is model prediction, bottom is error.
+
+RSSM is from modified from [Dreamer v1](https://danijar.com/project/dreamer/) code.
+Flat Binary Transformer pre-trains a binary autoencoder latent vectorl.
+Then each of those vectors is a token in a transformer that is trained to predict the next token autoregressively.
+ 
+RSSM Predictions | 
+:-------------------------:|
+`envs.Dropbox()` (16x16) | 
+![](./assets/model_preds/Dropbox.gif)  | 
+`envs.Bounce()` (16x16) |
+![](./assets/model_preds/Bounce.gif)  | 
+`envs.Bounce2()` (16x16) |
+![](./assets/model_preds/Bounce2.gif)  |
+`envs.Object2()` (16x16) |
+![](./assets/model_preds/Object2.gif)  | 
+
+Flat Binary Transformer Predictions | 
+:-------------------------:|
+`envs.Urchin()` (16x32) | 
+![](./assets/model_preds/Urchin.gif)  | 
+`envs.Luxo()` (16x32) |
+![](./assets/model_preds/Luxo.gif)  | 
+`envs.UrchinCube()` (16x24) |
+![](./assets/model_preds/UrchinCube.gif)  |
+`envs.LuxoCube()` (16x24) |
+![](./assets/model_preds/LuxoCube.gif)  | 
+
+### Reinforcement learning 📈
+
+We use the Flat Binary Transformer above as a reinforcement learning environment (blue lines)
+and compare it to learning directly in the base simulator (red lines).
+The goal is to reach the body goal shown in white.
+We find that policies trained in the learned simulator do nearly as well
+in the base simulator as policies trained in the base simulator.
+
+Ep Return curves show values during training (in real simulator and learned simulator, respectively).
+Success rate curves show evaluation on the real environment during training.
+\* values are success rates from evaluating policy at convergence with N=1000.
+
+![](./assets/rl/Urchin_rl.png)
+![](./assets/rl/Luxo_rl.png)
 
 
-## Training examples 📉
+Urchin Learned Env Policy | 
+:-------------------------:|
+Running In the Learned Env | 
+![](./assets/rl/Urchin_lenv.gif)  | 
+Transferring Directly to the Base Simulator | 
+![](./assets/rl/Urchin_real.gif)  | 
 
+Luxo Learned Env Policy | 
+:-------------------------:|
+Running In the Learned Env | 
+![](./assets/rl/Luxo_lenv.gif)  | 
+Transferring Directly to the Base Simulator | 
+![](./assets/rl/Luxo_real.gif)  | 
 
-To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a naive approach.
-
-Our model is a temporally masked Transformer trained to predict the next frame given all past frames.
-It is similar to a language model (e.g., GPT), but each token is simply the flattened 2D image for that timestep.
-To train the model, we feed those flat image tokens in, the model produces independent Bernoulli distributions for
-each pixel in the frame, and we optimize these distributions to match the ground truth (loss = -logp). 
-To sample the model, we prompt it with the start 10 frames of the episode, and have it predict the rest autoregressively.
-
-
-See [examples](./examples) for scripts to recreate the gifs below.
-In the gifs, the top is ground truth, middle is model prediction, and bottom is the error between the two (this visualization approach is copied from Dreamer).
-The results below were trained on a single NVIDIA GTX 1080Ti desktop machine.
-
-| | Training Results for datasets of 10k rollouts |   |
-|:---:|:-------------------------:| :-------------------------:|
-|`envs.Dropbox`| 10 epochs |  100 epochs |
-|episode length: 100<br/># of parameters: 4.5e5<br/>training time: **3 minutes 25 seconds** |![](./assets/samples/dropbox-10.gif)  |  ![](./assets/samples/dropbox-100.gif) |
-|`envs.Bounce()`| 10 epochs | 100 epochs |
-|episode length: 200<br/># of parameters: 4.7e5<br/>training time: **6 minutes 29 seconds** |![](./assets/samples/bounce-10.gif)  |  ![](./assets/samples/bounce-100.gif) |
-|`envs.Urchin()`| 10 epochs | 100 epochs |
-|episode length: 200<br/># of paremeters: 2.5e6<br/>training time: **16 minutes 16 seconds** |![](./assets/samples/urchin-10.gif)  |  ![](./assets/samples/urchin-100.gif) |
-
-This is an extremely simplistic approach and it has to generate the entire frame of pixels at once by sampling them independently.
-
-We do not condition on or predict the continuous proprioceptive state information, because I haven't gotten that working yet.
-I find using Gaussians leads to very bad autoregressive samples.
-Discrete sampling works much better out of the box.
-
-### Urchin
-The Urchin task is actually a bit tricky and the model started to overfit the smallish dataset of 10k rollouts in this experiment.
-The robot is 3-way symmetric, and since we are only using images here, the model is continually forced to
-identify which leg corresponds to which index in the action vector based on past observations and actions.
-We also randomly sample the actions for the 3 joints at each time step, so the agent can't rely on a semi-fixed policy
-to narrow down the state space it has to cover.
-
-(note: this is just an illustration of how far you can get with little effort. i expect you can do much better if you tried)
-
-### Intelligent Domain Randomization
-Because powerful generative models will have to model uncertainty in the environment, sampling them should give intelligent domain randomization.
-Instead of randomizing over a bunch of wacky parameters, the model will be tuned to the underlying distribution and only produce variety you might actually see in the real world.
-
-For a crude demonstration of this idea, I created an environment that simulates either a falling
-box or a bouncing ball. Since these shapes are sometimes indistinguishable at low resolution, the model 
-cannot tell them apart given the prompt, so it should sample each option some fraction of the time.
-(For a real world example, you may not know the mass of an opaque container, so your model should sample over a range of possible masses.)
-
-Below is an example where the expected behavior occurs.
-On the far left, the model samples a ball instead of a box.
-On the 4th to the right, the model samples a box instead of a ball.
-
-![](./assets/samples/domrand_good.gif) 
 
 ## Roadmap 📍
 
@@ -155,11 +162,6 @@ At the same time, boxLCD aims to remain computationally tractable and easy to wo
 Qualitatively, you can deal with the sequence learning and logic task independent of high resolution
 and getting the textures right. So it decouples the problem a bit and makes things simpler.
 -->
-
-boxLCD is in active development.
-At the moment, we are focused on developing environments and training models with the sole purpose of learning accurate physics models (not solving goals).
-I do believe that pushing on accuracy purely will be highely correlated with useful models.
-But in the future, we plan to expand this scope and design tasks that leverage our learned models.
 
 ### Future Features
 - support for scrolling (environments which do not fit on the screen all at once)
