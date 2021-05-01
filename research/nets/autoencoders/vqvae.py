@@ -24,6 +24,8 @@ from .quantize import VectorQuantizer
 from research import utils
 from research.nets.common import ResBlock
 
+# THIS IS NOT USED AT THE MOMENT. based on https://github.com/matwilso/generative_models#vq-vae
+
 class VQVAE(nn.Module):
   def __init__(self, env, G):
     super().__init__()

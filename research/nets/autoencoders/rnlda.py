@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 from research import utils
 from research.nets.common import ResBlock
-from .quantize import BinaryQuantize, RNLD
+from research.nets.quantize import RNLD
 from ._base import Autoencoder, SingleStepAE
 from .bvae import Encoder, Decoder
 

@@ -14,19 +14,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-
-class TanhD(nn.Module):
-  def __init__(self):
-    super().__init__()
-
-  def forward(self, z, noise=True):
-    z = th.tanh(z)
-    return z
-
 class RNLD(nn.Module):
   """
   Real Number Line Discretization (RNLD)
   you can call it ronald
+  this might be described somewhere, but i independently invented it
 
   Chunk up the number line into 4 bins.
   Assign all values in each bin to the mean of that bin.
