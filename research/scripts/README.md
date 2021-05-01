@@ -30,60 +30,96 @@ python3 scripts/kicker.py collect
 
 ```bash
 # single env
-python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=Urchin --logdir=logs/trash/Urchin
+python -m research.main --mode=train --model=MultiStepArbiter --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/Urchin --total_itr=30000  --nfilter=64 --hidden_size=256 --window=5
 ```
 
 ```bash
 # all envs
-python3 scripts/kicker.py collect
+python3 scripts/kicker.py arbiter --model=MultiStepArbiter
 ```
-
-
-
-```
-python main.py --mode=train --env=Dropbox --datadir=logs/datadump/Dropbox/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/evals/arbiter/Dropbox/ --window=5
-
-```
-
 
 ## MODEL LEARNING
 
-### Autoencoding 
+### Autoencoders
 
-```
-args="--window=4 --bs=256"
-```
+// should run for about 70s per 1000 training iterations on my 1080Ti.
+// maybe about 10 mins or so total, until the error in the pstate stuff goes away. around -6 log mse
 
-#### Arbiter
-```bash
-python main.py --mode=train --env=Luxo --datadir=logs/datadump/Luxo/ --model=ArbiterAE --nfilter=32 --lr=1e-3 --logdir=logs/autoencoder/Luxo/ArbiterAE/better_enc_norelu_compile --log_n=1000 --bs=32 --window=4
-```
-
-#### VAE 
+#### BVAE
 
 ```bash
-model=VAE
-python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model  --window=4 --bs=256 --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small 
+# single env
+python -m research.main --mode=train --model=BVAE --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/encoder/BVAE/Urchin --total_itr=30000 --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=16 --nfilter=16 --window=5
 ```
-
-#### Binary VAE 
 
 ```bash
-model=BVAE
-python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model  --nfilter=16 --vqD=8 --vqK=32 --hidden_size=64  --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small $args
+# all envs
+python3 scripts/kicker.py train --model=BVAE
 ```
 
+#### RNLDA
 
 ```bash
-python main.py --mode=train --env=Luxo --datadir=logs/datadump/Luxo/ --model=BVAE --window=4 --log_n=1000 --lr=1e-3 --bs=64 --log_n=1000 --lr=1e-3 --vqK=64 --hidden_size=64 --logdir=logs/newfolder/autoencoder/bvae/x --lr=1e-3 --skip_train=0 --nfilter=64 --vqD=32 --log_n=1000 --arbiterdir=logs/newfolder/arbiter/singlestep/2/
+# single env
+python -m research.main --mode=train --model=RNLDA --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/encoder/RNLDA/Urchin --total_itr=30000 --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=8 --nfilter=16 --window=5
+```
 
-# should run for about 70s per 1000 training iterations on my 1080Ti.
-# maybe about 10 mins or so total, until the error in the pstate stuff goes away. around -6 log mse
+```bash
+# all envs
+python3 scripts/kicker.py train --model=RNLDA
+```
 
+### Video
 
+#### RSSM
+
+```bash
+# single env
+python -m research.main --mode=train --model=RSSM --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/video/RSSM/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/trash/Urchin --nfilter=64 --hidden_size=300 --free_nats=0.01
+```
+
+```bash
+# all envs
+python3 scripts/kicker.py train --model=RSSM
+```
+
+#### FIT (Flat Image Token)
+```bash
+# single env
+python -m research.main --mode=train --model=FIT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/video/FIT/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/trash/Urchin --n_layer=2 --n_head=4 --n_embed=256 --hidden_size=256
+```
+
+```bash
+# all envs
+python3 scripts/kicker.py train --model=FIT
+```
+
+#### FBT (Flat Binary Token)
+```bash
+# single env
+python -m research.main --mode=train --model=FBT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/video/FBT/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/trash/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/trash/encoder/BVAE/Urchin
+```
+
+```bash
+# all envs
+python3 scripts/kicker.py train --model=FBT
+```
+
+#### FRNLD (Flat Ronald)
+```bash
+# single env
+python -m research.main --mode=train --model=FRNLD --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/trash/Urchin --logdir=logs/trash/video/FRNLD/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/trash/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/trash/encoder/RNDLA/Urchin
+```
+
+```bash
+# all envs
+python3 scripts/kicker.py train --model=FRNLD
 ```
 
 
+
+
+## LEARNED SIMULATION
 
 env=LuxoCube
 DP=logs/datadump/10fps/luxocube/
@@ -94,28 +130,8 @@ BVAE preproc, real env
 python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatb --weightdir=logs/flatb/bigger/ --window=100 --goals=1 --num_envs=12 --lenv=1 --logdir=logs/rl/flatb/nolenv/bvae_preproc_bs64_fixgoal --lenv_temp=0.1 --bs=64 --hidden_size=128 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0 --lenv=0 --net=bvae
 
 
-### VideoModels 
-
-```
-args="--window=4 --bs=256"
-```
-
-#### Flat Binary Token
-```bash
-
-model=FlatBToken
-wd=logs/autoencoder/$env/BVAE/small
-args="--window=100 --bs=100"
-
-python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model --weightdir=$wd --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --logdir=logs/video/$model/x $args
-```
-
-#### Flat Everything
-#### Flat Image
 
 
-
-## LEARNED SIMULATION
 ```
 # test learned simulator
 

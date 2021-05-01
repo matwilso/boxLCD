@@ -66,14 +66,14 @@ FBT.n_layer = 4
 FBT.n_head = 8
 FBT.n_embed = 512
 FBT.hidden_size = 512
-FBT.weightdir = '{K.encoderdir/"BVAE"}/{env}'
+FBT.weightdir = '{K.encoderdir/"encoder/BVAE"}/{env}'
 
 FRNLD = AttrDict()
 FRNLD.n_layer = 4
 FRNLD.n_head = 8
 FRNLD.n_embed = 512
 FRNLD.hidden_size = 512
-FRNLD.weightdir = '{K.encoderdir/"RNDLA"}/{env}'
+FRNLD.weightdir = '{K.encoderdir/"encoder/RNDLA"}/{env}'
 
 
 video = {

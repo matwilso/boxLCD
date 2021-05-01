@@ -16,7 +16,8 @@ from research import utils
 import ignite
 from ._base import VideoModel
 
-class FlatImageTransformer(VideoModel):
+class FIT(VideoModel):
+  """FlatImageToken"""
   def __init__(self, env, G):
     super().__init__(env, G)
     self.imsize = self.G.lcd_h * self.G.lcd_w
