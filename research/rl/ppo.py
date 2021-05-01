@@ -186,10 +186,6 @@ class PPO(RLAlgo):
 
         # save it
         self.ac.save(self.G.logdir)
-
-        # Log info about epoch
-        print('=' * 30)
-        print('Epoch', epoch)
         self.logger['var_count'] = [self.sum_count]
         self.logger['dt'] = dt = time.time() - epoch_time
         self.logger['env_interactions'] = env_interactions = itr * self.G.num_envs

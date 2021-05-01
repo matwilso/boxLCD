@@ -2,6 +2,7 @@ from research import utils
 from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
 from research.rl.ppo import PPO
+from research.rl.sac import SAC
 
 _G = utils.AttrDict()
 _G.replay_size = int(1e6)
@@ -39,9 +40,13 @@ _G.train_v_iters = 80
 _G.lam = 0.97
 _G.steps_per_epoch = 4000
 _G.target_kl = 0.01
-
-# TODO: allow changing default values.
-
+# SAC
+_G.replay_size = int(1e6)
+_G.total_steps = 1000000
+_G.learned_alpha = 1
+_G.alpha_lr = 1e-4  # for SAC w/ learned alpha
+_G.alpha = 0.1  # for SAC w/o learned alpha
+_G.polyak = 0.995
 
 if __name__ == '__main__':
   print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
@@ -51,16 +56,22 @@ if __name__ == '__main__':
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
   for key, value in _G.items():
     parser.add_argument(f'--{key}', type=args_type(value), default=value)
+  parser.add_argument('algo')
   tempC = parser.parse_args()
   # grab defaults from the env
   if tempC.env in env_map:
     Env = env_map[tempC.env]
     parser.set_defaults(**Env.ENV_DG)
     parser.set_defaults(**{'goals': 1, 'autoreset': 1})
+
   G = parser.parse_args()
   G.lcd_w = int(G.wh_ratio * G.lcd_base)
   G.lcd_h = G.lcd_base
   G.imsize = G.lcd_w * G.lcd_h
   # RUN
-  ppo = PPO(G)
-  ppo.run()
+  if G.algo == 'ppo':
+    ppo = PPO(G)
+    ppo.run()
+  elif G.algo == 'sac':
+    sac = SAC(G)
+    sac.run()
