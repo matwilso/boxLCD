@@ -10,5 +10,5 @@ else
     exit 1;
 fi
 for env in ${envs[@]}; do
-    python -m research.main --mode=train --env=$env --datapath=logs/datadump/fill/comprehensive/$env/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/april22/arbiter/$env/ --window=5 --total_itr=30000
+    python -m research.main --mode=train --env=$env --datapath=logs/datadump/$env/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/arbiter/$env/ --window=5 --total_itr=30000
 done

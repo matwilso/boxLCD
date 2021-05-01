@@ -11,9 +11,9 @@ from setuptools import find_packages, setup, Command
 # Package meta-data.
 NAME = 'boxLCD'
 DESCRIPTION = 'boxLCD code'
-URL = 'anon'
-EMAIL = 'anon'
-AUTHOR = 'anon'
+URL = 'https://github.com/matwilso/boxLCD/tree/matt_dev'
+EMAIL = 'mattwilsonmbw@gmail.com'
+AUTHOR = 'Matthew Wilson'
 REQUIRES_PYTHON = '>=3.5.0'
 VERSION = '0.2.0'
 

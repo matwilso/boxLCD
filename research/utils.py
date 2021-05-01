@@ -337,7 +337,6 @@ if __name__ == '__main__':
   real = th.rand(1000, 128)
   gen = th.randn(1000, 128)
   dist = th.cdist(real, gen)
-
   # precision = realistic, recall = coverage.
   #precision = manifold_estimate(real, gen, 3)
   #recall = manifold_estimate(gen, real, 3)

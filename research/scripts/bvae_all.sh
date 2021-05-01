@@ -7,9 +7,9 @@ elif [ $1 -eq 1 ]; then
     envs=(Urchin Luxo UrchinCube LuxoCube UrchinBall LuxoBall)
 else
     echo "nothing"
-    exit 1
+    exit 1;
 fi
 
 for env in ${envs[@]}; do
-    python -m research.main --mode=train --env=$env --datapath=logs/datadump/fill/comprehensive/$env/ --model=BVAE --lr=5e-4 --log_n=1000 --bs=32 --hidden_size=64 --vqK=64 --nfilter=16 --vqD=16 --window=5 --total_itr=30000 --logdir=logs/april22a/autoencoder/BVAE/$env/ 
+    python -m research.main --mode=train --env=$env --datapath=logs/datadump/$env/ --model=BVAE --lr=5e-4 --log_n=1000 --bs=32 --hidden_size=64 --vqK=64 --nfilter=16 --vqD=16 --window=5 --total_itr=30000 --logdir=logs/autoencoder/BVAE/$env/ 
 done

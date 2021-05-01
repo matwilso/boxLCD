@@ -18,5 +18,5 @@ for env in ${envs[@]}; do
         window=50
         prompt_n=3
     fi
-    python -m research.main --mode=train --env=$env --datapath=logs/datadump/fill/comprehensive/$env/ --arbiterdir=logs/april22/arbiter/$env --model=RSSM --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=300 --window=$window --total_itr=100000 --free_nats=0.01 --prompt_n=$prompt_n --logdir=logs/april22/video/RSSM/$env/
+    python -m research.main --mode=train --env=$env --datapath=logs/datadump/$env/ --arbiterdir=logs/arbiter/$env --model=RSSM --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=300 --window=$window --total_itr=100000 --free_nats=0.01 --prompt_n=$prompt_n --logdir=logs/video/RSSM/$env/
 done

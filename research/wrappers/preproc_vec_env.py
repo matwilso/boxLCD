@@ -1,4 +1,3 @@
-from research.nets.autoencoders import quantize
 import torch as th
 import copy
 from re import I

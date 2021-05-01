@@ -20,7 +20,7 @@ from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from .quantize import VectorQuantizer
+from research.nets.quantize import VectorQuantizer
 from research import utils
 from research.nets.common import ResBlock
 

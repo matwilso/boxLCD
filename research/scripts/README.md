@@ -33,7 +33,7 @@ env=UrchinCube
 python main.py --mode=collect --num_envs=10 --env=$env --train_barrels=100 --logdir=logs/datadump/$env
 ```
 
-Or run one of these commands to collect data for many envs
+Or run one of these commands to collect data for many envs. These take about 5-60 minutes.
 
 ```bash
 bash scripts/collect_all.sh 0 # tier 0 envs: Dropbox, Bounce, Bounce2, Object2

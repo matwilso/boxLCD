@@ -74,8 +74,6 @@ if __name__ == '__main__':
     exit()
   elif G.mode == 'fiddle':
     runner = runners.Fiddler(model, env, G)
-  elif G.mode == 'fiddle2':
-    runner = runners.Fiddler2(model, env, G)
   if G.ipython_mode:
     import IPython
     from traitlets.config import Config

@@ -1,5 +1,4 @@
 import pickle
-from research.nets.autoencoders import quantize
 import time
 import copy
 import matplotlib.pyplot as plt
