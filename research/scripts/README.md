@@ -16,31 +16,30 @@ Step 3: do RL. perhaps inside of a learned model <br>
 
 ## Collect data
 
-Choose an env, and then run the collect command
 ```bash
-# basics 
-env=Dropbox
-env=Bounce
-env=Bounce2
-env=Object2
-# simple robots 
-env=Urchin
-env=Luxo
-# simple manipulation 
-env=LuxoCube
-env=UrchinCube
-
-python main.py --mode=collect --num_envs=10 --env=$env --train_barrels=100 --logdir=logs/datadump/$env
+# single env
+python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=Urchin --logdir=logs/trash/Urchin
 ```
 
-Or run one of these commands to collect data for many envs. These take about 5-60 minutes.
-
 ```bash
-bash scripts/collect_all.sh 0 # tier 0 envs: Dropbox, Bounce, Bounce2, Object2
-bash scripts/collect_all.sh 1 # tier 1 envs: Urchin, Luxo, UrchinCube, LuxoCube, UrchinBall, LuxoBall
+# all envs
+python3 scripts/kicker.py collect
 ```
 
 ## Arbiter training
+
+```bash
+# single env
+python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=Urchin --logdir=logs/trash/Urchin
+```
+
+```bash
+# all envs
+python3 scripts/kicker.py collect
+```
+
+
+
 ```
 python main.py --mode=train --env=Dropbox --datapath=logs/datadump/Dropbox/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/evals/arbiter/Dropbox/ --window=5
 

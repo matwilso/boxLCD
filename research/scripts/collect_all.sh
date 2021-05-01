@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # collect data for all envs in a tier.
-# usage: bash scripts/collect_all.sh TIER
-# TODO: make these be in python since it is easier to quickly write python.
- 
-if [ -z "$1" ] || [ $1 -eq 0 ]; then
-    envs=(Dropbox Bounce Bounce2 Object2)
-elif [ $1 -eq 1 ]; then
-    envs=(Urchin Luxo UrchinCube LuxoCube UrchinBall LuxoBall)
-else
-    echo "nothing"
-    exit 1;
-fi
-for env in ${envs[@]}; do
-    python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=$env --logdir=logs/datadump/$env
-done
+# usage: bash scripts/collect_all.sh 
+
+args="python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10"
+datapath="logs/trash"
+$args --env=Dropbox --logdir=$datapath/Dropbox
+$args --env=Bounce --logdir=$datapath/Bounce
+$args --env=Bounce2 --logdir=$datapath/Bounce2
+$args --env=Object2 --logdir=$datapath/Object2
+$args --env=Urchin --logdir=$datapath/Urchin
+$args --env=Luxo --logdir=$datapath/Luxo
+$args --env=UrchinCube --logdir=$datapath/UrchinCube
+$args --env=LuxoCube --logdir=$datapath/LuxoCube
+$args --env=UrchinBall --logdir=$datapath/UrchinBall
+$args --env=LuxoBall --logdir=$datapath/LuxoBall
