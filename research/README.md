@@ -1,5 +1,6 @@
 # research
 
 This folder contains active experiments on models and on boxLCD components.
+They are unstable and subject to change, so you should stick to a specific release of boxLCD.
 
-There are some descriptions and commands to run models, but they are unstable and subject to change.
+For commands and scripts on running things, see [here](./scripts/README.md).
