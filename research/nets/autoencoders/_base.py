@@ -101,7 +101,7 @@ class Autoencoder(Net):
 
   def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
     # run the examples through encoder and decoder
-    z = self.encode(batch, flatten=False)
+    z = self.encode(batch, flatten=False, noise=False)
     decoded = self.decode_mode(z)
     if 'lcd' in decoded:
       pred_lcd = decoded['lcd']

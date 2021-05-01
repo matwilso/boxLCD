@@ -15,7 +15,7 @@ from research import utils
 from research.nets.autoencoders.bvae import BVAE
 from ._base import VideoModel
 
-class FlatBToken(VideoModel):
+class FBT(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
     # <LOAD BVAE>

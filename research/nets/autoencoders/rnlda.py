@@ -29,7 +29,7 @@ class RNLDA(SingleStepAE):
   def loss(self, batch):
     # autoencode
     z_e = self.encoder(batch)
-    z_q, idxs = self.vq(z_e)
+    z_q, idxs = self.vq(z_e, noise=True)
     decoded = self.decoder(z_q)
     # compute losses
     recon_losses = {}

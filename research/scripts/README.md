@@ -1,4 +1,4 @@
-# COMMON SHELL COMMANDS THAT I SAVE SO I DON'T FORGET THEM
+# SHELL COMMANDS TO RUN THE CODE
 
 ## Overview:
 
@@ -6,10 +6,13 @@ Step 1: collect data <br>
 Step 2: learn models on that data <br>
 Step 3: do RL. perhaps inside of a learned model <br>
 
+- [Overview:](#overview)
 - [Collect data](#collect-data)
+- [Arbiter training](#arbiter-training)
 - [MODEL LEARNING](#model-learning)
-  - [Autoencoding](#autoencoding)
-  - [VideoModels](#videomodels)
+  - [Autoencoders](#autoencoders)
+  - [Video](#video)
+- [LEARNED SIMULATION](#learned-simulation)
 - [RL](#rl)
   - [CUBES](#cubes)
 - [MISC](#misc)
@@ -42,7 +45,7 @@ python3 scripts/kicker.py arbiter --model=MultiStepArbiter
 
 ### Autoencoders
 
-// should run for about 70s per 1000 training iterations on my 1080Ti.
+// should run for about 70s per 1000 training iterations on my 1080Ti. <br>
 // maybe about 10 mins or so total, until the error in the pstate stuff goes away. around -6 log mse
 
 #### BVAE

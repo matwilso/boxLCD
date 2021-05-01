@@ -110,7 +110,7 @@ def reparse(K, **kwargs):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('mode')
-  parser.add_argument('--datadir', default='logs/trash/')
+  parser.add_argument('--datadir', default='logs/datadump/')
   parser.add_argument('--logdir', default='logs/trash/')
   parser.add_argument('--arbiterdir', default='logs/trash/')
   parser.add_argument('--encoderdir', default='logs/trash/')
@@ -153,4 +153,4 @@ if __name__ == '__main__':
     if K.dry:
       print(cmd)
     else:
-      subprocess.run(cmd.split(' '))
+      subprocess.run(cmd.split())

@@ -14,7 +14,7 @@ from research import utils
 from research.nets.autoencoders.rnlda import RNLDA
 from ._base import VideoModel
 
-class FlatRonald(VideoModel):
+class FRNLD(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
     # <LOAD ronald>
