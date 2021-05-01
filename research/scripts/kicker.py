@@ -15,10 +15,12 @@ ALL = TIER0 + TIER1
 envs = {'all': ALL, '0': TIER0, '1': TIER1}
 
 MultiStepArbiter = AttrDict()
-MultiStepArbiter.total_itr = int(3e4)
+MultiStepArbiter.total_itr = int(1e3)
+#MultiStepArbiter.total_itr = int(3e4)
 
 Encoder = AttrDict()
-Encoder.total_itr = int(3e4)
+Encoder.total_itr = int(1e3)
+#Encoder.total_itr = int(3e4)
 
 BVAE = AttrDict()
 BVAE.hidden_size = 64
@@ -45,7 +47,8 @@ ENV_PROMPT = defaultdict(lambda: 3)
 ENV_PROMPT['Dropbox'] = 1
 
 Video = AttrDict()
-Video.total_itr = int(1e5)
+Video.total_itr = int(1e3)
+#Video.total_itr = int(1e5)
 #Video.window = '{ENV_WINDOW[{env}]}'
 #Video.prompt = '{ENV_PROMPT[{env}]}'
 Video.arbiterdir = '{K.arbiterdir/env}'
@@ -112,7 +115,7 @@ if __name__ == '__main__':
   parser.add_argument('mode')
   parser.add_argument('--datadir', default='logs/datadump/')
   parser.add_argument('--logdir', default='logs/trash/')
-  parser.add_argument('--arbiterdir', default='logs/trash/')
+  parser.add_argument('--arbiterdir', default='logs/trash/arbiter/')
   parser.add_argument('--encoderdir', default='logs/trash/')
   parser.add_argument('--model')
   parser.add_argument('--envs', '-e', default='all')
