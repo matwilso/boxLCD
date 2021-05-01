@@ -33,7 +33,7 @@ def config():
   G.logdir = pathlib.Path('./logs/trash')
   G.weightdir = pathlib.Path('.')
   G.buffdir = pathlib.Path('.')
-  G.datapath = pathlib.Path('.')
+  G.datadir = pathlib.Path('.')
   G.arbiterdir = pathlib.Path('.')
   G.device = 'cuda' # 'cuda', 'cpu'
   G.mode = 'train'

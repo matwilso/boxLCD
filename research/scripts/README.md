@@ -41,7 +41,7 @@ python3 scripts/kicker.py collect
 
 
 ```
-python main.py --mode=train --env=Dropbox --datapath=logs/datadump/Dropbox/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/evals/arbiter/Dropbox/ --window=5
+python main.py --mode=train --env=Dropbox --datadir=logs/datadump/Dropbox/ --model=MultiStepArbiter --lr=5e-4 --log_n=1000 --bs=32 --nfilter=64 --hidden_size=256 --logdir=logs/evals/arbiter/Dropbox/ --window=5
 
 ```
 
@@ -56,26 +56,26 @@ args="--window=4 --bs=256"
 
 #### Arbiter
 ```bash
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/Luxo/ --model=ArbiterAE --nfilter=32 --lr=1e-3 --logdir=logs/autoencoder/Luxo/ArbiterAE/better_enc_norelu_compile --log_n=1000 --bs=32 --window=4
+python main.py --mode=train --env=Luxo --datadir=logs/datadump/Luxo/ --model=ArbiterAE --nfilter=32 --lr=1e-3 --logdir=logs/autoencoder/Luxo/ArbiterAE/better_enc_norelu_compile --log_n=1000 --bs=32 --window=4
 ```
 
 #### VAE 
 
 ```bash
 model=VAE
-python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model  --window=4 --bs=256 --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small 
+python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model  --window=4 --bs=256 --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small 
 ```
 
 #### Binary VAE 
 
 ```bash
 model=BVAE
-python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model  --nfilter=16 --vqD=8 --vqK=32 --hidden_size=64  --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small $args
+python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model  --nfilter=16 --vqD=8 --vqK=32 --hidden_size=64  --lr=1e-3  --logdir=logs/autoencoder/$env/$model/small $args
 ```
 
 
 ```bash
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/Luxo/ --model=BVAE --window=4 --log_n=1000 --lr=1e-3 --bs=64 --log_n=1000 --lr=1e-3 --vqK=64 --hidden_size=64 --logdir=logs/newfolder/autoencoder/bvae/x --lr=1e-3 --skip_train=0 --nfilter=64 --vqD=32 --log_n=1000 --arbiterdir=logs/newfolder/arbiter/singlestep/2/
+python main.py --mode=train --env=Luxo --datadir=logs/datadump/Luxo/ --model=BVAE --window=4 --log_n=1000 --lr=1e-3 --bs=64 --log_n=1000 --lr=1e-3 --vqK=64 --hidden_size=64 --logdir=logs/newfolder/autoencoder/bvae/x --lr=1e-3 --skip_train=0 --nfilter=64 --vqD=32 --log_n=1000 --arbiterdir=logs/newfolder/arbiter/singlestep/2/
 
 # should run for about 70s per 1000 training iterations on my 1080Ti.
 # maybe about 10 mins or so total, until the error in the pstate stuff goes away. around -6 log mse
@@ -87,8 +87,8 @@ python main.py --mode=train --env=Luxo --datapath=logs/datadump/Luxo/ --model=BV
 
 env=LuxoCube
 DP=logs/datadump/10fps/luxocube/
-python main.py --mode=train --env=$env --datapath=$DP --model=bvae --window=4 --bs=64 --log_n=1000   --lr=1e-3 --skip_train=0 --vqK=64 --hidden_size=64 --nfilter=64 --vqD=32 --log_n=100 --logdir=logs/bvae/x
-python main.py --mode=train --env=$env --datapath=$DP --model=flatb --window=100 --bs=32 --log_n=1000 --lr=1e-3 --weightdir=$WD --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --log_n=100 --logdir=logs/flatb/luxocube/bigger
+python main.py --mode=train --env=$env --datadir=$DP --model=bvae --window=4 --bs=64 --log_n=1000   --lr=1e-3 --skip_train=0 --vqK=64 --hidden_size=64 --nfilter=64 --vqD=32 --log_n=100 --logdir=logs/bvae/x
+python main.py --mode=train --env=$env --datadir=$DP --model=flatb --window=100 --bs=32 --log_n=1000 --lr=1e-3 --weightdir=$WD --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --log_n=100 --logdir=logs/flatb/luxocube/bigger
 
 BVAE preproc, real env
 python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatb --weightdir=logs/flatb/bigger/ --window=100 --goals=1 --num_envs=12 --lenv=1 --logdir=logs/rl/flatb/nolenv/bvae_preproc_bs64_fixgoal --lenv_temp=0.1 --bs=64 --hidden_size=128 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0 --lenv=0 --net=bvae
@@ -107,7 +107,7 @@ model=FlatBToken
 wd=logs/autoencoder/$env/BVAE/small
 args="--window=100 --bs=100"
 
-python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$model --weightdir=$wd --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --logdir=logs/video/$model/x $args
+python main.py --mode=train --env=$env --datadir=logs/datadump/$env/ --model=$model --weightdir=$wd --n_layer=3 --n_head=8 --hidden_size=512 --n_embed=512 --logdir=logs/video/$model/x $args
 ```
 
 #### Flat Everything
@@ -119,7 +119,7 @@ python main.py --mode=train --env=$env --datapath=logs/datadump/$env/ --model=$m
 ```
 # test learned simulator
 
-python learned_env.py --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --weightdir=logs/flatev/x/monsta2/ --goals=1 --num_envs=8 --window=100 
+python learned_env.py --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --weightdir=logs/flatev/x/monsta2/ --goals=1 --num_envs=8 --window=100 
 
 # run RL on learned simulator env, and non-learned env
 
@@ -152,20 +152,20 @@ python rl/sac.py --env=UrchinCube --state_rew=1 --net=mlp --goals=1 --num_envs=8
 ```
 
 multi-step model
-python main.py --mode=train --env=UrchinBall --datapath=$DP --model=multistep --vidstack=4 --phase=1 --log_n=50 --logdir=logs/biphase/x2/
-python main.py --mode=train --env=UrchinBall --datapath=$DP --model=multistep --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/1e5/nl3_512_16_32stacks/ --n_layer=3 --n_embed=512 --n_head=16 --bs=16 --amp=1
+python main.py --mode=train --env=UrchinBall --datadir=$DP --model=multistep --vidstack=4 --phase=1 --log_n=50 --logdir=logs/biphase/x2/
+python main.py --mode=train --env=UrchinBall --datadir=$DP --model=multistep --vidstack=4 --phase=2 --log_n=1 --logdir=logs/biphase/x2/phase2/1e5/nl3_512_16_32stacks/ --n_layer=3 --n_embed=512 --n_head=16 --bs=16 --amp=1
 
 frame_token
-python main.py --mode=train --env=Luxo --datapath=$DP --model=frame_token --logdir=logs/luxo/flattie/ --lr=1e-3 --n_layer=3 --n_embed=512 --n_head=16 --lr=5e-4
+python main.py --mode=train --env=Luxo --datadir=$DP --model=frame_token --logdir=logs/luxo/flattie/ --lr=1e-3 --n_layer=3 --n_embed=512 --n_head=16 --lr=5e-4
 
 FLAT EVERYTHING (GOOD ONE)
 state vqvae so that state is discrete binary
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=statevq --window=16 --log_n=1000 --lr=1e-3 --logdir=logs/ternary/juststate128_512_save/ --bs=32 --log_n=1000 --lr=1e-3 --vqK=128 --hidden_size=512
+python main.py --mode=train --env=Luxo --datadir=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=statevq --window=16 --log_n=1000 --lr=1e-3 --logdir=logs/ternary/juststate128_512_save/ --bs=32 --log_n=1000 --lr=1e-3 --vqK=128 --hidden_size=512
 then flat everything model
  a
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/med_bs32_ESR --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512
+python main.py --mode=train --env=Luxo --datadir=logs/datadump/luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/med_bs32_ESR --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512
  b
-python main.py --mode=train --env=Luxo --datapath=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/100window/smallnet_bs32_8e-4_fix --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512 --lr=8e-4
+python main.py --mode=train --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --wh_ratio=2.0 --model=flatev --log_n=1000 --lr=1e-3 --logdir=logs/flatev/100window/smallnet_bs32_8e-4_fix --bs=32 --log_n=1000 --lr=1e-3 --weightdir=logs/ternary/juststate128_512_save/ --window=100 --n_layer=3 --n_head=16 --hidden_size=512 --n_embed=512 --lr=8e-4
 
 ## MISC
 

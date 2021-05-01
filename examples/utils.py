@@ -15,7 +15,7 @@ def config():
   G = AttrDict()
   # BASICS
   G.logdir = pathlib.Path('./logs/')
-  G.datapath = pathlib.Path('.')
+  G.datadir = pathlib.Path('.')
   G.collect_n = 10000
   G.env = 'Bounce'
   G.lcd_mode = '1'  # just for visualization
@@ -64,8 +64,8 @@ class RolloutDataset(Dataset):
     return elem
 
 def load_ds(G):
-  train_dset = RolloutDataset(G.datapath, train=True, G=G)
-  test_dset = RolloutDataset(G.datapath, train=False, G=G)
+  train_dset = RolloutDataset(G.datadir, train=True, G=G)
+  test_dset = RolloutDataset(G.datadir, train=False, G=G)
   train_loader = DataLoader(train_dset, batch_size=G.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=G.bs, shuffle=True, pin_memory=True, num_workers=2, drop_last=True)
   return train_loader, test_loader

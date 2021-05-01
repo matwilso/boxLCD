@@ -133,7 +133,7 @@ class RolloutDataset(IterableDataset):
     """recheck the directory for new barrels"""
     self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))
     self.nbarrels = len(self.barrel_files)
-    assert self.nbarrels > 0, 'didnt find any barrels at datapath'
+    assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
   def __iter__(self):
     worker_info = th.utils.data.get_worker_info()
@@ -170,8 +170,8 @@ def load_ds(G):
   #  tree_multi_map(lambda x, *y: )
   #  import ipdb; ipdb.set_trace()
   #  pass
-  train_dset = RolloutDataset(G.datapath / 'train', G.window, refresh_data=G.refresh_data)
-  test_dset = RolloutDataset(G.datapath / 'test', G.window, infinite=False)
+  train_dset = RolloutDataset(G.datadir / 'train', G.window, refresh_data=G.refresh_data)
+  test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False)
   train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=12, drop_last=True)
   train_loader.nbarrels = train_dset.nbarrels

@@ -28,7 +28,7 @@ if __name__ == '__main__':
   # grab defaults from the env
   Env = env_map[temp_cfg.env]
   parser.set_defaults(**Env.ENV_DG)
-  data_yaml = temp_cfg.datapath / 'hps.yaml'
+  data_yaml = temp_cfg.datadir / 'hps.yaml'
   weight_yaml = temp_cfg.weightdir / 'hps.yaml'
   defaults = {
       'vidstack': temp_cfg.ep_len,
