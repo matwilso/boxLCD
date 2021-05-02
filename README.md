@@ -9,15 +9,15 @@ boxLCD is box2D physics with low resolution and binarized rendering. It provides
 environments and an API for defining and rendering custom environments.
 
 The aim of this project is to accelerate progress in [learned simulator](https://matwilso.github.io/learned-sims/) and world model research,
-by providing a simple testbed for learning predictive dynamics models of physics environments.
+by providing a simple testbed for learning predictive dynamics models of physics environments and using those to solve tasks.
 Eventually we care about predictive models that are trained on real world data and that help robots act in the real world.
 However, we believe these is a lot of fundamental research to do before we can realize that [full vision](https://matwilso.github.io/robot-future/),
 and that small scale testbeds are very useful for making progress.
 
 boxLCD is meant to vary from extremely simple environments with low resolution, binarized rendering, and
 low frames per second (FPS) / frequency (Hz) for getting started, to increasingly complicated environments that push
-the capabilities of current methods more. You can think of it kind of like a video game skill tree, which
-starts with the challenge of predicting video of simple physics environments and expands outwards from there in several directions.
+the capabilities of current methods more. I imagine it kind of like a video game skill tree, which
+starts with learning models for simple physics environments and expands outwards from there in several directions.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
 
 <!--
@@ -82,16 +82,15 @@ Tier 1: Simple Robots and Manipulation |  - |
 `envs.UrchinBall()` (16x24) | `envs.LuxoBall()` (16x24) | 
 ![](./assets/envs/UrchinBall.gif)  |  ![](./assets/envs/LuxoBall.gif)  |  
 
-To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a naive approach.
-
 ## Model learning 📉
 
-After 100k iterations on a datset of 100k rollouts.
+We train a few different models on a dataset of 100k rollouts for 100k gradient updates.
+Code to run these can be found in the [`research`](./research) folder or [`research/scripts`](./research/scripts).
 Green is prompt, red is model prediction. Top is ground truth, middle is model prediction, bottom is error.
 
-RSSM is from modified from [Dreamer v1](https://danijar.com/project/dreamer/) code.
-Flat Binary Transformer pre-trains a binary autoencoder latent vectorl.
-Then each of those vectors is a token in a transformer that is trained to predict the next token autoregressively.
+RSSM is [modified](./research/nets/video_models/rssm.py) from [Dreamer v1](https://danijar.com/project/dreamer/) code.
+Flat Binary Transformer ([FBT](research/nets/video_models/flat_btoken.py)) first pre-trains a binary autoencoder latent vector,
+then each of those vectors is a token in a transformer that is trained to predict the next token autoregressively.
  
 Tier 0 RSSM Predictions | -|
 :-------------------------:|:----:|
