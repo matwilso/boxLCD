@@ -15,12 +15,12 @@ ALL = TIER0 + TIER1
 envs = {'all': ALL, '0': TIER0, '1': TIER1}
 
 MultiStepArbiter = AttrDict()
-MultiStepArbiter.total_itr = int(1e3)
-#MultiStepArbiter.total_itr = int(3e4)
+#MultiStepArbiter.total_itr = int(1e3)
+MultiStepArbiter.total_itr = int(3e4)
 
 Encoder = AttrDict()
-Encoder.total_itr = int(1e3)
-#Encoder.total_itr = int(3e4)
+#Encoder.total_itr = int(1e3)
+Encoder.total_itr = int(3e4)
 
 BVAE = AttrDict()
 BVAE.hidden_size = 64
@@ -47,8 +47,8 @@ ENV_PROMPT = defaultdict(lambda: 3)
 ENV_PROMPT['Dropbox'] = 1
 
 Video = AttrDict()
-Video.total_itr = int(1e3)
-#Video.total_itr = int(1e5)
+#Video.total_itr = int(1e3)
+Video.total_itr = int(1e5)
 Video.window = '{window}'
 Video.prompt = '{prompt}'
 Video.arbiterdir = '{K.arbiterdir/env}'
