@@ -52,8 +52,7 @@ pip install -r requirements.txt
 ```
 
 To get started, I would check out the [`examples`](./examples/) folder.
-
-And later the [`research`](./research/) folder for more complex examples.
+And later the [`research`](./research/) folder for more complex examples, along with [`scripts`](./research/scripts) that you can run.
 
 ## Environment demos ⚽
 
