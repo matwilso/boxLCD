@@ -72,21 +72,6 @@ Tier 0: Basic Passive Objects |  - |
 ![](./assets/envs/Dropbox.gif)  | ![](./assets/envs/Bounce.gif)  |
 `envs.Bounce2()` (16x16) | `envs.Object2()` (16x16) |
 ![](./assets/envs/Bounce2.gif)  | ![](./assets/envs/Object2.gif)  | 
-||||||| merged common ancestors
-Pretty rendering vs LCD rendering (upscaled for visualization) |  
-:-------------------------:|
-`envs.Dropbox()` (16x16) | 
-![](./assets/demos/dropbox.gif)  |  
-`envs.Bounce()` (16x16) | 
-![](./assets/demos/bounce.gif)  |  
-`envs.Urchin()` (16x16) | 
-![](./assets/demos/urchin.gif)  |  
-`envs.UrchinBall()` (16x24) | 
-![](./assets/demos/urchin_ball.gif)  |  
-`envs.UrchinBalls()` (16x32) | 
-![](./assets/demos/urchin_balls.gif)  |  
-`envs.UrchinCubes()` (16x32) | 
-![](./assets/demos/urchin_cubes.gif)  |  
 
 Tier 1: Simple Robots and Manipulation |  - |  
 :-------------------------:|:------:|
