@@ -262,17 +262,20 @@ def compute_fid(x, y):
   https://en.wikipedia.org/wiki/Wasserstein_metric#Normal_distributions
   https://en.wikipedia.org/wiki/Fr%C3%A9chet_inception_distance
   """
-  assert x.ndim == 2 and y.ndim == 2
-  # aggregate stats from this batch
-  pmu = np.mean(x, 0)
-  pcov = np.cov(x, rowvar=False)
-  tmu = np.mean(y, 0)
-  tcov = np.cov(y, rowvar=False)
-  assert pcov.shape[0] == x.shape[-1]
-  # compute FID equation
-  fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))
-  # TODO: this is somewhat concerning i got an imaginary number before.
-  return fid.real
+  try:
+    assert x.ndim == 2 and y.ndim == 2
+    # aggregate stats from this batch
+    pmu = np.mean(x, 0)
+    pcov = np.cov(x, rowvar=False)
+    tmu = np.mean(y, 0)
+    tcov = np.cov(y, rowvar=False)
+    assert pcov.shape[0] == x.shape[-1]
+    # compute FID equation
+    fid = np.mean((pmu - tmu)**2) + np.trace(pcov + tcov - 2 * fractional_matrix_power(pcov.dot(tcov), 0.5))
+    # TODO: this is somewhat concerning i got an imaginary number before.
+    return fid.real
+  except:
+    return np.nan
 
 def flat_batch(batch):
   return {key: val.flatten(0, 1) for key, val in batch.items()}

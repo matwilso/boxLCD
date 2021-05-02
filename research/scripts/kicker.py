@@ -49,8 +49,8 @@ ENV_PROMPT['Dropbox'] = 1
 Video = AttrDict()
 Video.total_itr = int(1e3)
 #Video.total_itr = int(1e5)
-#Video.window = '{ENV_WINDOW[{env}]}'
-#Video.prompt = '{ENV_PROMPT[{env}]}'
+Video.window = '{window}'
+Video.prompt = '{prompt}'
 Video.arbiterdir = '{K.arbiterdir/env}'
 
 RSSM = AttrDict()
@@ -76,7 +76,7 @@ FRNLD.n_layer = 4
 FRNLD.n_head = 8
 FRNLD.n_embed = 512
 FRNLD.hidden_size = 512
-FRNLD.weightdir = '{K.encoderdir/"encoder/RNDLA"}/{env}'
+FRNLD.weightdir = '{K.encoderdir/"encoder/RNLDA"}/{env}'
 
 
 video = {
@@ -152,6 +152,8 @@ if __name__ == '__main__':
 
   if K.dry: print('DRY RUN')
   for env in ALL:
+    prompt = ENV_PROMPT[env]
+    window = ENV_WINDOW[env]
     cmd = fstr(cmd_template)
     if K.dry:
       print(cmd)
