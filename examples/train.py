@@ -65,7 +65,7 @@ class Trainer:
       if 'BoxOrCircle' == self.G.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
-        reset_states = np.c_[np.random.uniform(-1,1,N), np.random.uniform(-1,1,N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
+        reset_states = np.c_[np.random.uniform(-1, 1, N), np.random.uniform(-1, 1, N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
     else:
       reset_states = [None] * N
     obses = {key: [[] for ii in range(N)] for key in self.env.observation_space.spaces}
@@ -103,7 +103,7 @@ class Trainer:
         loss = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
     sample_start = time.time()
-    if i % 10 == 0:
+    if i % self.C.log_n == 0:
       self.sample(i)
     self.logger['dt/sample'] = [time.time() - sample_start]
     self.logger['num_vars'] = self.num_vars
@@ -111,12 +111,18 @@ class Trainer:
     self.writer.flush()
     self.model.train()
 
+  def save(self, i=0):
+    path = self.C.logdir / f'model.pt'
+    print("SAVED MODEL", path)
+    torch.save(self.model.state_dict(), path)
+
   def run(self):
     for i in itertools.count():
       self.train_epoch(i)
       self.test(i)
       if i >= self.G.num_epochs:
         break
+    self.save(i)
 
 if __name__ == '__main__':
   G = parse_args()

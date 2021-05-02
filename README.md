@@ -1,4 +1,4 @@
-![](./assets/lcd_sideside.png)
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/lcd_sideside.png)
 
 boxLCD 📟
 =================
@@ -72,7 +72,21 @@ Tier 0: Basic Passive Objects |  - |
 ![](./assets/envs/Dropbox.gif)  | ![](./assets/envs/Bounce.gif)  |
 `envs.Bounce2()` (16x16) | `envs.Object2()` (16x16) |
 ![](./assets/envs/Bounce2.gif)  | ![](./assets/envs/Object2.gif)  | 
-
+||||||| merged common ancestors
+Pretty rendering vs LCD rendering (upscaled for visualization) |  
+:-------------------------:|
+`envs.Dropbox()` (16x16) | 
+![](./assets/demos/dropbox.gif)  |  
+`envs.Bounce()` (16x16) | 
+![](./assets/demos/bounce.gif)  |  
+`envs.Urchin()` (16x16) | 
+![](./assets/demos/urchin.gif)  |  
+`envs.UrchinBall()` (16x24) | 
+![](./assets/demos/urchin_ball.gif)  |  
+`envs.UrchinBalls()` (16x32) | 
+![](./assets/demos/urchin_balls.gif)  |  
+`envs.UrchinCubes()` (16x32) | 
+![](./assets/demos/urchin_cubes.gif)  |  
 
 Tier 1: Simple Robots and Manipulation |  - |  
 :-------------------------:|:------:|
@@ -83,6 +97,7 @@ Tier 1: Simple Robots and Manipulation |  - |
 `envs.UrchinBall()` (16x24) | `envs.LuxoBall()` (16x24) | 
 ![](./assets/envs/UrchinBall.gif)  |  ![](./assets/envs/LuxoBall.gif)  |  
 
+To demonstrate what is possible with boxLCD, we train a [model](./examples/model.py) on a few simple environments using a naive approach.
 
 ## Model learning 📉
 
@@ -137,7 +152,6 @@ Running In the Learned Env |
 Transferring Directly to the Base Simulator (0.988 success rate) | 
 ![](./assets/rl/Luxo_real.gif)  | 
 
-
 ## Roadmap 📍
 
 Some of the reasoning behind this project can be found in some blog posts I have written on 
@@ -178,7 +192,7 @@ and getting the textures right. So it decouples the problem a bit and makes thin
 - baby surprisal
 - tying more envs together. like creating a setting in which there are many possible robots and objects that could be simulated.
 
-![](./assets/roadmap_pic.png)
+![](https://raw.githubusercontent.com/matwilso/boxLCD/main/assets/roadmap_pic.png)
 
 ## Related Work 📚
 
@@ -200,6 +214,7 @@ However, I'm not aware of any work with the same goals as boxLCD, nor one that s
 - [Gibson environment](https://github.com/StanfordVL/GibsonEnv). "Real-World Perception for Embodied Agents". You can load robots in and they can walk around in realistic looking scenes.
 - [AI2-THOR environment](https://ai2thor.allenai.org/). Realistic scenes, Unity 3D physics, has simulated and real world counterparts.
 - [DeepMind Lab](https://github.com/deepmind/lab). 3D learning environment based on Quake III engine. This is often used in video prediction work, especially from Alphabet.
+- [ViZDoom](http://vizdoom.cs.put.edu.pl/). 3D environment based on DOOM game. Also customizable. 
 
 ### Other miniaturized environments and datasets
 - [MinAtar](https://github.com/kenjyoung/MinAtar). Miniature versions of 5 Atari games, played on 10x10 grids.
