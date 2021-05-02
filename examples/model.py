@@ -100,7 +100,8 @@ class GPT(nn.Module):
     action = batch['action']
 
     # SHIFT RIGHT (add a padding on the left) so you can't see yourself 
-    x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+    x = torch.cat([torch.zeros(BS, 1, E).to(self.C.device), x[:, :-1]], dim=1)
+    acts = torch.cat([torch.zeros(BS, 1, acts.shape[-1]).to(self.C.device), acts[:, :-1]], dim=1)
     # forward the GPT model
     x = self.embed(x)
     cin = self.act_condition(action)
