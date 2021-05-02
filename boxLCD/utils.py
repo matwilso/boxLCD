@@ -15,12 +15,12 @@ def args_type(default):
     return lambda x: pathlib.Path(x).expanduser()
   return type(default)
 
-class X:
+class ConciseNumpyArray:
   """
   Singleton object to be able to easily create numpy arrays without having to type as much
 
   usage:
-    >>> A = X()
+    >>> A = ConciseNumpyArray()
     >>> arr = A[1, 2, 3]
     array([1, 2, 3])
     >>> arr = A[-1.0, 1.0]
@@ -28,7 +28,7 @@ class X:
   """
   def __getitem__(self, stuff):
     return np.array(stuff)
-A = X()
+A = ConciseNumpyArray()
 
 class NamedArray():
   """
@@ -110,7 +110,6 @@ def filtdict(dict, phrase): return {key: dict[key] for key in dict if re.match(p
 def nfiltdict(dict, phrase): return {key: dict[key] for key in dict if re.match(phrase, key) is None}
 def filtlist(list, phrase): return [item for item in list if re.match(phrase, item) is not None]
 def nfiltlist(list, phrase): return [item for item in list if re.match(phrase, item) is None]
-
 # env specific stuff
 def get_angle(sin, cos): return np.arctan2(sin, cos)
 def make_rot(angle): return A[[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]

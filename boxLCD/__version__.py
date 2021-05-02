@@ -1,0 +1,8 @@
+__title__ = 'boxLCD'
+__description__ = 'A Testbed for Learned Simulator Research'
+__url__ = 'https://github.com/matwilso/boxLCD/tree/matt_dev'
+__version__ = '0.2.0'
+__author__ = 'Matthew Wilson'
+__author_email__ = 'mattwilsonmbw@gmail.com'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2021 Matthew Wilson'

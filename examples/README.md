@@ -14,6 +14,12 @@ Similar to basic, but allows you to set the env from cmd line, and it enables so
 python less_basic.py --env=UrchinBall
 ```
 
+or 
+
+```
+python less_basic.py --env=LuxoBall --lcd_mode=rgb # experimental visualization mode
+```
+
 ## Training
 
 Simple naive training approach using a Tranformer, where LCD (~16x16) frames are flattened and used directly as
@@ -24,13 +30,11 @@ just images
 
 1. Collect data:
 ```
-# (10k rollouts, should take 5-ish minutes)
-python collect.py --env=Bounce --collect_n=10000 
+python collect.py --env=Bounce --collect_n=10000 # (10k rollouts, should take 5-ish minutes)
 ```
 2. Train a model on that data:
 ```
-# trains in a few minutes on GPU, longer for harder tasks
-python train.py --env=Bounce --datapath=rollouts/Bounce-10000.npz 
+python train.py --env=Bounce --datadir=rollouts/Bounce-10000.npz # trains in a few minutes on GPU, longer for harder tasks
 ```
 3. Visualize training and samples:
 ```

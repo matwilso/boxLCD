@@ -6,13 +6,13 @@ import time
 import argparse
 import numpy as np
 from tqdm import tqdm
-from boxLCD import envs
+from boxLCD import envs, env_map
 from boxLCD.utils import A, AttrDict, args_type
 import copy
 import matplotlib.pyplot as plt
 import itertools
 from torch.utils.tensorboard import SummaryWriter
-import torch
+import torch as th
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 import numpy as np
@@ -23,28 +23,28 @@ import argparse
 from boxLCD.utils import A
 from model import GPT
 import utils
-from define_config import env_fn, parse_args
+from utils import parse_args
 
 class Trainer:
-  def __init__(self, C):
-    self.C = C
-    self.env = env_fn(C)()
+  def __init__(self, G):
+    self.G = G
+    self.env = env_map[G.env](G)
     self.act_dim = self.env.action_space.shape[0]
-    self.C.lcd_w = int(self.C.lcd_base * self.C.wh_ratio)
-    self.C.lcd_h = self.C.lcd_base
-    self.model = GPT(self.act_dim, C)
-    self.optimizer = Adam(self.model.parameters(), lr=C.lr)
-    self.C.num_vars = self.num_vars = utils.count_vars(self.model)
+    self.G.lcd_w = int(self.G.lcd_base * self.G.wh_ratio)
+    self.G.lcd_h = self.G.lcd_base
+    self.model = GPT(self.act_dim, G)
+    self.optimizer = Adam(self.model.parameters(), lr=G.lr)
+    self.G.num_vars = self.num_vars = utils.count_vars(self.model)
     print('num vars', self.num_vars)
-    self.train_ds, self.test_ds = utils.load_ds(C)
-    self.writer = SummaryWriter(C.logdir)
-    self.logger = utils.dump_logger({}, self.writer, 0, C)
+    self.train_ds, self.test_ds = utils.load_ds(G)
+    self.writer = SummaryWriter(G.logdir)
+    self.logger = utils.dump_logger({}, self.writer, 0, G)
 
   def train_epoch(self, i):
     """run a single epoch of training over the data"""
     self.optimizer.zero_grad()
     for batch in self.train_ds:
-      batch = {key: val.to(self.C.device) for key, val in batch.items()}
+      batch = {key: val.to(self.G.device) for key, val in batch.items()}
       self.optimizer.zero_grad()
       loss = self.model.loss(batch)
       loss.backward()
@@ -54,15 +54,15 @@ class Trainer:
   def sample(self, i):
     # TODO: prompt to a specific point and sample from there. to compare against ground truth.
     N = 5
-    acts = (torch.rand(N, self.C.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.C.device)
-    sample, sample_loss = self.model.sample(N, acts=acts)
+    action = (th.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
+    sample, sample_loss = self.model.sample(N, action=action)
     self.logger['sample_loss'] += [sample_loss]
     lcd = sample['lcd']
     lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-    self.writer.add_video('lcd_samples', utils.force_shape(lcd), i, fps=50)
+    self.writer.add_video('unprompted_samples', utils.force_shape(lcd), i, fps=self.G.fps)
     # EVAL
     if len(self.env.world_def.robots) == 0:  # if we are just dropping the object, always use the same setup
-      if 'BoxOrCircle' == self.C.env:
+      if 'BoxOrCircle' == self.G.env:
         reset_states = np.c_[np.ones(N), np.zeros(N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
       else:
         reset_states = np.c_[np.random.uniform(-1, 1, N), np.random.uniform(-1, 1, N), np.linspace(-0.8, 0.8, N), 0.5 * np.ones(N)]
@@ -73,7 +73,7 @@ class Trainer:
     for ii in range(N):
       for key, val in self.env.reset(reset_states[ii]).items():
         obses[key][ii] += [val]
-      for _ in range(self.C.ep_len - 1):
+      for _ in range(self.G.ep_len - 1):
         act = self.env.action_space.sample()
         obs = self.env.step(act)[0]
         for key, val in obs.items():
@@ -81,10 +81,10 @@ class Trainer:
         acts[ii] += [act]
       acts[ii] += [np.zeros_like(act)]
     obses = {key: np.array(val) for key, val in obses.items()}
-    acts = np.array(acts)
-    acts = torch.as_tensor(acts, dtype=torch.float32).to(self.C.device)
-    prompts = {key: torch.as_tensor(1.0 * val[:, :10]).to(self.C.device) for key, val in obses.items()}
-    prompted_samples, prompt_loss = self.model.sample(N, acts=acts, prompts=prompts)
+    action = np.array(acts)
+    action = th.as_tensor(action, dtype=th.float32).to(self.G.device)
+    prompts = {key: th.as_tensor(1.0 * val[:, :10]).to(self.G.device) for key, val in obses.items()}
+    prompted_samples, prompt_loss = self.model.sample(N, action=action, prompts=prompts)
     self.logger['prompt_sample_loss'] += [prompt_loss]
     real_lcd = obses['lcd'][:, :, None]
     lcd_psamp = prompted_samples['lcd']
@@ -93,14 +93,13 @@ class Trainer:
     blank = np.zeros_like(real_lcd)[..., :1, :]
     out = np.concatenate([real_lcd, blank, lcd_psamp, blank, error], 3)
     out = out.repeat(4, -1).repeat(4, -2)
-    self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=50)
-    self.logger['pixel_delta'] += [((real_lcd - lcd_psamp)**2).mean()]
+    self.writer.add_video('prompted_lcd', utils.force_shape(out), i, fps=self.G.fps)
 
   def test(self, i):
     self.model.eval()
-    with torch.no_grad():
+    with th.no_grad():
       for batch in self.test_ds:
-        batch = {key: val.to(self.C.device) for key, val in batch.items()}
+        batch = {key: val.to(self.G.device) for key, val in batch.items()}
         loss = self.model.loss(batch)
         self.logger['test_loss'] += [loss.mean().detach().cpu()]
     sample_start = time.time()
@@ -108,7 +107,7 @@ class Trainer:
       self.sample(i)
     self.logger['dt/sample'] = [time.time() - sample_start]
     self.logger['num_vars'] = self.num_vars
-    self.logger = utils.dump_logger(self.logger, self.writer, i, self.C)
+    self.logger = utils.dump_logger(self.logger, self.writer, i, self.G)
     self.writer.flush()
     self.model.train()
 
@@ -121,13 +120,11 @@ class Trainer:
     for i in itertools.count():
       self.train_epoch(i)
       self.test(i)
-      if i % self.C.save_n == 0:
-        self.save(i)
-      if i >= self.C.num_epochs:
+      if i >= self.G.num_epochs:
         break
     self.save(i)
 
 if __name__ == '__main__':
-  C = parse_args()
-  trainer = Trainer(C)
+  G = parse_args()
+  trainer = Trainer(G)
   trainer.run()
