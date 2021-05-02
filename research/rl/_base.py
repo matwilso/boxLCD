@@ -77,6 +77,8 @@ class RLAlgo:
     elif self.tenv.__class__.__name__ == 'CubeGoalEnv':
       self.goal_key = 'goal:object'
 
+  def get_av(self, o):
+    raise NotImplementedError()
 
   def test_agent(self, itr, use_lenv=False):
     # init
@@ -99,7 +101,8 @@ class RLAlgo:
     success = pf.zeros_like(ep_ret)
     for i in range(self.G.ep_len):
       # Take deterministic actions at test time
-      a, v, logp = self.ac.step(o)
+      a, v = self.get_av(o)
+      #a, v, logp = self.ac.step(o)
       if not use_lenv and self.G.lenv:
         a = a.detach().cpu().numpy()
         v = v.detach().cpu().numpy()

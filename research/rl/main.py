@@ -19,7 +19,7 @@ _G.num_test_episodes = 2
 _G.update_every = 40
 _G.start_steps = 1000
 _G.update_after = 1000
-_G.use_done = 0
+_G.use_done = 1
 _G.net = 'mlp'
 _G.zdelta = 1
 _G.lenv = 0
@@ -49,7 +49,7 @@ _G.alpha = 0.1  # for SAC w/o learned alpha
 _G.polyak = 0.995
 
 if __name__ == '__main__':
-  print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
+  #print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
   import argparse
   parser = argparse.ArgumentParser()
   for key, value in config().items():

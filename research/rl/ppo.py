@@ -45,7 +45,9 @@ class PPO(RLAlgo):
     self.test_agent(-1)
     if self.G.lenv:
       self.test_agent(-1, use_lenv=True)
-    # writer.flush()
+
+  def get_av(self, o):
+    return self.ac.step(o)[:2]
 
   def compute_loss_pi(self, data):
     obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']

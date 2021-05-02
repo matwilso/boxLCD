@@ -1,2 +1,0 @@
-python rl/ppo.py --env=Urchin --goals=1 --num_envs=12 --bs=4096 --hidden_size=256 --logdir=logs/april24/rl/ppo/urchin/bs4096/ --pi_lr=3e-4 --vf_lr=1e-3 --total_steps=500000 --goal_thresh=0.010
-python rl/sac.py --env=Urchin --bs=256 --hidden_size=256 --net=mlp --num_envs=12 --logdir=logs/april24/rl/ppo/sac/urchin/bs256 --goals=1 --goal_thresh=0.010 --total_steps=100000

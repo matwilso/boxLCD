@@ -12,10 +12,11 @@ Step 3: do RL. perhaps inside of a learned model <br>
 - [MODEL LEARNING](#model-learning)
   - [Autoencoders](#autoencoders)
   - [Video](#video)
-- [LEARNED SIMULATION](#learned-simulation)
+  - [Model Evaluations](#model-evaluations)
 - [RL](#rl)
-  - [CUBES](#cubes)
-- [MISC](#misc)
+  - [BodyGoals in real environment](#bodygoals-in-real-environment)
+  - [BodyGoals in learned environment](#bodygoals-in-learned-environment)
+  - [CubeGoals in real environment](#cubegoals-in-real-environment)
 
 ## Collect data
 
@@ -119,10 +120,40 @@ python -m research.main --mode=train --model=FRNLD --lr=0.0005 --bs=32 --log_n=1
 python3 scripts/kicker.py train --model=FRNLD
 ```
 
+### Model Evaluations
+
+```
+python -m research.main --mode=eval --env=UrchinCube --datadir=logs/datadump/UrchinCube/ --arbiterdir=logs/arbiter/UrchinCube --model=FBT --prompt_n=3 --weightdir=logs/april28/video/FBT/UrchinCube/ --logdir=logs/evals/FBT_UrchinCube --bs=500
+```
+
+```
+python -m research.main --mode=eval --env=Urchin --datadir=logs/datadump/Urchin/ --arbiterdir=logs/arbiter/Urchin --model=RSSM prompt_n=3 --weightdir=logs/video/RSSM/Urchin/ --logdir=logs/april22/eval/RSSM_Urchin --bs=1000
+```
 
 
+## RL
 
-## LEARNED SIMULATION
+### BodyGoals in real environment
+```bash
+python rl/main.py ppo --env=Luxo --goals=1 --num_envs=12 --bs=4096 --hidden_size=256 --logdir=logs/rl/Luxo_real/ --total_steps=500000 --goal_thresh=0.05
+
+python rl/main.py ppo --env=Urchin --goals=1 --num_envs=12 --bs=4096 --hidden_size=256 --logdir=logs/rl/Urchin_real/ --total_steps=1000000 --goal_thresh=0.05
+```
+
+### BodyGoals in learned environment
+```bash
+python rl/main.py ppo --env=Luxo --model=FBT --weightdir=logs/video/FBT/Luxo/ --window=50 --goals=1 --num_envs=12 --bs=4096 --hidden_size=256 --lenv=1 --logdir=logs/rl/Luxo_lenv --lenv_temp=1.0 --total_steps=500000 --goal_thres=0.05
+
+python rl/main.py ppo --env=Urchin --model=FBT --weightdir=logs/video/FBT/Urchin/ --window=50 --goals=1 --num_envs=12 --bs=4096 --hidden_size=256 --lenv=1 --logdir=logs/rl/Urchin_lenv --lenv_temp=1.0 --total_steps=1000000 --goal_thres=0.05
+```
+
+
+### CubeGoals in real environment
+```
+python rl/main.py ppo --env=UrchinCube --goals=1 --num_envs=24 --bs=4096 --hidden_size=256 --goal_thres=0.05 --pi_lr=1e-4 --vf_lr=1e-4 --state_key=full_state --diff_delt=1
+```
+
+<!--
 
 env=LuxoCube
 DP=logs/datadump/10fps/luxocube/
@@ -145,14 +176,6 @@ python learned_env.py --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --wh_rati
 python rl/sac.py --env=Luxo --wh_ratio=2.0 --model=flatev --weightdir=logs/flatev/x/ --window=100 --goals=1 --num_envs=8 --lenv=1 --logdir=logs/rl/lenv/x --lenv_temp=0.1 --bs=512 --hidden_size=512 --learned_alpha=1 --alpha_lr=1e-4 --reset_prompt=0 --succ_reset=0
 ```
 
-## RL
-
-```bash
-python rl/sac.py --env=Luxo --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=mlp --logdir=logs/rl/luxo
-python rl/sac.py --env=Urchin --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=mlp --logdir=logs/rl/urchin
-python rl/sac.py --env=Luxo --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=cnn --logdir=logs/rl/luxo_cnn
-python rl/sac.py --env=Urchin --wh_ratio=2.0 --bs=512 --hidden_size=512 --net=cnn --logdir=logs/rl/urchin_cnn
-```
 
 ### CUBES
 
@@ -192,3 +215,4 @@ python main.py --mode=train --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --w
 # convert a set of images to a single video gif
 convert -resize 100% -delay 2 -loop 0 *.png test.gif
 ```
+-->

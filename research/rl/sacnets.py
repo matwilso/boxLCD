@@ -1,4 +1,5 @@
 from re import I
+from research.wrappers.cube_goal import CubeGoalEnv
 from research import utils
 from datetime import datetime
 import PIL
@@ -112,11 +113,12 @@ class BaseMLP(nn.Module):
     return self.net(x)
 
 class QFunction(nn.Module):
-  def __init__(self, obs_space, act_dim, G, preproc=None):
+  def __init__(self, obs_space, act_dim, goal_key, G, preproc=None):
     super().__init__()
     H = G.hidden_size
     self.G = G
-    gsize = obs_space['goal:compact'].shape[0]
+    gsize = obs_space[goal_key].shape[0]
+    self.goal_key = goal_key
     size = obs_space[self.G.state_key].shape[0] + gsize + act_dim
     if self.G.net == 'mlp':
       self.base = BaseMLP(size, 1, G)
@@ -125,39 +127,24 @@ class QFunction(nn.Module):
     elif self.G.net == 'cnn':
       self.base = BaseCNN(obs_space, H, G)
     self.actin = nn.Linear(act_dim, H)
-
-    if 'vae' in self.G.net:
-      self.preproc = preproc
-      #self.goalie = nn.Linear(self.preproc.z_size, G.hidden_size//2)
-      self.statie = nn.Linear(self.preproc.z_size, G.hidden_size)
-      self.act_head = nn.Sequential(
-          nn.Linear(H + gsize + H, H),
-          nn.ReLU(),
-          #nn.Linear(H, H),
-          #nn.ReLU(),
-          nn.Linear(H, H),
-          nn.ReLU(),
-          nn.Linear(H, 1),
-      )
-    else:
-      self.act_head = nn.Sequential(
-          nn.Linear(2 * H, H),
-          nn.ReLU(),
-          nn.Linear(H, 1),
-      )
+    self.act_head = nn.Sequential(
+        nn.Linear(2 * H, H),
+        nn.ReLU(),
+        nn.Linear(H, 1),
+    )
 
   def forward(self, obs, act):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:compact'], act], -1)
+      x = th.cat([obs[self.G.state_key], obs[self.goal_key], act], -1)
       return self.base(x).squeeze(-1)
     elif self.G.net == 'bvae':
       x = self.preproc.encode(obs).detach()
       x = self.statie(x)
-      if 'goal:proprio' in obs:
+      if True:
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gx = self.preproc.encode(goals).detach()
         #gx = self.goalie(gx)
-        x = th.cat([x, obs['goal:compact']], -1)
+        x = th.cat([x, obs[self.goal_key]], -1)
         #x = x + gx
       xa = self.actin(act)
       x = th.cat([x, xa], -1)
@@ -171,10 +158,11 @@ class QFunction(nn.Module):
       return x.squeeze(-1)
 
 class SquashedGaussianActor(nn.Module):
-  def __init__(self, obs_space, act_dim, G, preproc=None):
+  def __init__(self, obs_space, act_dim, goal_key, G, preproc=None):
     super().__init__()
     self.G = G
-    gsize = obs_space['goal:compact'].shape[0]
+    gsize = obs_space[goal_key].shape[0]
+    self.goal_key = goal_key
     size = obs_space[self.G.state_key].shape[0] + gsize
     self.size = size
     if self.G.net == 'mlp':
@@ -188,10 +176,10 @@ class SquashedGaussianActor(nn.Module):
       #self.goalie = nn.Linear(self.preproc.z_size, G.hidden_size//2)
       self.statie = nn.Linear(self.preproc.z_size, G.hidden_size)
       self.net = nn.Sequential(
-          nn.Linear(G.hidden_size+gsize, G.hidden_size),
+          nn.Linear(G.hidden_size + gsize, G.hidden_size),
           nn.ReLU(),
           #nn.Linear(G.hidden_size, G.hidden_size),
-          #nn.ReLU(),
+          # nn.ReLU(),
           nn.Linear(G.hidden_size, G.hidden_size),
           nn.ReLU(),
           nn.Linear(G.hidden_size, 2 * act_dim),
@@ -200,16 +188,16 @@ class SquashedGaussianActor(nn.Module):
 
   def forward(self, obs, deterministic=False, with_logprob=True):
     if self.G.net == 'mlp':
-      x = th.cat([obs[self.G.state_key], obs['goal:compact']], -1)
+      x = th.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
     elif self.G.net == 'bvae':
       z = self.preproc.encode(obs).detach()
       x = self.statie(z)
-      if 'goal:compact' in obs:
+      if True:
         #goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
         #gz = self.preproc.encode(goals).detach()
         #gx = self.goalie(gz)
         #x = th.cat([x, gx], -1)
-        x = th.cat([x, obs['goal:compact']], -1)
+        x = th.cat([x, obs[self.goal_key]], -1)
         #1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
         #x = x + gx
     else:
@@ -244,15 +232,15 @@ class SquashedGaussianActor(nn.Module):
     return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
 
 class ActorCritic(nn.Module):
-  def __init__(self, obs_space, act_space, G=None):
+  def __init__(self, obs_space, act_space, goal_key, G=None):
     super().__init__()
     act_dim = act_space.shape[0]
 
     self.preproc = None
     # build policy and value functions
-    self.pi = SquashedGaussianActor(obs_space, act_dim, G=G, preproc=self.preproc)
-    self.q1 = QFunction(obs_space, act_dim, G=G, preproc=self.preproc)
-    self.q2 = QFunction(obs_space, act_dim, G=G, preproc=self.preproc)
+    self.pi = SquashedGaussianActor(obs_space, act_dim, goal_key, G=G, preproc=self.preproc)
+    self.q1 = QFunction(obs_space, act_dim, goal_key, G=G, preproc=self.preproc)
+    self.q2 = QFunction(obs_space, act_dim, goal_key, G=G, preproc=self.preproc)
     if G.learned_alpha:
       self.target_entropy = -np.prod(act_space.shape)
       self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))

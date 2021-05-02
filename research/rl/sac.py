@@ -30,32 +30,39 @@ from research import wrappers
 #from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_multimap, tree_map
 from research.nets import net_map
+from ._base import RLAlgo
 
-class SAC:
-  def __init__(self):
-    print(self.G.full_cmd)
-    # th.manual_seed(G.seed)
-    # np.random.seed(G.seed)
-
+class SAC(RLAlgo):
+  def __init__(self, G):
+    super().__init__(G)
     # Create actor-critic module and target networks
-    self.ac = ActorCritic(self.obs_space, self.act_space, G=self.G).to(self.G.device)
+    self.ac = ActorCritic(self.obs_space, self.act_space, self.goal_key, G=self.G).to(self.G.device)
     self.ac_targ = deepcopy(self.ac)
+    var_counts = tuple(utils.count_vars(module) for module in [self.ac.pi, self.ac.q1, self.ac.q2])
+    print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d\n' % var_counts)
+    self.sum_count = sum(var_counts)
+    print(f'total: {self.sum_count}')
 
     # Freeze target networks with respect to optimizers (only updte via polyak averaging)
     for p in self.ac_targ.parameters():
       p.requires_grad = False
 
     # List of parameters for both Q-networks (save this for convenience)
-    q_params = itertools.chain(self.ac.q1.parameters(), self.ac.q2.parameters())
+    self.q_params = itertools.chain(self.ac.q1.parameters(), self.ac.q2.parameters())
 
     # Experience buffer
     self.buf = ReplayBuffer(self.G, obs_space=self.obs_space, act_space=self.act_space)
 
     # Set up optimizers for policy and q-function
-    self.q_optimizer = Adam(q_params, lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8)
+    self.q_optimizer = Adam(self.q_params, lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8)
     self.pi_optimizer = Adam(self.ac.pi.parameters(), lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8)
     if self.G.learned_alpha:
       self.alpha_optimizer = Adam([self.ac.log_alpha], lr=self.G.alpha_lr)
+
+    self.test_agent(-1)
+    if self.G.lenv:
+      self.test_agent(-1, use_lenv=True)
+
 
   # Set up function for computing SAC Q-losses
   def compute_loss_q(self, data):
@@ -73,8 +80,8 @@ class SAC:
       a2, logp_a2, ainfo = self.ac.pi(o2)
 
       # Target Q-values
-      q1_pi_targ = ac_targ.q1(o2, a2)
-      q2_pi_targ = ac_targ.q2(o2, a2)
+      q1_pi_targ = self.ac_targ.q1(o2, a2)
+      q2_pi_targ = self.ac_targ.q2(o2, a2)
       q_pi_targ = th.min(q1_pi_targ, q2_pi_targ)
       backup = r + self.G.gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
 
@@ -181,7 +188,7 @@ class SAC:
       act = act.cpu().numpy()
     return act
 
-  def get_action_val(self, o, deterministic=False):
+  def get_av(self, o, deterministic=False):
     with th.no_grad():
       o = {key: th.as_tensor(1.0 * val, dtype=th.float32).to(self.G.device) for key, val in o.items()}
       a, _, ainfo = self.ac.pi(o, deterministic, False)
@@ -237,17 +244,17 @@ class SAC:
     # Prepare for interaction with environment
     epoch_time = self.start_time = time.time()
     if self.G.lenv:
-      o, ep_ret, ep_len = self.env.reset(np.arange(self.G.num_envs)), th.zeros(self.G.num_envs).to(self.G.device), th.zeros(self.G.num_envs).to(self.G.device)
+      o, ep_ret, ep_len = self.env.reset(), th.zeros(self.G.num_envs).to(self.G.device), th.zeros(self.G.num_envs).to(self.G.device)
       success = th.zeros(self.G.num_envs).to(self.G.device)
-      time_to_succ = self.G.ep_len * th.ones(self.G.num_envs).to(G.device)
+      time_to_succ = self.G.ep_len * th.ones(self.G.num_envs).to(self.G.device)
       pf = th
     else:
-      o, ep_ret, ep_len = self.env.reset(np.arange(self.G.num_envs)), np.zeros(self.G.num_envs), np.zeros(self.G.num_envs)
+      o, ep_ret, ep_len = self.env.reset(), np.zeros(self.G.num_envs), np.zeros(self.G.num_envs)
       success = np.zeros(self.G.num_envs, dtype=np.bool)
       time_to_succ = self.G.ep_len * np.ones(self.G.num_envs)
       pf = np
     # Main loop: collect experience in venv and update/log each epoch
-    for itr in range(self.G.total_steps):
+    for itr in range(1, self.G.total_steps+1):
       # Until start_steps have elapsed, randomly sample actions
       # from a uniform distribution for better exploration. Afterwards,
       # use the learned policy.
@@ -306,7 +313,8 @@ class SAC:
           #self.logger['success_rate'] += [proc(d[idx])]
           #self.logger['success_rate_nenv'] += [proc(d[idx])**(1/self.G.num_envs)]
         if len(dixs) != 0:
-          o = self.env.reset(dixs)
+          if not self.G.autoreset:
+            o = self.env.reset(dixs)
           if self.G.lenv:
             assert len(dixs) == self.G.num_envs, "the learned env needs the envs to be in sync in terms of history.  you can't easily reset one without resetting the others. it's hard"
           else:
@@ -322,8 +330,8 @@ class SAC:
             self.update(data=batch)
 
       # End of epoch handling
-      if (itr + 1) % self.G.log_n == 0:
-        epoch = (itr + 1) // self.G.log_n
+      if itr % self.G.log_n == 0:
+        epoch = itr // self.G.log_n
 
         # Save model
         if (epoch % self.G.save_freq == 0) or (itr == self.G.total_steps):
@@ -342,17 +350,6 @@ class SAC:
           if 'vae' in self.G.net:
             test_batch = self.buf.sample_batch(8)
             self.ac.preproc.evaluate(self.writer, test_batch['obs'], itr)
-          #test_agent(video=epoch % 1 == 0)
-          # if self.buf.ptr > self.G.ep_len*4:
-          #  eps = self.buf.get_last(4)
-          #  goal = eps['obs']['goal:lcd']
-          #  lcd = eps['obs']['lcd']
-          #  goal = goal.reshape([4, -1, *goal.shape[1:]])
-          #  lcd = lcd.reshape([4, -1, *lcd.shape[1:]])
-          #  error = (goal - lcd + 1) / 2
-          #  out = np.concatenate([goal, lcd, error], 2)
-          #  out = utils.combine_imgs(out[:,:,None], row=1, col=4)[None,:,None]
-          #  utils.add_video(self.writer, 'samples', out, epoch, fps=self.G.fps)
 
         # Log info about epoch
         self.logger['var_count'] = [self.sum_count]
