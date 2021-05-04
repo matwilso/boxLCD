@@ -10,11 +10,14 @@ pyglet==1.5.0
 opencv_python==4.4.0.44
 pytorch_ignite==0.4.4
 jax==0.2.0
+jaxlib==0.1.65+cuda110
 tqdm==4.49.0
 matplotlib==3.3.4
 numpy==1.18.5
 Box2D==2.3.10
 ignite==1.1.0
-ipython==7.23.0
 Pillow==8.2.0
 PyYAML==5.4.1
+ipython
+tqdm
+matplotlib
