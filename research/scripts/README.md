@@ -22,7 +22,7 @@ Step 3: do RL. perhaps inside of a learned model <br>
 
 ```bash
 # single env
-python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=Urchin --logdir=logs/trash/Urchin
+python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env=Urchin --logdir=logs/datadump/Urchin
 ```
 
 ```bash
@@ -34,7 +34,7 @@ python3 scripts/kicker.py collect
 
 ```bash
 # single env
-python -m research.main --mode=train --model=MultiStepArbiter --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/Urchin --total_itr=30000  --nfilter=64 --hidden_size=256 --window=5
+python -m research.main --mode=train --model=MultiStepArbiter --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/datadump/Urchin --logdir=logs/Urchin --total_itr=30000  --nfilter=64 --hidden_size=256 --window=5
 ```
 
 ```bash
