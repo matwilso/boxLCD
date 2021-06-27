@@ -3,7 +3,7 @@
 boxLCD 📟
 =================
 
-**[Paper 📄](https://matwilso.github.io/assets/boxLCD_iclr2021_workshop.pdf)** | **[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Model learning 📉](#model-learning-)** | **[Reinforcement learning 📈 ](#reinforcement-learning-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
+**[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Model learning 📉](#model-learning-)** | **[Reinforcement learning 📈 ](#reinforcement-learning-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
 
 boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
 environments and an API for defining and rendering custom environments.
@@ -19,6 +19,8 @@ low frames per second (FPS) / frequency (Hz) for getting started, to increasingl
 the capabilities of current methods more. I imagine it kind of like a video game skill tree, which
 starts with learning models for simple physics environments and expands outwards from there in several directions.
 For more of the reasoning behind it and future plans, see the [Roadmap](#roadmap-).
+
+(See [here](https://matwilso.github.io/assets/boxLCD_iclr2021_workshop.pdf) for the workshop paper.)
 
 <!--
 It is designed around a skill tree, progressive difficulty setup. 
