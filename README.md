@@ -3,7 +3,7 @@
 boxLCD 📟
 =================
 
-**[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Model learning 📉](#model-learning-)** | **[Reinforcement learning 📈 ](#reinforcement-learning-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
+**[Paper 📄](https://matwilso.github.io/assets/boxLCD_iclr2021_workshop.pdf)** | **[Installation ‍💻](#installation-)** | **[Demos ⚽](#environment-demos-)** | **[Model learning 📉](#model-learning-)** | **[Reinforcement learning 📈 ](#reinforcement-learning-)** | **[Roadmap 📍](#roadmap-)** | **[Related Work 📚](#related-work-)**
 
 boxLCD is box2D physics with low resolution and binarized rendering. It provides sample
 environments and an API for defining and rendering custom environments.
