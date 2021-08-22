@@ -169,7 +169,7 @@ class PPO(RLAlgo):
       # if trajectory didn't reach terminal state, bootstrap value target
       _, v, _ = self.ac.step(o)
       v[mask] *= 0
-      self.buf.finish_paths(np.nonzero(terminal_epoch)[0], v)
+      self.buf.finish_paths(np.nonzero(terminal_epoch)[0], proc(v))
       for idx in np.nonzero(terminal_epoch)[0]:
         self.logger['EpRet'] += [proc(ep_ret[idx])]
         self.logger['EpLen'] += [ep_len[idx]]

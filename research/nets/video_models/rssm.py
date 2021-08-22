@@ -132,7 +132,7 @@ class RSSM(VideoModel):
         decoded = self.decoder(feat.flatten(0, 1))
         gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
         gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
+        gen['proprio'] = gen['proprio'].reshape(n, -1, self.env.observation_space['proprio'].shape[0])
       else:
         batch = tree_map(lambda x: x[:, :prompt_n], prompts)
         flat_batch = tree_map(lambda x: x.flatten(0,1), batch)
@@ -144,7 +144,7 @@ class RSSM(VideoModel):
         decoded = self.decoder(feat.flatten(0, 1))
         gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
         gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
+        gen['proprio'] = gen['proprio'].reshape(n, -1, self.env.observation_space['proprio'].shape[0])
         prompts['lcd'] = prompts['lcd'][:,:,None]
         gen = tree_multimap(lambda x, y: th.cat([x[:,:prompt_n], y], 1), utils.subdict(prompts, ['lcd', 'proprio']), gen)
         prompts['lcd'] = prompts['lcd'][:,:,0]
