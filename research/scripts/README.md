@@ -124,12 +124,14 @@ python3 scripts/kicker.py train --model=FRNLD
 
 These usually take ___ minutes to run.
 
-```
-python -m research.main --mode=eval --env=UrchinCube --datadir=logs/datadump/UrchinCube/ --arbiterdir=logs/arbiter/UrchinCube --model=FBT --prompt_n=3 --weightdir=logs/video/FRNLD/UrchinCube/ --logdir=logs/evals/FRNLD_UrchinCube --bs=500
+```bash
+# single env
+python -m research.main --mode=eval --env=Urchin --datadir=logs/datadump/Urchin/ --arbiterdir=logs/arbiter/Urchin --model=FBT --prompt_n=3 --weightdir=logs/video/FRNLD/Urchin/ --logdir=logs/evals/FRNLD_Urchin --bs=500
 ```
 
-```
-python -m research.main --mode=eval --env=Urchin --datadir=logs/datadump/Urchin/ --arbiterdir=logs/arbiter/Urchin --model=RSSM --prompt_n=3 --weightdir=logs/video/RSSM/Urchin/ --logdir=logs/eval/RSSM_Urchin --bs=1000
+```bash
+# all envs
+python3 scripts/kicker.py eval --model=FRNLD
 ```
 
 ## RL

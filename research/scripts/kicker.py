@@ -79,6 +79,7 @@ FRNLD.hidden_size = 512
 FRNLD.weightdir = '{K.encoderdir/"encoder/RNLDA"}/{env}'
 
 
+
 video = {
     'RSSM': RSSM,
     'FIT': FIT,
@@ -101,6 +102,7 @@ def parse():
   K.logdir = Path(K.logdir)
   K.arbiterdir = Path(K.arbiterdir)
   K.encoderdir = Path(K.encoderdir)
+  K.weightdir = Path(K.weightdir)
   return K
 
 def reparse(K, **kwargs):
@@ -116,6 +118,7 @@ if __name__ == '__main__':
   parser.add_argument('--datadir', default='logs/datadump/')
   parser.add_argument('--logdir', default='logs/')
   parser.add_argument('--arbiterdir', default='logs/arbiter/')
+  parser.add_argument('--weightdir', default='logs/video/')
   parser.add_argument('--encoderdir', default='logs/')
   parser.add_argument('--model')
   parser.add_argument('--envs', '-e', default='all')
@@ -125,9 +128,15 @@ if __name__ == '__main__':
   parser.add_argument('--bs', type=float, default=32)
   parser.add_argument('--total_itr')
   ddir = '{str(Path(K.datadir)/env)}'
+  arbdir = '{str(Path(K.arbiterdir)/env)}'
+  eval_weightdir = '{str((Path(K.weightdir)/K.model)/env)}'
+  eval_logdir = '{str(((Path(K.logdir)/"evalz")/K.model)/env)}'
   K = parse()
+  #eval_logdir = (K.logdir / 'evals') / K.model
 
   TRAIN_TEMPLATE = "python -m research.main --mode=train --model={K.model} --lr={K.lr} --bs={K.bs} --log_n={K.log_n} --datadir={ddir} --logdir={logdir} --total_itr={K.total_itr} "
+
+  EVAL_TEMPLATE = "python -m research.main --mode=eval --model={K.model} --bs=500 --datadir={ddir} --logdir={eval_logdir} --arbiterdir={arbdir} --weightdir={eval_weightdir} --prompt_n=3 "
 
   if K.mode == 'collect':
     cmd_template = "python -m research.main --mode=collect --num_envs=10 --train_barrels=100 --test_barrels=10 --env={env} --logdir={ddir}"
@@ -149,13 +158,16 @@ if __name__ == '__main__':
     path = dir / K.model
     logdir = '{path/env}'
     cmd_template = TRAIN_TEMPLATE + ' '.join(params)
+  elif K.mode == 'eval':
+    eval_params = [f'--{key}={val}' for key, val in {'bs': 500}.items()]
+    cmd_template = EVAL_TEMPLATE + ' '.join(eval_params)
+    K = reparse(K, **{})
 
   if K.dry: print('DRY RUN')
   for env in ALL:
     prompt = ENV_PROMPT[env]
     window = ENV_WINDOW[env]
     cmd = fstr(cmd_template)
-    if K.dry:
-      print(cmd)
-    else:
+    print(cmd)
+    if not K.dry:
       subprocess.run(cmd.split())

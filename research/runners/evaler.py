@@ -66,6 +66,11 @@ class Evaler:
     self.model.load(self.G.weightdir)
 
   def run(self):
+    """
+    it runs through the test and train datasets 5 times each and averages the stats.
+    
+    can take quite awhile to run
+    """
     self.model.eval()
     self.N = 1e4
     with th.no_grad():

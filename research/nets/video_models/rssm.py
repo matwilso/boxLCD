@@ -23,6 +23,7 @@ class RSSM(VideoModel):
     super().__init__(env, G)
     self._stoch_size = 64
     self._deter_size = 256
+    self.z_size = self._stoch_size + self._deter_size
     state_n = env.observation_space.spaces['proprio'].shape[0]
     self.embed_size = 256
     self.encoder = Encoder(state_n, self.embed_size, G)
