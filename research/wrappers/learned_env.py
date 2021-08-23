@@ -23,8 +23,6 @@ from research.wrappers.cube_goal import CubeGoalEnv
 def outproc(img):
   return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
 
-# TODO: add back this wrapper probably, since it makes things a bit cleaner.
-# i was wrong about something when i removed it.
 class LearnedEnv:
   def __init__(self, num_envs, model, G):
     self.num_envs = num_envs
@@ -48,6 +46,62 @@ class LearnedEnv:
     for key in self.keys:
       val = self.real_env.observation_space.spaces[key]
       spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
+
+    spaces['zstate'] = gym.spaces.Box(-1, +1, (num_envs, self.model.z_size), dtype=val.dtype)
+    self.observation_space = gym.spaces.Dict(spaces)
+
+  def reset(self, *args, update_window_batch=True, **kwargs):
+    with th.no_grad():
+      prompts = [self.real_env.reset() for _ in range(self.num_envs)]
+      prompts = tree_multimap(lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device).float(), prompts[0], *prompts[1:])
+      z = self.model.encoder(prompts)
+      acts = th.zeros(self.action_space.shape).to(self.G.device)
+      post, prior = self.model.observe(z[:,None], acts[:,None])
+      self.post = {key: val[:, 0] for key, val in post.items()}
+      feat = self.model.get_feat(self.post)
+      decoded = self.model.decoder(feat)
+      obs = {'lcd': decoded['lcd'].probs[:,0], 'proprio': decoded['proprio'].mean, 'zstate': feat}
+      self.ep_t = 0
+      return obs
+
+  def step(self, act):
+    with th.no_grad():
+      self.ep_t += 1
+      with th.no_grad():
+        act = th.as_tensor(act).to(self.G.device)
+        prior = self.model.imagine(act[:,None], self.post)
+        self.post = {key: val[:, 0] for key, val in prior.items()}
+        feat = self.model.get_feat(self.post)
+        decoded = self.model.decoder(feat)
+        obs = {'lcd': decoded['lcd'].probs[:,0], 'proprio': decoded['proprio'].mean, 'zstate': feat}
+      rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(self.num_envs).to(self.G.device)
+      done[:] = self.ep_t >= self.G.ep_len
+      return obs, rew, done, {'timeout': done.clone()}
+
+class TransformerLenv:
+  def __init__(self, num_envs, model, G):
+    self.num_envs = num_envs
+    self.window_batch = None
+    self.G = G
+    self.model = model
+    #self.real_env = env_fn(G)()
+    self.real_env = model.env
+    self.obs_keys = self.real_env._env.obs_keys
+    self.pobs_keys = self.real_env._env.pobs_keys
+    self.model.load(G.weightdir)
+    self.action_space = gym.spaces.Box(-1, +1, (num_envs,) + model.action_space.shape, model.action_space.dtype)
+    self.model.eval()
+    for p in self.model.parameters():
+      p.requires_grad = False
+
+    def act_sample(): return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
+    self.action_space.sample = act_sample
+    spaces = {}
+    self.keys = ['lcd', 'proprio']
+    for key in self.keys:
+      val = self.real_env.observation_space.spaces[key]
+      spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
+
     spaces['zstate'] = gym.spaces.Box(-1, +1, (num_envs, self.model.z_size), dtype=val.dtype)
     self.observation_space = gym.spaces.Dict(spaces)
 
