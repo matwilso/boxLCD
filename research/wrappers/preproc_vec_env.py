@@ -49,7 +49,9 @@ class PreprocVecEnv:
     batch_obs = {key: th.as_tensor(1.0 * val).float().to(self.device) for key, val in obs.items()}
     zstate = self.model.encode(batch_obs, noise=False, quantize=False)
     obs['zstate'] = zstate.detach().cpu().numpy()
-    if 'goal:full_state' in batch_obs:
+    # TODO: why was this here?
+    if True: 
+    #if 'goal:full_state' in batch_obs:
       goal = utils.filtdict(batch_obs, 'goal:', fkey=lambda x: x[5:])
       zgoal = self.model.encode(goal, noise=False)
       obs['goal:zstate'] = zgoal.detach().cpu().numpy()
@@ -95,6 +97,7 @@ class PreprocVecEnv:
   def step(self, action):
     obs, rew, done, _info = self._env.step(action)
     obs = self._preproc_obs(obs)
+    info = _info
     if self.G.preproc_rew:
       rew = self.comp_rew(obs['zstate'], obs['goal:zstate'])
     elif self.G.learned_rew:
@@ -127,7 +130,13 @@ class PreprocVecEnv:
       rew[success] = 1.0
       info['learned_rew'] = rew
       info['rew_delta'] = info['og_rew'] - rew
-    self.last_obs = tree_map(lambda x: np.array(x), obs)
+    
+    def proc(x):
+      if isinstance(x, np.ndarray):
+        return x
+      elif isinstance(x, th.Tensor):
+        return x.cpu().detach().numpy()
+    self.last_obs = tree_map(proc, obs)
     if 'RewardLenv' in self._env.__class__.__name__:
       rew = th.as_tensor(rew).to(self.G.device)
       done = th.as_tensor(done).to(self.G.device)

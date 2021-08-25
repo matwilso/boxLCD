@@ -1,3 +1,4 @@
+from re import I
 import numpy as np
 from research import wrappers
 from collections import defaultdict
@@ -35,8 +36,15 @@ class RLAlgo:
       model.eval()
       for p in model.parameters():
         p.requires_grad = False
-      self.env = wrappers.RewardLenv(wrappers.LearnedEnv(G.num_envs, model, G))
-      self.tvenv = self.learned_tvenv = wrappers.RewardLenv(wrappers.LearnedEnv(TN, model, G))
+      if G.model == 'FRNLD':
+        Lenv = wrappers.TransformerLenv
+      elif G.model == 'RSSM':
+        Lenv = wrappers.RSSMLenv
+      else:
+        import ipdb; ipdb.set_trace()
+
+      self.env = wrappers.RewardLenv(Lenv(G.num_envs, model, G))
+      self.tvenv = self.learned_tvenv = wrappers.RewardLenv(Lenv(TN, model, G))
       #self.obs_space.spaces = utils.subdict(self.obs_space.spaces, self.env.observation_space.spaces.keys())
       self.obs_space = self.env.observation_space
 
@@ -44,9 +52,9 @@ class RLAlgo:
         x.shape = x.shape[1:]
         return x
       self.obs_space.spaces = tree_map(fx, self.env.observation_space.spaces)
-
       if G.preproc:
-        preproc = model.ronald
+        preproc = model.encoder
+        #preproc = model.ronald
         self.env = wrappers.PreprocVecEnv(preproc, self.env, G)
         self.tvenv = self.learned_tvenv = wrappers.PreprocVecEnv(preproc, self.learned_tvenv, G)
         self.real_tvenv = wrappers.PreprocVecEnv(preproc, self.real_tvenv, G)

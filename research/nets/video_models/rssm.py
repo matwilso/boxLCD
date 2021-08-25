@@ -182,11 +182,15 @@ class Encoder(nn.Module):
         nn.Linear(size * nf, out_size),
 
     ])
+    self.z_size = size*nf // 2
 
   def get_dist(self, x):
     mu, log_std = x.chunk(2, -1)
     std = F.softplus(log_std) + 1e-4
     return thd.Normal(mu, std)
+
+  def encode(self, batch, noise=None, quantize=None):
+    return self.forward(batch)
 
   def forward(self, batch):
     state = batch['proprio']
