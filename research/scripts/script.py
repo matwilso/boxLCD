@@ -4,31 +4,31 @@ import pathlib
 import pickle
 
 metrics = [
-        'FVD', 
         #'F1',
         #'PRC',
         #'REC',
         'SSIM',
         'PSNR', 
-        'LPIPS', 
+        'COS*', 
+        'FVD*', 
         ]
 met_map = {
         'SSIM': 'ssim',
         'PSNR': 'psnr',
-        'FVD': 'fvd',
+        'FVD*': 'fvd',
         'F1': 'f1',
         'PRC': 'precision',
         'REC': 'recall',
-        'LPIPS': 'cosdist',
+        'COS*': 'cosdist',
 }
 envs = ['Dropbox', 'Bounce', 'Bounce2', 'Object2', 'Urchin', 'Luxo', 'UrchinCube', 'LuxoCube']
-models = ['RSSM', 'FIT']
+models = ['RSSM', 'FRNLD']
 mega = np.zeros([len(metrics), len(envs), len(models)])
 
 sigfigs = {}
 for i, model in enumerate(models):
     for j, env in enumerate(envs):
-        path = pathlib.Path(model+'_'+env)
+        path = pathlib.Path(f'logs/evalz/{model}/{env}')
         file = path / 'logger.pkl'
         with file.open('rb') as f:
             arr = pickle.load(f)
@@ -41,13 +41,19 @@ for i, model in enumerate(models):
             mega[k, j, i] = testp[met_map[met]][0]
             print(model, env, met,mega[k,j,i]) 
 
+maxmega = mega * np.concatenate([np.ones_like(mega[:2]), -np.ones_like(mega[2:])], axis=0)
+
 for i, row in enumerate(mega.reshape([-1,len(models)*len(envs)])):
     print(metrics[i], end=' ')
+    mm = maxmega[i]
     sf = sigfigs[metrics[i]]
-    for col in row:
+    for j,col in enumerate(row):
         post = str(sf) + 'f}'
-        val = ('{col:.'+post).format(col=col)[:5]
+        if mm.argmin(1)[j//2] == j%2:
+            val = ('{col:.'+post).format(col=col)[:5]
+        else:
+            val = ('{col:.'+post).format(col=col)[:5]
+            val = '\\textbf{' + val + '}'
         print('& '+val, end=' ')
     print('\\\\')
-
 
