@@ -6,7 +6,7 @@ from ._base import VideoModel
 
 video_model_map = {}
 package_dir = Path(__file__).resolve().parent
-for (_, module_name, _) in iter_modules([package_dir]):
+for (_, module_name, _) in iter_modules([package_dir.__str__()]):
   module = import_module(f'{__name__}.{module_name}')
   for attribute_name in dir(module):
     attribute = getattr(module, attribute_name)
