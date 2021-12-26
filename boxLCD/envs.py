@@ -44,6 +44,13 @@ class Object3(WorldEnv):
     w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8) for i in range(3)])
     super().__init__(w, G)
 
+@cc(ep_len=50, wh_ratio=1.0, base_dim=8, lcd_base=32)
+class Object4(WorldEnv):
+  def __init__(self, G={}):
+    w = WorldDef(robots=[], objects=[Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8) for i in range(4)])
+    super().__init__(w, G)
+
+
 # SIMPLE ROBOTS
 @cc(ep_len=100)
 class Urchin(WorldEnv):

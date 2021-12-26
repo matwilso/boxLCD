@@ -38,6 +38,7 @@ class VideoModel(Net):
     return metrics
 
   def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
+    """generate a sample without a prompt (to see how good initial state sampling and further generation is)"""
     n = batch['lcd'].shape[0]
     action = (th.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
     sample = self.sample(n, action)
@@ -47,6 +48,9 @@ class VideoModel(Net):
 
     if 'proprio' in sample:
       self._proprio_video(epoch, writer, sample['proprio'])
+
+    if 'full_state' in sample:
+      self._full_state_video(epoch, writer, sample['full_state'])
 
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)
@@ -82,6 +86,7 @@ class VideoModel(Net):
         metrics['eval/fid'] = fid
 
   def _duplicate_eval(self, epoch, writer, metrics, batch, arbiter=None):
+    """generate several samples from the same prompt to see variance"""
     n = batch['lcd'].shape[0]
     batch = {key: val[:1].repeat_interleave(self.G.video_n, 0) for key, val in batch.items()}
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
@@ -93,8 +98,14 @@ class VideoModel(Net):
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
       self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate_proprio', prompt_n=self.G.prompt_n)
+    if 'full_state' in sample:
+      pred_full_state = sample['full_state']
+      true_full_state = batch['full_state']
+      self._full_state_video(epoch, writer, pred_full_state, true_full_state, name='duplicate_full_state', prompt_n=self.G.prompt_n)
+
 
   def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
+    """generate a sample given a prompt"""
     n = batch['lcd'].shape[0]
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
 
@@ -118,6 +129,14 @@ class VideoModel(Net):
       metrics['eval/proprio_log_mse'] = ((true_proprio[:, self.G.prompt_n:] - pred_proprio[:, self.G.prompt_n:])**2).mean().log().cpu()
       # visualize reconstruction
       self._proprio_video(epoch, writer, pred_proprio, true_proprio, prompt_n=self.G.prompt_n)
+
+    if 'full_state' in sample:
+      pred_full_state = sample['full_state']
+      true_full_state = batch['full_state']
+      metrics['eval/full_state_log_mse'] = ((true_full_state[:, self.G.prompt_n:] - pred_full_state[:, self.G.prompt_n:])**2).mean().log().cpu()
+      # visualize reconstruction
+      self._full_state_video(epoch, writer, pred_full_state, true_full_state, prompt_n=self.G.prompt_n)
+
 
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)
@@ -209,6 +228,47 @@ class VideoModel(Net):
       name = name or 'prompted_proprio'
     else:
       name = name or 'unprompted_proprio'
+      out = pred_lcds
+    out = utils.force_shape(out)
+    out = out.repeat(3, 2)
+    if prompt_n is not None:
+      W, H = self.G.lcd_w, self.G.lcd_h
+      out = out.transpose(0, 1, 4, 3, 2)
+      for j in range(7):
+        out[:, :prompt_n, W * (j + 1) + j, :] = GREEN
+        out[:, prompt_n:, W * (j + 1) + j, :] = RED
+      out[:, :prompt_n, :, H] = GREEN
+      out[:, prompt_n:, :, H] = RED
+      out[:, :prompt_n, :, 2 * H + 1] = GREEN
+      out[:, prompt_n:, :, 2 * H + 1] = RED
+      out = out.transpose(0, 1, 4, 3, 2)
+      #out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
+    out = out.repeat(4, -1).repeat(4, -2)
+    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
+
+
+  def _full_state_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
+    """visualize proprio reconstructions"""
+    pred_state = pred[:self.G.video_n].cpu().detach().numpy()
+    pred_lcds = []
+    for i in range(pred_state.shape[1]):
+      lcd = self.venv.reset(np.arange(self.G.video_n), full_state=pred_state[:, i])['lcd']
+      pred_lcds += [lcd]
+    pred_lcds = 1.0 * np.stack(pred_lcds, 1)[:, :, None]
+
+    if truth is not None:
+      true_full_state = truth[:self.G.video_n].cpu().detach().numpy()
+      true_lcds = []
+      for i in range(true_full_state.shape[1]):
+        lcd = self.venv.reset(np.arange(self.G.video_n), full_state=true_full_state[:, i])['lcd']
+        true_lcds += [lcd]
+      true_lcds = 1.0 * np.stack(true_lcds, 1)[:, :, None]
+      error = (pred_lcds - true_lcds + 1.0) / 2.0
+      blank = np.zeros_like(true_lcds)[..., :1, :]
+      out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], 3)
+      name = name or 'prompted_state'
+    else:
+      name = name or 'unprompted_state'
       out = pred_lcds
     out = utils.force_shape(out)
     out = out.repeat(3, 2)
