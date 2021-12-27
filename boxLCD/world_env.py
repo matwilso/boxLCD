@@ -15,6 +15,11 @@ from boxLCD import utils
 from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
 
+from enum import Enum     # for enum34, or the stdlib version
+class Shape(Enum):
+  Circle = 0
+  Box = 1
+
 
 # THIS IS AN ABSTRACT CLASS ALL OF THE LOGIC FOR SIMULATION
 # SPECIFIC INSTANCES ARE DESCRIBED IN envs.py, WHERE SPECIFIC WORLDS ARE DEFINED
@@ -70,6 +75,8 @@ class WorldEnv(gym.Env, EzPickle):
     self.obs_info = {}
     self.act_info = {}
     for obj in self.world_def.objects:
+      self.obs_info[f'{obj.name}:shape'] = A[-1, 1]
+      #self.obs_info[f'{obj.name}:shape'] = A[0, len(Shape)]
       self.obs_info[f'{obj.name}:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{obj.name}:y:p'] = A[0, self.HEIGHT]
       if self.G.all_corners:
@@ -120,10 +127,12 @@ class WorldEnv(gym.Env, EzPickle):
     self.obs_info = utils.sortdict(self.obs_info)
     self.obs_size = len(self.obs_info)
     self.obs_keys = list(self.obs_info.keys())
+    self.obs_idx_dict = {k: i for i, k in enumerate(self.obs_keys)} 
     # partial observation
     self.pobs_keys = utils.nfiltlist(self.obs_keys, 'object')
     self.pobs_size = len(self.pobs_keys)
     self.pobs_idxs = [self.obs_keys.index(x) for x in self.pobs_keys]
+    self.pobs_idx_dict = {k: i for i, k in enumerate(self.obs_keys)} 
     # observation is a dict space
     spaces = {}
     spaces['full_state'] = gym.spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
@@ -138,6 +147,7 @@ class WorldEnv(gym.Env, EzPickle):
     self.act_info = utils.sortdict(self.act_info)
     self.act_size = len(self.act_info)
     self.act_keys = list(self.act_info.keys())
+    self.act_idx_dict = {k: i for i, k in enumerate(self.act_keys)}
     self.action_space = gym.spaces.Box(-1, +1, (self.act_size,), dtype=np.float32)
     self.seed()
 
@@ -194,7 +204,7 @@ class WorldEnv(gym.Env, EzPickle):
     self.dynbodies = {}
     self.b2_world = Box2D.b2World(gravity=self.world_def.gravity)
 
-  def _reset_bodies(self):
+  def _reset_bodies(self, full_state=None):
     self.joints = {}
     # ROBOT
     for robot in self.world_def.robots:
@@ -267,11 +277,14 @@ class WorldEnv(gym.Env, EzPickle):
         self.joints[name] = jnt = self.b2_world.CreateJoint(rjd)
 
     # OBJECT
-    for obj in self.world_def.objects:
+    for oi, obj in enumerate(self.world_def.objects):
       # MAKE SHAPE AND SIZE
       obj_size = obj.size
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
+      if full_state is not None:
+        key = f'object{oi}:shape'
+        shape_name = {0: 'circle', 1: 'box'}[round(full_state[self.obs_idx_dict[key]])]
       shape = obj_shapes[shape_name]
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=obj.restitution)
       # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
@@ -301,6 +314,7 @@ class WorldEnv(gym.Env, EzPickle):
           angularDamping=obj.angularDamping,
       )
       body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
+      body.shape = {'circle': Shape.Circle, 'box': Shape.Box}[shape_name].value
       self.dynbodies[obj.name] = body
 
   def reset(self, full_state=None, proprio=None):
@@ -315,6 +329,7 @@ class WorldEnv(gym.Env, EzPickle):
     else:
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
+    #self._reset_bodies(full_state=full_state)
 
     if proprio is not None:
       assert proprio.shape[-1] == self.observation_space.spaces['proprio'].shape[-1], f'invalid shape for proprio {proprio.shape} {self.observation_space.spaces["proprio"]}'
@@ -389,6 +404,7 @@ class WorldEnv(gym.Env, EzPickle):
     # GRAB OBJECT INFO
     for obj in self.world_def.objects:
       body = self.dynbodies[obj.name]
+      full_state[f'{obj.name}:shape'] = body.shape
       full_state[f'{obj.name}:x:p'], full_state[f'{obj.name}:y:p'] = body.position
       if self.G.all_corners:
         full_state[f'{obj.name}:kx:p', f'{obj.name}:ky:p'] = A[body.transform * body.fixtures[0].shape.vertices[-1]]

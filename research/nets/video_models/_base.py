@@ -1,4 +1,4 @@
-from re import I
+import io
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
@@ -7,6 +7,7 @@ from torch.optim import Adam
 import torch.nn as nn
 from research.nets._base import Net
 from research import utils
+import boxLCD.utils as boxLCD_utils
 from research.wrappers.async_vector_env import AsyncVectorEnv
 from jax.tree_util import tree_map
 A = utils.A
@@ -50,7 +51,7 @@ class VideoModel(Net):
       self._proprio_video(epoch, writer, sample['proprio'])
 
     if 'full_state' in sample:
-      self._full_state_video(epoch, writer, sample['full_state'])
+      self._full_state_video(epoch, writer, sample['full_state'], name='unprompted')
 
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)
@@ -101,7 +102,8 @@ class VideoModel(Net):
     if 'full_state' in sample:
       pred_full_state = sample['full_state']
       true_full_state = batch['full_state']
-      self._full_state_video(epoch, writer, pred_full_state, true_full_state, name='duplicate_full_state', prompt_n=self.G.prompt_n)
+      self._full_state_line_plot(epoch, writer, pred_full_state, true_full_state, name='duplicate', prompt_n=self.G.prompt_n)
+      self._full_state_video(epoch, writer, pred_full_state, true_full_state, name='duplicate', prompt_n=self.G.prompt_n)
 
 
   def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
@@ -135,7 +137,8 @@ class VideoModel(Net):
       true_full_state = batch['full_state']
       metrics['eval/full_state_log_mse'] = ((true_full_state[:, self.G.prompt_n:] - pred_full_state[:, self.G.prompt_n:])**2).mean().log().cpu()
       # visualize reconstruction
-      self._full_state_video(epoch, writer, pred_full_state, true_full_state, prompt_n=self.G.prompt_n)
+      self._full_state_line_plot(epoch, writer, pred_full_state, true_full_state, name='prompted', prompt_n=self.G.prompt_n)
+      self._full_state_video(epoch, writer, pred_full_state, true_full_state, name='prompted', prompt_n=self.G.prompt_n)
 
 
     if arbiter is not None:
@@ -247,6 +250,29 @@ class VideoModel(Net):
     utils.add_video(writer, name, out, epoch, fps=self.G.fps)
 
 
+  def _full_state_line_plot(self, epoch, writer, pred, truth, name=None, prompt_n=None):
+    import tensorflow as tf
+
+    truth_obs = boxLCD_utils.NamedArray(truth.cpu().numpy(), self.env.obs_info, do_map=False)
+    truth_xy = truth_obs['object0:x:p', 'object0:y:p']
+    pred_obs = boxLCD_utils.NamedArray(pred.cpu().numpy(), self.env.obs_info, do_map=False)
+    pred_xy = pred_obs['object0:x:p', 'object0:y:p']
+
+    error = np.linalg.norm(pred_xy - truth_xy, axis=-1)
+    images = []
+    for i in range(4):
+      fig = plt.figure()
+      #fig = plt.figure(figsize=(10,10))
+      plt.plot(error[i], '-o')
+      plt.xlabel('time')
+      plt.ylabel('xy error')
+      # Convert to image and log
+      fig.canvas.draw()
+      image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8').reshape(fig.canvas.get_width_height()[::-1] + (3,))
+      image = image.transpose(2, 0, 1)
+      images += [image]
+    writer.add_images('error_xy_'+name, np.stack(images), epoch)
+
   def _full_state_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
     """visualize proprio reconstructions"""
     pred_state = pred[:self.G.video_n].cpu().detach().numpy()
@@ -275,7 +301,7 @@ class VideoModel(Net):
     if prompt_n is not None:
       W, H = self.G.lcd_w, self.G.lcd_h
       out = out.transpose(0, 1, 4, 3, 2)
-      for j in range(7):
+      for j in range(self.G.video_n-1):
         out[:, :prompt_n, W * (j + 1) + j, :] = GREEN
         out[:, prompt_n:, W * (j + 1) + j, :] = RED
       out[:, :prompt_n, :, H] = GREEN

@@ -16,6 +16,7 @@ from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, Transf
 from research import utils
 import ignite
 from ._base import VideoModel
+import boxLCD.utils as boxLCD_utils
 
 # RNN
 
@@ -27,25 +28,11 @@ class SingleState(VideoModel):
     self.lstm = nn.LSTM(size, H, num_layers=1, batch_first=True)
     self.fc = nn.Linear(H, size)
     self.optimizer = Adam(self.parameters(), lr=G.lr)
+    self.shape_idxs = [v for k, v in self.env.obs_idx_dict.items() if 'shape' in k]
 
   def forward(self, batch):
     import ipdb; ipdb.set_trace()
-    # Forward propagate LSTM
-    out, _ = self.lstm(x, (h0, c0))  # out: tensor of shape (bs, seq_length, hidden_size)
-
-    # Decode the hidden state of the last time step
-    out = self.fc(out).squeeze(-1)  # b x 784
-    loss = -tdib.Bernoulli(logits=out.reshape([bs, 1, 28, 28])).log_prob(inp).mean()
-    return loss, {'nlogp': loss}
-    import ipdb; ipdb.set_trace()
-
-  def train_step(self, batch, dry=False):
-    self.optimizer.zero_grad()
-    loss, metrics = self.loss(batch)
-    if not dry:
-      loss.backward()
-      self.optimizer.step()
-    return metrics
+    pass
 
   def loss(self, batch):
     state = batch['full_state'] # BS x WINDOW x SIZE
@@ -53,7 +40,9 @@ class SingleState(VideoModel):
     state = th.cat([th.zeros(state.shape[0], 1, state.shape[2]).to(state.device), state], dim=1)
     out, _ = self.lstm(state)
     out = self.fc(out)
-    mse = (state[:,1:] - out[:,:-1]).pow(2).mean()
+    delta = state[:,1:] - out[:,:-1]
+    #delta[..., self.shape_idxs] = 0.0
+    mse = (delta).pow(2).mean()
     return mse, {'mse': mse}
 
   def onestep(self, batch, i, temp=1.0):
@@ -72,7 +61,7 @@ class SingleState(VideoModel):
       batch = {}
       if prompts is None:
         # get initial state by sampling with zeros
-        out, (h, c) = self.lstm(th.zeros(n, 1, 4).to(self.device))
+        out, (h, c) = self.lstm(th.zeros(n, 1, len(self.env.obs_keys)).to(self.device))
         out = self.fc(out)
         imdts = [out]
         for i in range(self.window-1):
@@ -85,6 +74,3 @@ class SingleState(VideoModel):
         out = self.fc(out)
         batch['full_state'] = out
     return batch
-
-
-
