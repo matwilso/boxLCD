@@ -319,7 +319,7 @@ class WorldEnv(gym.Env, EzPickle):
       body.shape = {'circle': Shape.Circle, 'box': Shape.Box}[shape_name].value
       self.dynbodies[obj.name] = body
 
-  def reset(self, full_state=None, proprio=None):
+  def reset(self, full_state=None, proprio=None, render_high_res=False):
     self._destroy()
     self.ep_t = 0
     if self.G.walls:
@@ -398,10 +398,10 @@ class WorldEnv(gym.Env, EzPickle):
     if not self.G.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
 
-    obs =  self._get_obs()
+    obs =  self._get_obs(render_high_res=render_high_res)
     return obs
 
-  def _get_obs(self):
+  def _get_obs(self, render_high_res=False):
     full_state = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
     # GRAB OBJECT INFO
     for obj in self.world_def.objects:
@@ -444,7 +444,14 @@ class WorldEnv(gym.Env, EzPickle):
 
     full_state = full_state.arr
     proprio = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
-    return {'full_state': full_state, 'proprio': proprio, 'lcd': self.lcd_render()}
+    obs = {'full_state': full_state, 'proprio': proprio, 'lcd': self.lcd_render()}
+    if render_high_res:
+      print("HIGH RES")
+      base = 32
+      width = int(base * self.G.wh_ratio)
+      height = base
+      obs['high_res'] = self.lcd_render(width=width, height=height, lcd_mode='RGB')
+    return obs
 
   def step(self, action):
     self.ep_t += 1
@@ -524,7 +531,7 @@ class WorldEnv(gym.Env, EzPickle):
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     lcd = np.asarray(image)
     if lcd.dtype == np.bool:
-      lcd = lcd.astype(np.float).astype(np.bool)  # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
+      lcd = lcd.astype(np.float).astype(np.bool)  # fixes bug where PIL produces a bool(xFF) instead of a bool(0x01)
     if lcd_mode == 'RGB':
       lcd = 255 - lcd
     return lcd

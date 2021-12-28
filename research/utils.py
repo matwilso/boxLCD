@@ -130,7 +130,7 @@ def combine_rgbs(arr, row=5, col=5):
 
   if len(arr.shape) == 4:  # image
     BS, C, H, W = arr.shape
-    assert BS == row * col, f'{(BS, row, col, H, W)} {row*col},{BS}'
+    assert BS == row * col, f'{(BS, row, col, H, W)} {row*col}, {BS}'
     x = permute(arr.reshape([row, col, C, H, W]), (2, 0, 3, 1, 4)).reshape([C, row * H, col * W])
     return x
   elif len(arr.shape) == 5:  # video

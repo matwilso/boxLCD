@@ -43,7 +43,7 @@ class Trainer:
     if G.arbiterdir.name != '':
       arbiter_path = list(G.arbiterdir.glob('*.pt'))
       if len(arbiter_path) == 0:
-        assert False, f'probably wrong arbiter path that you pointed to {G.arbiterdir}'
+        raise Exception(f'you probably pointed to the wrong arbiter path: {G.arbiterdir}')
       arbiter_path = arbiter_path[0]
       self.arbiter = th.jit.load(str(arbiter_path))
       with (arbiter_path.parent/'hps.yaml').open('r') as f:

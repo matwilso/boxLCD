@@ -29,6 +29,8 @@ class Autoencoder(Net):
       mode['proprio'] = dists['proprio'].mean
     if 'action' in dists:
       mode['action'] = dists['action'].mean
+    if 'full_state' in dists:
+      mode['full_state'] = dists['full_state'].mean
     return mode
 
   def decode_dist(self, z):
@@ -80,6 +82,31 @@ class Autoencoder(Net):
       writer.add_image('recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
     else:
       writer.add_image('sample_proprio', utils.combine_rgbs(preds[:, None], 1, self.G.video_n), epoch)
+
+  def _plot_full_state(self, epoch, writer, pred, truth=None):
+    """visualize proprio reconstructions"""
+    viz_idxs = np.arange(0, pred.shape[0], pred.shape[0]//self.G.video_n)
+    pred_full_state = pred[viz_idxs,:3].cpu().flatten(0,1)
+    truth_full_state = truth[viz_idxs,:3].cpu().flatten(0,1)
+    preds = []
+    for s in pred_full_state:
+      preds += [self.env.reset(full_state=s.numpy())['lcd']]
+    preds = 1.0 * np.stack(preds)
+
+    if truth is not None:
+      truths = []
+      for s in truth_full_state:
+        truths += [self.env.reset(full_state=s.numpy())['lcd']]
+      truths = 1.0 * np.stack(truths)
+
+      preds = preds.reshape([-1, 3, *preds.shape[1:]])
+      truths = truths.reshape([-1, 3, *truths.shape[1:]])
+      error = (preds - truths + 1.0) / 2.0
+      stack = np.concatenate([truths, preds, error], -2)
+      writer.add_image('recon_full_state', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
+    else:
+      writer.add_image('sample_full_state', utils.combine_rgbs(preds[:, None], 1, self.G.video_n), epoch)
+
 
   def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
     n = batch['lcd'].shape[0]
@@ -146,6 +173,7 @@ class MultiStepAE(Autoencoder):
     self.unproc = lambda x: x
 
   def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
+    import ipdb; ipdb.set_trace()
     n = batch['lcd'].shape[0]
     decoded = self.sample(n)
 
@@ -180,6 +208,12 @@ class MultiStepAE(Autoencoder):
       pred_proprio = decoded['proprio']
       true_proprio = batch['proprio']
       metrics['eval/proprio_log_mse'] = ((true_proprio - pred_proprio)**2).mean().log().cpu()
+
+    if 'full_state' in decoded:
+      pred_full_state = decoded['full_state']
+      true_full_state = batch['full_state']
+      metrics['eval/full_state_log_mse'] = ((true_full_state - pred_full_state)**2).mean().log().cpu()
+      self._plot_full_state(epoch, writer, pred_full_state, true_full_state)
 
     if 'action' in decoded:
       pred_action = decoded['action']

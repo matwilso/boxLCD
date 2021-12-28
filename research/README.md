@@ -38,7 +38,7 @@ python3 scripts/kicker.py collect
 
 ```bash
 # single env
-python -m research.main --mode=train --model=MultiStepArbiter --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/datadump/Urchin --logdir=logs/Urchin --total_itr=30000  --nfilter=64 --hidden_size=256 --window=5
+python -m research.main --mode=train --model=MultiStepArbiter --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/datadump/Urchin --logdir=logs/arbiter/Urchin --total_itr=30000  --nfilter=64 --hidden_size=256 --window=5
 ```
 
 ```bash
@@ -57,7 +57,7 @@ python3 scripts/kicker.py arbiter --model=MultiStepArbiter
 
 ```bash
 # single env
-python -m research.main --mode=train --model=BVAE --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/encoder/BVAE/Urchin --total_itr=30000 --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=16 --nfilter=16 --window=5
+python -m research.main --mode=train --model=BVAE --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/encoder/BVAE/Urchin --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=16 --nfilter=16 --window=5
 ```
 
 ```bash
@@ -69,7 +69,7 @@ python3 scripts/kicker.py train --model=BVAE
 
 ```bash
 # single env
-python -m research.main --mode=train --model=RNLDA --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/encoder/RNLDA/Urchin --total_itr=30000 --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=8 --nfilter=16 --window=5
+python -m research.main --mode=train --model=RNLDA --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/encoder/RNLDA/Urchin --total_itr=30000 --hidden_size=64 --vqK=64 --vqD=8 --nfilter=16 --window=5
 ```
 
 ```bash
@@ -83,7 +83,7 @@ python3 scripts/kicker.py train --model=RNLDA
 
 ```bash
 # single env
-python -m research.main --mode=train --model=RSSM --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/RSSM/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --nfilter=64 --hidden_size=300 --free_nats=0.01
+python -m research.main --mode=train --model=RSSM --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/RSSM/Urchin --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --nfilter=64 --hidden_size=300 --free_nats=0.01
 ```
 
 ```bash
@@ -94,7 +94,7 @@ python3 scripts/kicker.py train --model=RSSM
 #### FIT (Flat Image Token)
 ```bash
 # single env
-python -m research.main --mode=train --model=FIT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FIT/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=2 --n_head=4 --n_embed=256 --hidden_size=256
+python -m research.main --mode=train --model=FIT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FIT/Urchin --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=2 --n_head=4 --n_embed=256 --hidden_size=256
 ```
 
 ```bash
@@ -105,7 +105,7 @@ python3 scripts/kicker.py train --model=FIT
 #### FBT (Flat Binary Token)
 ```bash
 # single env
-python -m research.main --mode=train --model=FBT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FBT/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/encoder/BVAE/Urchin
+python -m research.main --mode=train --model=FBT --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FBT/Urchin --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/encoder/BVAE/Urchin
 ```
 
 ```bash
@@ -116,7 +116,7 @@ python3 scripts/kicker.py train --model=FBT
 #### FRNLD (Flat Ronald)
 ```bash
 # single env
-python -m research.main --mode=train --model=FRNLD --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FRNLD/Urchin --total_itr=100000 --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/encoder/RNDLA/Urchin
+python -m research.main --mode=train --model=FRNLD --lr=0.0005 --bs=32 --log_n=1000 --datadir=logs/Urchin --logdir=logs/video/FRNLD/Urchin --total_itr=100000 --arbiterdir=logs/arbiter/Urchin --n_layer=4 --n_head=8 --n_embed=512 --hidden_size=512 --weightdir=logs/encoder/RNDLA/Urchin
 ```
 
 ```bash

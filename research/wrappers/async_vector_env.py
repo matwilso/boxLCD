@@ -143,12 +143,13 @@ class AsyncVectorEnv(VectorEnv):
     self._assert_is_running()
     if self._state != AsyncState.DEFAULT:
       raise AlreadyPendingCallError('Calling `reset_async` while waiting for a pending call to `{0}` to complete'.format(self._state.value), self._state.value)
-
     pps = [self.parent_pipes[i] for i in idxs]
     kws = []
-    for key in kwargs:
-      for arr in [*kwargs[key]]:
-        kws += [{key: arr}]
+    for i in range(len(pps)):
+      kw = {}
+      for key in kwargs:
+        kw[key] = kwargs[key][i]
+      kws += [kw]
     if kwargs == {} or kwargs is None:
       kws = [{}] * len(pps)
     for pipe, kw in zip(pps, kws):

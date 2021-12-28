@@ -34,7 +34,7 @@ class VideoModel(Net):
     metrics = {}
     self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
     self._prompted_eval(epoch, writer, metrics, batch, arbiter)
-    self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
+    #self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
     metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
     return metrics
 
@@ -56,7 +56,8 @@ class VideoModel(Net):
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)
       s_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], sample)
-      s_post_prompt['lcd'] = s_post_prompt['lcd'][:, :, 0]
+      if 'lcd' in s_post_prompt:
+        s_post_prompt['lcd'] = s_post_prompt['lcd'][:, :, 0]
       if arbiter.original_name == 'TracedArbiter':
         def chop(x):
           T = x.shape[1]
@@ -144,9 +145,9 @@ class VideoModel(Net):
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)
       s_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], sample)
-      s_post_prompt['lcd'] = s_post_prompt['lcd'][:, :, 0]
+      if 'lcd' in s_post_prompt:
+        s_post_prompt['lcd'] = s_post_prompt['lcd'][:, :, 0]
       if arbiter.original_name == 'TracedArbiter':
-
         def chop(x):
           T = x.shape[1]
           _chop = T % arbiter.G.window
@@ -275,6 +276,7 @@ class VideoModel(Net):
     pred_lcds = []
     for i in range(pred_state.shape[1]):
       lcd = self.venv.reset(np.arange(self.G.video_n), full_state=pred_state[:, i])['lcd']
+      #lcd = self.venv.reset(np.arange(self.G.video_n), full_state=pred_state[:, i])['lcd']
       pred_lcds += [lcd]
     pred_lcds = 1.0 * np.stack(pred_lcds, 1)[:, :, None]
 
