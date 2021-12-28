@@ -45,10 +45,10 @@ class VideoModel(Net):
     sample = self.sample(n, action)
 
     if 'lcd' in sample:
-      self._lcd_video(epoch, writer, sample['lcd'])
+      self._lcd_video(epoch, writer, sample['lcd'], name='unprompted')
 
     if 'proprio' in sample:
-      self._proprio_video(epoch, writer, sample['proprio'])
+      self._proprio_video(epoch, writer, sample['proprio'], name='unprompted')
 
     if 'full_state' in sample:
       self._full_state_video(epoch, writer, sample['full_state'], name='unprompted')
@@ -94,11 +94,11 @@ class VideoModel(Net):
     if 'lcd' in sample:
       pred_lcd = sample['lcd']
       true_lcd = batch['lcd'][:, :, None]
-      self._lcd_video(epoch, writer, pred_lcd, true_lcd, name='duplicate_lcd', prompt_n=self.G.prompt_n)
+      self._lcd_video(epoch, writer, pred_lcd, true_lcd, name='duplicate', prompt_n=self.G.prompt_n)
     if 'proprio' in sample:
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
-      self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate_proprio', prompt_n=self.G.prompt_n)
+      self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate', prompt_n=self.G.prompt_n)
     if 'full_state' in sample:
       pred_full_state = sample['full_state']
       true_full_state = batch['full_state']
@@ -123,14 +123,14 @@ class VideoModel(Net):
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
       # visualize reconstruction
-      self._lcd_video(epoch, writer, pred_lcd, true_lcd, prompt_n=self.G.prompt_n)
+      self._lcd_video(epoch, writer, pred_lcd, true_lcd, name='prompted', prompt_n=self.G.prompt_n)
 
     if 'proprio' in sample:
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
       metrics['eval/proprio_log_mse'] = ((true_proprio[:, self.G.prompt_n:] - pred_proprio[:, self.G.prompt_n:])**2).mean().log().cpu()
       # visualize reconstruction
-      self._proprio_video(epoch, writer, pred_proprio, true_proprio, prompt_n=self.G.prompt_n)
+      self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='prompted', prompt_n=self.G.prompt_n)
 
     if 'full_state' in sample:
       pred_full_state = sample['full_state']
@@ -187,10 +187,8 @@ class VideoModel(Net):
       error = (pred_lcds - real_lcds + 1.0) / 2.0
       blank = np.zeros_like(real_lcds)[..., :1, :]
       out = np.concatenate([real_lcds, blank, pred_lcds, blank, error], 3)
-      name = name or 'prompted_lcd'
     else:
       out = pred_lcds
-      name = name or 'unprompted_lcd'
     out = utils.force_shape(out)
     out = out.repeat(3, 2)
     if prompt_n is not None:
@@ -207,7 +205,7 @@ class VideoModel(Net):
 
     #  out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
     out = out.repeat(4, -1).repeat(4, -2)
-    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
+    utils.add_video(writer, name+'_lcd', out, epoch, fps=self.G.fps)
 
   def _proprio_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
     """visualize proprio reconstructions"""
@@ -228,9 +226,7 @@ class VideoModel(Net):
       error = (pred_lcds - true_lcds + 1.0) / 2.0
       blank = np.zeros_like(true_lcds)[..., :1, :]
       out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], 3)
-      name = name or 'prompted_proprio'
     else:
-      name = name or 'unprompted_proprio'
       out = pred_lcds
     out = utils.force_shape(out)
     out = out.repeat(3, 2)
@@ -247,7 +243,7 @@ class VideoModel(Net):
       out = out.transpose(0, 1, 4, 3, 2)
       #out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
     out = out.repeat(4, -1).repeat(4, -2)
-    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
+    utils.add_video(writer, name+'_proprio', out, epoch, fps=self.G.fps)
 
 
   def _full_state_line_plot(self, epoch, writer, pred, truth, name=None, prompt_n=None):
@@ -292,9 +288,7 @@ class VideoModel(Net):
       error = (pred_lcds - true_lcds + 1.0) / 2.0
       blank = np.zeros_like(true_lcds)[..., :1, :]
       out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], 3)
-      name = name or 'prompted_state'
     else:
-      name = name or 'unprompted_state'
       out = pred_lcds
     out = utils.force_shape(out)
     out = out.repeat(3, 2)
@@ -311,4 +305,4 @@ class VideoModel(Net):
       out = out.transpose(0, 1, 4, 3, 2)
       #out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
     out = out.repeat(4, -1).repeat(4, -2)
-    utils.add_video(writer, name, out, epoch, fps=self.G.fps)
+    utils.add_video(writer, name + '_full_state', out, epoch, fps=self.G.fps)

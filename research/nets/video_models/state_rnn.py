@@ -38,7 +38,9 @@ class SingleState(VideoModel):
     state = batch['full_state'] # BS x WINDOW x SIZE
     # zero pad window
     state = th.cat([th.zeros(state.shape[0], 1, state.shape[2]).to(state.device), state], dim=1)
-    out, _ = self.lstm(state)
+    feed = state.clone()
+    #feed[..., self.shape_idxs] = 0.0
+    out, _ = self.lstm(feed)
     out = self.fc(out)
     delta = state[:,1:] - out[:,:-1]
     #delta[..., self.shape_idxs] = 0.0
@@ -65,12 +67,28 @@ class SingleState(VideoModel):
         out = self.fc(out)
         imdts = [out]
         for i in range(self.window-1):
+          out[..., self.shape_idxs] = 0.0
           out, (h, c) = self.lstm(out, (h,c))
           out = self.fc(out)
           imdts += [out]
         batch['full_state'] = th.cat(imdts, 1)
       else:
-        out, (h, c) = self.lstm(prompts['full_state'])
+        fs = prompts['full_state'].clone()
+        #fs[...,self.shape_idxs] = 0.0
+        fs = th.cat([th.zeros(fs.shape[0], 1, fs.shape[2]).to(fs.device), fs], dim=1)
+        out, (h, c) = self.lstm(fs[:,:5])
         out = self.fc(out)
-        batch['full_state'] = out
+        imdts = [out]
+        out = out[:,-1:]
+        for i in range(4, self.window-1):
+          #out[..., self.shape_idxs] = 0.0
+          out, (h, c) = self.lstm(out, (h,c))
+          out = self.fc(out)
+          imdts += [out]
+        #out, (h, c) = self.lstm(fs)
+        #out, (h, c) = self.lstm(prompts['full_state'])
+        #out = self.fc(out)
+        #out[..., self.shape_idxs] = prompts['full_state'][..., self.shape_idxs]
+        #batch['full_state'] = out
+        batch['full_state'] = th.cat(imdts, 1)
     return batch

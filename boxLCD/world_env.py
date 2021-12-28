@@ -284,7 +284,9 @@ class WorldEnv(gym.Env, EzPickle):
       shape_name = list(obj_shapes.keys())[np.random.randint(len(obj_shapes))] if obj.shape == 'random' else obj.shape
       if full_state is not None:
         key = f'object{oi}:shape'
-        shape_name = {0: 'circle', 1: 'box'}[round(full_state[self.obs_idx_dict[key]])]
+        raw = full_state[self.obs_idx_dict[key]]
+        x = np.clip(round(raw), 0, 1)
+        shape_name = {0: 'circle', 1: 'box'}[x]
       shape = obj_shapes[shape_name]
       fixture = fixtureDef(shape=shape, density=obj.density, friction=obj.friction, categoryBits=obj.categoryBits, restitution=obj.restitution)
       # SAMPLE POSITION. KEEP THE OBJECT IN THE BOUNDS OF THE ARENA
@@ -328,8 +330,8 @@ class WorldEnv(gym.Env, EzPickle):
       self.statics['wall4'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(0, self.HEIGHT + X), (self.WIDTH + X, self.HEIGHT + X)]))
     else:
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
-    self._reset_bodies()
-    #self._reset_bodies(full_state=full_state)
+    #self._reset_bodies()
+    self._reset_bodies(full_state=full_state)
 
     if proprio is not None:
       assert proprio.shape[-1] == self.observation_space.spaces['proprio'].shape[-1], f'invalid shape for proprio {proprio.shape} {self.observation_space.spaces["proprio"]}'

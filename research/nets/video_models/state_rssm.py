@@ -1,4 +1,3 @@
-from re import I
 import sys
 from collections import defaultdict
 import numpy as np
@@ -18,14 +17,12 @@ import ignite
 from ._base import VideoModel
 from jax.tree_util import tree_map, tree_multimap
 
-# TODO: maybe add option everywhere to choose which state keys you use
-
-class RSSM(VideoModel):
+class State_RSSM(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
     self._stoch_size = 64
     self._deter_size = 256
-    state_n = env.observation_space.spaces['proprio'].shape[0]
+    state_n = env.observation_space.spaces['full_state'].shape[0]
     self.embed_size = 256
     self.encoder = Encoder(state_n, self.embed_size, G)
     self.cell = nn.GRUCell(self.G.hidden_size, self._deter_size)
@@ -45,7 +42,7 @@ class RSSM(VideoModel):
 
   def loss(self, batch):
     flat_batch = tree_map(lambda x: x.flatten(0, 1), batch)
-    embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
+    embed = self.encoder(flat_batch).unflatten(0, (*batch['full_state'].shape[:2],))
     action = batch['action'][:,:-1]
     embed = embed[:,1:]
     post, prior = self.observe(embed, action)
@@ -54,8 +51,7 @@ class RSSM(VideoModel):
     decoded = self.decoder(feat.flatten(0, 1))
     recon_losses = {}
     chop_flat = tree_map(lambda x: x[:,1:].flatten(0, 1), batch)
-    recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(chop_flat['proprio']).mean()
-    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(chop_flat['lcd'][:, None]).mean()
+    recon_losses['loss/recon_full_state'] = -decoded['full_state'].log_prob(chop_flat['full_state']).mean()
     recon_loss = sum(recon_losses.values())
 
     # variational inference loss.
@@ -132,24 +128,18 @@ class RSSM(VideoModel):
         prior = self.imagine(action)
         feat = self.get_feat(prior)
         decoded = self.decoder(feat.flatten(0, 1))
-        gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
-        gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
+        gen = {'full_state': decoded['full_state'].mean.reshape(n, -1, len(self.env.obs_keys))}
       else:
         batch = tree_map(lambda x: x[:, :prompt_n], prompts)
         flat_batch = tree_map(lambda x: x.flatten(0,1), batch)
-        embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
+        embed = self.encoder(flat_batch).unflatten(0, (*batch['full_state'].shape[:2],))
         action = th.cat([th.zeros_like(action)[:,:1], action[:,:-1]], 1)
         post, prior = self.observe(embed, action[:,:prompt_n])
         prior = self.imagine(action[:,prompt_n:], state=tree_map(lambda x: x[:,-1], post))
         feat = self.get_feat(prior)
         decoded = self.decoder(feat.flatten(0, 1))
-        gen = {'lcd': (1.0 * (decoded['lcd'].probs > 0.5)), 'proprio': decoded['proprio'].mean}
-        gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        gen['proprio'] = th.zeros([*gen['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]).to(gen['lcd'].device)
-        prompts['lcd'] = prompts['lcd'][:,:,None]
-        gen = tree_multimap(lambda x, y: th.cat([x[:,:prompt_n], y], 1), utils.subdict(prompts, ['lcd', 'proprio']), gen)
-        prompts['lcd'] = prompts['lcd'][:,:,0]
+        gen = {'full_state': decoded['full_state'].mean.reshape(n, -1, len(self.env.obs_keys))}
+        gen = tree_multimap(lambda x, y: th.cat([x[:,:prompt_n], y], 1), utils.subdict(prompts, ['full_state']), gen)
     return gen
 
   def get_feat(self, state):
@@ -168,21 +158,8 @@ class Encoder(nn.Module):
         nn.ReLU(),
         nn.Linear(n, n),
         nn.ReLU(),
-        nn.Linear(n, n),
+        nn.Linear(n, out_size)
     )
-    nf = G.nfilter
-    size = (G.lcd_h * G.lcd_w) // 64
-    self.seq = nn.ModuleList([
-        nn.Conv2d(1, nf, 3, 2, padding=1),
-        ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Conv2d(nf, nf, 3, 2, padding=1),
-        ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Conv2d(nf, nf, 3, 2, padding=1),
-        ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Flatten(-3),
-        nn.Linear(size * nf, out_size),
-
-    ])
 
   def get_dist(self, x):
     mu, log_std = x.chunk(2, -1)
@@ -190,32 +167,12 @@ class Encoder(nn.Module):
     return thd.Normal(mu, std)
 
   def forward(self, batch):
-    state = batch['proprio']
-    lcd = batch['lcd']
-    emb = self.state_embed(state)
-    x = lcd[:, None]
-    for layer in self.seq:
-      if isinstance(layer, ResBlock):
-        x = layer(x, emb)
-      else:
-        x = layer(x)
-    return x
+    state = batch['full_state']
+    return self.state_embed(state)
 
 class Decoder(nn.Module):
   def __init__(self, state_n, in_size, G):
     super().__init__()
-    nf = G.nfilter
-    H = 2
-    W = int(2 * G.wh_ratio)
-    self.net = nn.Sequential(
-        nn.ConvTranspose2d(in_size, nf, (H, W), 2),
-        nn.ReLU(),
-        nn.ConvTranspose2d(nf, nf, 4, 4, padding=0),
-        nn.ReLU(),
-        nn.Conv2d(nf, nf, 3, 1, padding=1),
-        nn.ReLU(),
-        nn.ConvTranspose2d(nf, 1, 4, 2, padding=1),
-    )
     n = G.hidden_size
     self.state_net = nn.Sequential(
         nn.Linear(in_size, n),
@@ -224,9 +181,7 @@ class Decoder(nn.Module):
         nn.ReLU(),
         nn.Linear(n, state_n),
     )
-    nf = G.nfilter
 
   def forward(self, x):
-    lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]))
     state_dist = thd.Normal(self.state_net(x), 1)
-    return {'lcd': lcd_dist, 'proprio': state_dist}
+    return {'full_state': state_dist}
