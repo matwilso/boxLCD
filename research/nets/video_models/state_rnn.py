@@ -67,7 +67,7 @@ class SingleState(VideoModel):
         out = self.fc(out)
         imdts = [out]
         for i in range(self.window-1):
-          out[..., self.shape_idxs] = 0.0
+          #out[..., self.shape_idxs] = 0.0
           out, (h, c) = self.lstm(out, (h,c))
           out = self.fc(out)
           imdts += [out]

@@ -26,7 +26,7 @@ class CausalSelfAttention(nn.Module):
   explicit implementation here to show that there is nothing too scary here.
   """
 
-  def __init__(self, block_size, G):
+  def __init__(self, block_size, G, causal=True):
     super().__init__()
     self.block_size = block_size
     assert G.n_embed % G.n_head == 0
@@ -36,8 +36,12 @@ class CausalSelfAttention(nn.Module):
     self.value = nn.Linear(G.n_embed, G.n_embed)
     # output projection
     self.proj = nn.Linear(G.n_embed, G.n_embed)
-    # causal mask to ensure that attention is only applied to the left in the input sequence
-    self.register_buffer("mask", th.tril(th.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
+    if causal:
+      # causal mask to ensure that attention is only applied to the left in the input sequence
+      self.register_buffer("mask", th.tril(th.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
+    else:
+      self.register_buffer("mask", th.ones(self.block_size, self.block_size).view(1, 1, self.block_size, self.block_size))
+
     self.G = G
 
   def forward(self, x, layer_past=None):
@@ -58,11 +62,11 @@ class CausalSelfAttention(nn.Module):
 
 class TransformerBlock(nn.Module):
   """ an unassuming Transformer block (from @karpathy)"""
-  def __init__(self, block_size, G):
+  def __init__(self, block_size, G, causal=True):
     super().__init__()
     self.ln1 = nn.LayerNorm(G.n_embed)
     self.ln2 = nn.LayerNorm(G.n_embed)
-    self.attn = CausalSelfAttention(block_size, G)
+    self.attn = CausalSelfAttention(block_size, G, causal=causal)
     self.mlp = nn.Sequential(
         nn.Linear(G.n_embed, 4 * G.n_embed),
         nn.GELU(),

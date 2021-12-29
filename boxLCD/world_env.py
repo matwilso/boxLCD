@@ -20,6 +20,10 @@ class Shape(Enum):
   Circle = 0
   Box = 1
 
+# TODO: refactor things so that we have a standard definition format. like world def is more complete.
+# then to sample different possible worlds, we just sample different definitions. take the randomness
+# out of the env and fully specify things in the def format.
+
 
 # THIS IS AN ABSTRACT CLASS ALL OF THE LOGIC FOR SIMULATION
 # SPECIFIC INSTANCES ARE DESCRIBED IN envs.py, WHERE SPECIFIC WORLDS ARE DEFINED
