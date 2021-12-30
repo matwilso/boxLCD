@@ -21,6 +21,7 @@ class VideoModel(Net):
     self.observation_space = env.observation_space
     self.action_space = env.action_space
     self.proprio_n = env.observation_space.spaces['proprio'].shape[0]
+    self.full_state_n = env.observation_space.spaces['full_state'].shape[0]
     from research.define_config import env_fn
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.video_n)])
 
@@ -34,7 +35,7 @@ class VideoModel(Net):
     metrics = {}
     self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
     self._prompted_eval(epoch, writer, metrics, batch, arbiter)
-    #self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
+    self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
     metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
     return metrics
 
@@ -77,6 +78,7 @@ class VideoModel(Net):
         taz, taa = arbiter.forward(t_window)
         fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
         metrics['eval/unprompted_fvd'] = fvd
+        import ipdb; ipdb.set_trace()
         precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=5)
         metrics['eval/unprompted_precision'] = precision.cpu()
         metrics['eval/unprompted_recall'] = recall.cpu()

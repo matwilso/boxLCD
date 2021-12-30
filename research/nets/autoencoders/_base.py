@@ -83,6 +83,28 @@ class Autoencoder(Net):
     else:
       writer.add_image('sample_proprio', utils.combine_rgbs(preds[:, None], 1, self.G.video_n), epoch)
 
+  def _single_plot_full_state(self, epoch, writer, pred, truth=None):
+    """visualize proprio reconstructions"""
+    viz_idxs = np.arange(0, pred.shape[0], pred.shape[0]//self.G.video_n)
+    pred_full_state = pred[viz_idxs].cpu()
+    preds = []
+    for s in pred_full_state:
+      preds += [self.env.reset(full_state=s.numpy())['lcd']]
+    preds = 1.0 * np.stack(preds)
+
+    if truth is not None:
+      true_full_state = truth[viz_idxs].cpu()
+      truths = []
+      for s in true_full_state:
+        truths += [self.env.reset(full_state=s.numpy())['lcd']]
+      truths = 1.0 * np.stack(truths)
+      error = (preds - truths + 1.0) / 2.0
+      stack = np.concatenate([truths, preds, error], -2)[:, None]
+      writer.add_image('recon_full_state', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
+    else:
+      writer.add_image('sample_full_state', utils.combine_rgbs(preds[:, None], 1, self.G.video_n), epoch)
+
+
   def _plot_full_state(self, epoch, writer, pred, truth=None):
     """visualize proprio reconstructions"""
     viz_idxs = np.arange(0, pred.shape[0], pred.shape[0]//self.G.video_n)
@@ -120,7 +142,7 @@ class Autoencoder(Net):
       sample_proprio = decoded['proprio']
       self._plot_proprios(epoch, writer, sample_proprio)
 
-    if arbiter is not None:
+    if arbiter is not None and 'lcd' in decoded:
       decoded['lcd'] = self.proc(decoded['lcd'])
       paz = arbiter.forward(decoded).cpu().numpy()
       taz = arbiter.forward(batch).cpu().numpy()
@@ -149,6 +171,12 @@ class Autoencoder(Net):
       metrics['eval/proprio_log_mse'] = ((true_proprio - pred_proprio)**2).mean().log().cpu()
       # visualize proprio reconstructions
       self._plot_proprios(epoch, writer, pred_proprio, true_proprio)
+
+    if 'full_state' in decoded:
+      pred_full_state = decoded['full_state']
+      true_full_state = batch['full_state']
+      metrics['eval/full_state_log_mse'] = ((true_full_state - pred_full_state)**2).mean().log().cpu()
+      self._single_plot_full_state(epoch, writer, pred_full_state, true_full_state)
 
     if arbiter is not None:
       decoded['lcd'] = decoded['lcd'][:, 0]
