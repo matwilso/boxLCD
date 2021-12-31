@@ -220,3 +220,10 @@ python main.py --mode=train --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --w
 convert -resize 100% -delay 2 -loop 0 *.png test.gif
 ```
 -->
+
+
+## misc
+
+```
+python /home/matthewwilson/code/boxLCD/research/main.py --mode=train --model=State_Graph_AE --lr=0.0005 --bs=32 --log_n=100 --datadir=logs/datadump/Object3_lcd32/ --total_itr=30000 --hidden_size=64 --nfilter=16 --window=5 --log_n=1000 --free_nats=0.01 --lr=5e-4 --lcd_base=32 --logdir=logs/dec31/graph_ae
+```

@@ -76,9 +76,9 @@ class VideoModel(Net):
         paz, paa = arbiter.forward(s_window)
         metrics['eval/unprompted_action_log_mse'] = ((sact - paa)**2).mean().log()
         taz, taa = arbiter.forward(t_window)
+        assert taz.shape[0] != 0, "this can sometimes happen if you set the window incorrectly compared to the arbiter"
         fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
         metrics['eval/unprompted_fvd'] = fvd
-        import ipdb; ipdb.set_trace()
         precision, recall, f1 = utils.precision_recall_f1(taz, paz, k=5)
         metrics['eval/unprompted_precision'] = precision.cpu()
         metrics['eval/unprompted_recall'] = recall.cpu()
