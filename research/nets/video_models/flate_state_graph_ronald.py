@@ -1,3 +1,4 @@
+import copy
 from re import I
 import yaml
 import sys
@@ -32,6 +33,9 @@ class State_Graph_FRNLD(VideoModel):
     self.n_objects = len(env.world_def.objects)
 
     self.block_size = self.G.window
+    tfG = copy.deepcopy(G)
+    tfG.n_embed = self.z_size
+    self.graph_mixer = TransformerBlock(self.n_objects, tfG, causal=False)
     # GPT STUFF
     self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
     self.cond_in = nn.Linear(self.act_n, G.n_embed // 2, bias=False)
@@ -48,12 +52,14 @@ class State_Graph_FRNLD(VideoModel):
     x = self.embed(z)
     # TODO: was figuring out how to reshape things to make this work
     # forward the GPT model
-    import ipdb; ipdb.set_trace()
     BS, T, N, E = x.shape
+    x = self.graph_mixer(x.flatten(0,1)).unflatten(0, [BS, T])
+    x = x.swapaxes(1, 2).reshape([BS * N, T, E])
     # SHIFT RIGHT (add a padding on the left)
-    x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+    x = th.cat([th.zeros(BS*N, 1, E).to(self.G.device), x[:, :-1]], dim=1)
     action = th.cat([th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1)
     cin = self.cond_in(action)
+    cin = cin.repeat_interleave(N, dim=0)
     if action.ndim == 2:
       x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
     else:
@@ -61,12 +67,12 @@ class State_Graph_FRNLD(VideoModel):
     x += self.pos_emb  # each position maps to a (learnable) vector
     x = self.blocks(x)
     logits = self.ln_f(x)
-    return self.out_net(logits)
+    x = self.out_net(logits)
+    return x.unflatten(0, [BS, N]).swapaxes(1, 2)
 
   def loss(self, batch):
     z = self.ronald.encode(batch, noise=False).detach()
     logits = self.forward(z, batch['action'])
-    import ipdb; ipdb.set_trace()
     loss = ((th.tanh(logits) - z)**2).mean()
     return loss, {'loss/total': loss}
 
@@ -103,11 +109,11 @@ class State_Graph_FRNLD(VideoModel):
         batch['full_state'][:, :prompt_n] = prompts['full_state'][:, :prompt_n]
         start = prompt_n
       z = self.ronald.encode(batch, noise=False)
-      z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD).to(self.G.device)
+      z_sample = th.zeros(n, self.block_size, self.n_objects, self.ronald.G.vqD).to(self.G.device)
       z_sample[:, :prompt_n] = z[:, :prompt_n]
       # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
       z_sample = self.latent_sample(z_sample, action, start, temp)
-      z_sample = z_sample.reshape([n * self.block_size, self.ronald.G.vqD])
+      z_sample = z_sample.reshape([n * self.block_size, self.n_objects, self.ronald.G.vqD])
 
       # DECODE
       dist = self.ronald.decoder(z_sample)
