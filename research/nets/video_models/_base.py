@@ -82,8 +82,8 @@ class VideoModel(Net):
         metrics['eval/fid'] = fid
 
   def _duplicate_eval(self, epoch, writer, metrics, batch, arbiter=None):
-    n = batch['lcd'].shape[0]
-    batch = {key: val[:1].repeat_interleave(self.G.video_n, 0) for key, val in batch.items()}
+    n = self.G.video_n
+    batch = {key: val[:1].repeat_interleave(n, 0) for key, val in batch.items()}
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
     if 'lcd' in sample:
       pred_lcd = sample['lcd']
@@ -99,14 +99,17 @@ class VideoModel(Net):
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
 
     if 'lcd' in sample:
-      pred_lcd = sample['lcd'][:, self.G.prompt_n:]
-      true_lcd = batch['lcd'][:, :, None][:, self.G.prompt_n:]
+      assert self.G.prompt_n < sample['lcd'].shape[1]
+      pred_lcd = sample['lcd']
+      true_lcd = batch['lcd'][:, :, None]
+      cpred = pred_lcd[:, self.G.prompt_n:]
+      ctrue = true_lcd[:, self.G.prompt_n:]
       # run basic metrics
-      self.ssim.update((pred_lcd.flatten(0, 1), true_lcd.flatten(0, 1)))
+      self.ssim.update((cpred.flatten(0, 1), ctrue.flatten(0, 1)))
       ssim = self.ssim.compute().cpu().detach()
       metrics['eval/ssim'] = ssim
       # TODO: try not flat
-      self.psnr.update((pred_lcd.flatten(0, 1), true_lcd.flatten(0, 1)))
+      self.psnr.update((cpred.flatten(0, 1), ctrue.flatten(0, 1)))
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
       # visualize reconstruction
@@ -149,8 +152,7 @@ class VideoModel(Net):
         cosdist = 1 - self.cossim(paz, taz).mean().cpu()
         metrics['eval/prompted_cosdist'] = cosdist
       else:
-        import ipdb; ipdb.set_trace()
-        sample['lcd'] = sample['lcd'][:, :, 0]
+        sample['lcd'] = sample['lcd'][:, :, 0,]
         paz = arbiter.forward(utils.flat_batch(sample))
         taz = arbiter.forward(utils.flat_batch(batch))
         cosdist = 1 - self.cossim(paz, taz).mean().cpu()
