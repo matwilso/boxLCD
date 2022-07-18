@@ -13,33 +13,35 @@ def zero_module(module):
     p.detach().zero_()
   return module
 
-class CausalSelfAttention(nn.Module):
+class SelfAttention(nn.Module):
   """
   A vanilla multi-head masked self-attention layer with a projection at the end.
   It is possible to use th.nn.MultiheadAttention here but I am including an
   explicit implementation here to show that there is nothing too scary here.
   """
 
-  def __init__(self, block_size, G):
+  def __init__(self, block_size, n_embed, n_head, causal=True):
     super().__init__()
     self.block_size = block_size
-    assert G.n_embed % G.n_head == 0
+    assert n_embed % n_head == 0
     # key, query, value projections for all heads
-    self.key = nn.Linear(G.n_embed, G.n_embed)
-    self.query = nn.Linear(G.n_embed, G.n_embed)
-    self.value = nn.Linear(G.n_embed, G.n_embed)
+    self.key = nn.Linear(n_embed, n_embed)
+    self.query = nn.Linear(n_embed, n_embed)
+    self.value = nn.Linear(n_embed, n_embed)
     # output projection
-    self.proj = nn.Linear(G.n_embed, G.n_embed)
+    self.proj = nn.Linear(n_embed, n_embed)
     # causal mask to ensure that attention is only applied to the left in the input sequence
     self.register_buffer("mask", th.tril(th.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size))
-    self.G = G
+    self.n_head = n_head
+    if not causal:
+      self.mask = th.ones_like(self.mask)
 
   def forward(self, x, layer_past=None):
     B, T, G = x.size()
     # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-    k = self.key(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    q = self.query(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
-    v = self.value(x).view(B, T, self.G.n_head, G // self.G.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    k = self.key(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    q = self.query(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+    v = self.value(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
     # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
     att = (q @ k.transpose(-2, -1)) * (1.0 / np.sqrt(k.size(-1)))
     att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
@@ -52,15 +54,15 @@ class CausalSelfAttention(nn.Module):
 
 class TransformerBlock(nn.Module):
   """ an unassuming Transformer block (from @karpathy)"""
-  def __init__(self, block_size, G):
+  def __init__(self, block_size, n_embed, n_head, causal=True):
     super().__init__()
-    self.ln1 = nn.LayerNorm(G.n_embed)
-    self.ln2 = nn.LayerNorm(G.n_embed)
-    self.attn = CausalSelfAttention(block_size, G)
+    self.ln1 = nn.LayerNorm(n_embed)
+    self.ln2 = nn.LayerNorm(n_embed)
+    self.attn = SelfAttention(block_size, n_embed, n_head, causal=causal)
     self.mlp = nn.Sequential(
-        nn.Linear(G.n_embed, 4 * G.n_embed),
+        nn.Linear(n_embed, 4 * n_embed),
         nn.GELU(),
-        nn.Linear(4 * G.n_embed, G.n_embed),
+        nn.Linear(4 * n_embed, n_embed),
     )
   def forward(self, x):
     x = x + self.attn(self.ln1(x))

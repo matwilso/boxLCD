@@ -1,20 +1,7 @@
-from os import pipe
-from tqdm import tqdm
 import yaml
-import time
-import matplotlib.pyplot as plt
-import itertools
-from torch.utils.tensorboard import SummaryWriter
-import torch as th
-from torch.utils.data import Dataset, DataLoader
-from torch.optim import Adam
-import numpy as np
 import yaml
-from datetime import datetime
 import argparse
 from research.define_config import config, args_type, env_fn
-from boxLCD import envs
-from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
 
 from boxLCD import env_map
 from research import utils, runners, data

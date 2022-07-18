@@ -11,7 +11,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
+from research.nets.common import GaussHead, MDNHead, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead
 from research import utils
 import ignite
 from ._base import VideoModel

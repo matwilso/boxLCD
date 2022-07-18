@@ -81,7 +81,7 @@ def config():
   G.skip_train = 0
 
   G.phase = 1
-  G.window = 200
+  G.window = 50
   G.seed = 0
   G.end2end = 0
 

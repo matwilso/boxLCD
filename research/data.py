@@ -21,6 +21,10 @@ from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
 #from jax.tree_util import tree_map, tree_multimap
 
+"""
+Crack yourself open a fresh barrel of data
+"""
+
 def collect(env_fn, G):
   collect_start = time.time()
   G.logdir.mkdir(parents=True, exist_ok=True)

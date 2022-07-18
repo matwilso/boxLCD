@@ -12,7 +12,7 @@ import torch as th
 from torch import distributions as thd
 from torch import nn
 import torch.nn.functional as F
-from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead, ResBlock
+from research.nets.common import GaussHead, MDNHead, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed, ConvBinHead, ResBlock
 from research import utils
 import ignite
 from ._base import VideoModel
@@ -21,6 +21,7 @@ from jax.tree_util import tree_map, tree_multimap
 class RSSM(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
+    import ipdb; ipdb.set_trace()
     self._stoch_size = 64
     self._deter_size = 256
     state_n = env.observation_space.spaces['proprio'].shape[0]
