@@ -4,6 +4,7 @@ from boxLCD.world_defs import SCALE, ROBOT_FILLER
 import time
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
+from matplotlib import colors
 
 import numpy as np
 import Box2D
@@ -15,6 +16,12 @@ from boxLCD import utils
 from boxLCD.viewer import Viewer
 A = utils.A  # np.array[]
 
+def to_rgb(color: str):
+  if color == 'random':
+    color = np.random.uniform(size=3)
+  else:
+    color = colors.to_rgb(color)
+  return tuple([int(255*c) for c in color])
 
 # THIS IS AN ABSTRACT CLASS ALL OF THE LOGIC FOR SIMULATION
 # SPECIFIC INSTANCES ARE DESCRIBED IN envs.py, WHERE SPECIFIC WORLDS ARE DEFINED
@@ -39,7 +46,6 @@ class WorldEnv(gym.Env, EzPickle):
   ENV_DG.root_offset = 0  # compute position offsets from root
   ENV_DG.compact_obs = 0  # use compact joint angle space instead of joint positions and sin+cos of theta
   ENV_DG.use_speed = 1  # use velocity control vs. torque control
-  ENV_DG.all_corners = 0  # use corner keypoint obs instead of sin+cos of theta
   ENV_DG.walls = 1  # bound the environment with walls on both sides
   ENV_DG.debug = 0
   ENV_DG.fps = 10
@@ -72,24 +78,16 @@ class WorldEnv(gym.Env, EzPickle):
     for obj in self.world_def.objects:
       self.obs_info[f'{obj.name}:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{obj.name}:y:p'] = A[0, self.HEIGHT]
-      if self.G.all_corners:
-        self.obs_info[f'{obj.name}:kx:p'] = A[0, self.WIDTH]
-        self.obs_info[f'{obj.name}:ky:p'] = A[0, self.HEIGHT]
-      else:
-        self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
-        self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
+      self.obs_info[f'{obj.name}:cos'] = A[-1, 1]
+      self.obs_info[f'{obj.name}:sin'] = A[-1, 1]
 
     for i in range(len(self.world_def.robots)):
       robot = self.world_def.robots[i]
       self.world_def.robots[i] = robot = ROBOT_FILLER[robot.type](robot, self.G)
       self.obs_info[f'{robot.name}:root:x:p'] = A[0, self.WIDTH]
       self.obs_info[f'{robot.name}:root:y:p'] = A[0, self.HEIGHT]
-      if self.G.all_corners:
-        self.obs_info[f'{robot.name}:kx:p'] = A[0, self.WIDTH]
-        self.obs_info[f'{robot.name}:ky:p'] = A[0, self.HEIGHT]
-      else:
-        self.obs_info[f'{robot.name}:root:cos'] = A[-1, 1]
-        self.obs_info[f'{robot.name}:root:sin'] = A[-1, 1]
+      self.obs_info[f'{robot.name}:root:cos'] = A[-1, 1]
+      self.obs_info[f'{robot.name}:root:sin'] = A[-1, 1]
 
       for joint_name, joint in robot.joints.items():
         if self.G.root_offset:
@@ -99,12 +97,8 @@ class WorldEnv(gym.Env, EzPickle):
           self.obs_info[f'{robot.name}:{joint_name}:x:p'] = A[0, self.WIDTH]
           self.obs_info[f'{robot.name}:{joint_name}:y:p'] = A[0, self.HEIGHT]
 
-        if self.G.all_corners:
-          self.obs_info[f'{robot.name}:{joint_name}:kx:p'] = A[0, self.WIDTH]
-          self.obs_info[f'{robot.name}:{joint_name}:ky:p'] = A[0, self.HEIGHT]
-        else:
-          self.obs_info[f'{robot.name}:{joint_name}:cos'] = A[-1, 1]
-          self.obs_info[f'{robot.name}:{joint_name}:sin'] = A[-1, 1]
+        self.obs_info[f'{robot.name}:{joint_name}:cos'] = A[-1, 1]
+        self.obs_info[f'{robot.name}:{joint_name}:sin'] = A[-1, 1]
 
         if joint.limits[0] != joint.limits[1]:
           # act
@@ -198,19 +192,14 @@ class WorldEnv(gym.Env, EzPickle):
     self.joints = {}
     # ROBOT
     for robot in self.world_def.robots:
-      color = (0.9, 0.4, 0.4), (0.5, 0.3, 0.5)
       root_body = robot.root_body
+      robot_color = to_rgb(robot.color)
       fixture = fixtureDef(shape=root_body.shape, density=1.0 if root_body.density is None else root_body.density, categoryBits=root_body.categoryBits, maskBits=root_body.maskBits, friction=1.0)
       name = robot.name + ':root'
       rangex = 1 - (2 * robot.bound / self.WIDTH)
       rangey = 1 - (2 * robot.bound / self.HEIGHT)
       root_xy = A[self._sample(name + ':x:p', -rangex, rangex), self._sample(name + ':y:p', -rangey, -rangey)]
-
-      if self.G.all_corners:
-        body = root_body
-        root_angle = self._comp_angle(name, body, root_xy)
-      else:
-        root_angle = np.arctan2(self._sample(name + ':sin'), self._sample(name + ':cos'))
+      root_angle = np.arctan2(self._sample(name + ':sin'), self._sample(name + ':cos'))
 
       if not robot.rand_angle:
         root_angle = 0
@@ -221,7 +210,7 @@ class WorldEnv(gym.Env, EzPickle):
           angularDamping=robot.angularDamping,
           linearDamping=robot.linearDamping,
       )
-      dyn.color1, dyn.color2 = color
+      dyn.color = robot_color
       self.dynbodies[name] = dyn
 
       # PUT ALL THE JOINT ON THE ROOT AND ENSURE CORRECT ANGLES
@@ -250,7 +239,7 @@ class WorldEnv(gym.Env, EzPickle):
             position=self.dynbodies[parent_name].position + aa_delta - ab_delta,
             angle=mangle,
             fixtures=fixture)
-        dyn.color1, dyn.color2 = color
+        dyn.color = robot_color
         self.dynbodies[name] = dyn
         rjd = revoluteJointDef(
             bodyA=self.dynbodies[parent_name],
@@ -268,6 +257,9 @@ class WorldEnv(gym.Env, EzPickle):
 
     # OBJECT
     for obj in self.world_def.objects:
+      if np.random.binomial(1, obj.dropout):
+        continue
+
       # MAKE SHAPE AND SIZE
       obj_size = obj.size
       obj_shapes = {'circle': circleShape(radius=obj_size, pos=(0, 0)), 'box': (polygonShape(box=(obj_size, obj_size)))}
@@ -279,17 +271,14 @@ class WorldEnv(gym.Env, EzPickle):
         rangex = 1 - (2 * obj_size / self.WIDTH)
       if obj.rangey is None:
         rangey = 1 - (2 * obj_size / self.HEIGHT)
+      # if no robots, drop cubes from up high for more interestingness
       if len(self.world_def.robots) == 0:
         pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, rangey))]
       else:
         pos = A[(self._sample(obj.name + ':x:p', -rangex, rangex), self._sample(obj.name + ':y:p', -rangey, -0.25))]
       # ANGLE OR NOT
       if obj.rand_angle:
-        if self.G.all_corners:
-          samp = self._sample(obj.name + ':kx:p'), self._sample(obj.name + ':ky:p')
-          angle = np.arctan2(*(pos - samp))
-        else:
-          angle = np.arctan2(self._sample(obj.name + ':sin'), self._sample(obj.name + ':cos'))
+        angle = np.arctan2(self._sample(obj.name + ':sin'), self._sample(obj.name + ':cos'))
       else:
         angle = 0
       # CREATE OBJ BODY
@@ -300,7 +289,7 @@ class WorldEnv(gym.Env, EzPickle):
           linearDamping=obj.linearDamping,
           angularDamping=obj.angularDamping,
       )
-      body.color1, body.color2 = (0.5, 0.4, 0.9), (0.3, 0.3, 0.5)
+      body.color = to_rgb(obj.color)
       self.dynbodies[obj.name] = body
 
   def reset(self, full_state=None, proprio=None):
@@ -315,6 +304,7 @@ class WorldEnv(gym.Env, EzPickle):
     else:
       self.statics['floor'] = self.b2_world.CreateStaticBody(shapes=edgeShape(vertices=[(-1000 * self.WIDTH, 0), (1000 * self.WIDTH, 0)]))
     self._reset_bodies()
+    self.current_background_color = to_rgb(self.world_def.background_color)
 
     if proprio is not None:
       assert proprio.shape[-1] == self.observation_space.spaces['proprio'].shape[-1], f'invalid shape for proprio {proprio.shape} {self.observation_space.spaces["proprio"]}'
@@ -331,20 +321,12 @@ class WorldEnv(gym.Env, EzPickle):
         name = obj.name
         body = self.dynbodies[name]
         self.dynbodies[name].position = xy = full_state[f'{name}:x:p', f'{name}:y:p']
-        if self.G.all_corners:
-          import ipdb; ipdb.set_trace()  # TODO: make comp angle work with object as well
-          self.dynbodies[name].angle = self._comp_angle(name, body, xy)
-        else:
-          self.dynbodies[name].angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
+        self.dynbodies[name].angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
 
       for robot in self.world_def.robots:
         name = robot.name + ':root'
         self.dynbodies[f'{name}'].position = root_xy = full_state[f'{name}:x:p', f'{name}:y:p']
-
-        if self.G.all_corners:
-          self.dynbodies[f'{name}'].angle = root_angle = self._comp_angle(name, robot.root_body, root_xy)
-        else:
-          self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
+        self.dynbodies[f'{name}'].angle = root_angle = np.arctan2(full_state(name + ':sin'), full_state(name + ':cos'))
         parent_angles = {}
         parent_angles[name] = root_angle
 
@@ -370,13 +352,10 @@ class WorldEnv(gym.Env, EzPickle):
           else:
             self.dynbodies[name].position = self.joints[name].bodyB.transform.position = pos = A[(full_state[name + ':x:p'], full_state[name + ':y:p'])]
 
-          if self.G.all_corners:
-            offset_angle = self._comp_angle(name, robot.bodies[name.split(':')[1]], pos)
-          else:
-            offset_angle = np.arctan2(full_state[name + ':sin'], full_state[name + ':cos'])
-            if self.G.angular_offset:
-              offset_angle = root_angle + offset_angle
-              offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
+          offset_angle = np.arctan2(full_state[name + ':sin'], full_state[name + ':cos'])
+          if self.G.angular_offset:
+            offset_angle = root_angle + offset_angle
+            offset_angle = np.arctan2(np.sin(offset_angle), np.cos(offset_angle))
           self.dynbodies[name].angle = offset_angle
     if not self.G.walls:
       self.scroll = self.dynbodies[f'{self.world_def.robots[0].type}0:root'].position.x - self.VIEWPORT_W / SCALE / 2
@@ -388,22 +367,22 @@ class WorldEnv(gym.Env, EzPickle):
     full_state = utils.NamedArray(np.zeros(self.obs_size), self.obs_info)
     # GRAB OBJECT INFO
     for obj in self.world_def.objects:
-      body = self.dynbodies[obj.name]
-      full_state[f'{obj.name}:x:p'], full_state[f'{obj.name}:y:p'] = body.position
-      if self.G.all_corners:
-        full_state[f'{obj.name}:kx:p', f'{obj.name}:ky:p'] = A[body.transform * body.fixtures[0].shape.vertices[-1]]
-      else:
+      if obj.name in self.dynbodies:
+        body = self.dynbodies[obj.name]
+        full_state[f'{obj.name}:x:p'], full_state[f'{obj.name}:y:p'] = body.position
         full_state[f'{obj.name}:cos'] = np.cos(body.angle)
         full_state[f'{obj.name}:sin'] = np.sin(body.angle)
+      else:
+        full_state[f'{obj.name}:x:p'], full_state[f'{obj.name}:y:p'] = np.nan, np.nan
+        full_state[f'{obj.name}:cos'] = np.nan
+        full_state[f'{obj.name}:sin'] = np.nan
+
     # GRAB ROBOT INFO
     for robot in self.world_def.robots:
       root = self.dynbodies[robot.name + ':root']
       full_state[f'{robot.name}:root:x:p'], full_state[f'{robot.name}:root:y:p'] = root_xy = root.position
-      if self.G.all_corners:
-        full_state[f'{robot.name}:root:kx:p', f'{robot.name}:root:ky:p'] = A[root.transform * root.fixtures[0].shape.vertices[-1]]
-      else:
-        full_state[f'{robot.name}:root:cos'] = np.cos(root.angle)
-        full_state[f'{robot.name}:root:sin'] = np.sin(root.angle)
+      full_state[f'{robot.name}:root:cos'] = np.cos(root.angle)
+      full_state[f'{robot.name}:root:sin'] = np.sin(root.angle)
       for joint_name, joint in robot.joints.items():
         jnt = self.joints[f'{robot.name}:{joint_name}']
         if self.G.compact_obs:
@@ -418,11 +397,8 @@ class WorldEnv(gym.Env, EzPickle):
             angle = np.arctan2(np.sin(angle), np.cos(angle))
           else:
             angle = jnt.bodyB.transform.angle
-          if self.G.all_corners:
-            full_state[f'{robot.name}:{joint_name}:kx:p', f'{robot.name}:{joint_name}:ky:p'] = A[jnt.bodyB.transform * jnt.bodyB.fixtures[0].shape.vertices[-1]]
-          else:
-            full_state[f'{robot.name}:{joint_name}:cos'] = np.cos(angle)
-            full_state[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
+          full_state[f'{robot.name}:{joint_name}:cos'] = np.cos(angle)
+          full_state[f'{robot.name}:{joint_name}:sin'] = np.sin(angle)
 
     full_state = full_state.arr
     proprio = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
@@ -468,28 +444,24 @@ class WorldEnv(gym.Env, EzPickle):
       width = int(self.G.lcd_base * self.G.wh_ratio)
       height = self.G.lcd_base
     if lcd_mode == '1':
-      backgrond = 1
+      background = 1
     elif lcd_mode == 'RGB':
-      backgrond = (1, 1, 1)
+      background = self.current_background_color
 
     image = Image.new(lcd_mode, (width, height))
     draw = ImageDraw.Draw(image)
-    draw.rectangle([0, 0, width, height], fill=backgrond)
+    draw.rectangle([0, 0, width, height], fill=background)
     for name, body in self.dynbodies.items():
       pos = A[body.position]
       shape = body.fixtures[0].shape
+
       if lcd_mode == 'RGB':
-        color = tuple([int(255.0 * (1 - x)) for x in body.color1])
-        outline = tuple([int(255.0 * (1 - x)) for x in body.color2])
+        color = body.color
+        outline = (0, 0, 0)
       else:
         color = 0
         outline = None
-        #if 'root' in name or 'object' in name:
-        #  color = 1
-        #  outline = 0
-        #else:
-        #  color = 0
-        #  outline = None
+
       if isinstance(shape, circleShape):
         rad = shape.radius
         topleft = (pos - rad) / self.WIDTH
@@ -503,12 +475,11 @@ class WorldEnv(gym.Env, EzPickle):
         points = (width * points).tolist()
         points = tuple([tuple(xy) for xy in points])
         draw.polygon(points, fill=color, outline=outline)
+
     image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
     lcd = np.asarray(image)
     if lcd.dtype == np.bool:
       lcd = lcd.astype(np.float).astype(np.bool)  # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
-    if lcd_mode == 'RGB':
-      lcd = 255 - lcd
     return lcd
 
   def render(self, mode='rgb_array', lcd_mode='1', return_pyglet_view=False):

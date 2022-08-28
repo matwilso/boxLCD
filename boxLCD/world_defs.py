@@ -21,6 +21,8 @@ class Object(NamedTuple):
   rand_angle: int = 1
   rangex: Tuple[float, float] = None
   rangey: Tuple[float, float] = None
+  color: str = 'xkcd:windows blue'
+  dropout: float = 0.0
 
 # ROBOT PARTS
 class Body(NamedTuple):
@@ -50,6 +52,7 @@ class Robot(NamedTuple):
   angularDamping: float = 0
   linearDamping: float = 0
   bound: float = 1.5  # spatial extent of robot. must be set so we don't start robot stuck in a wall
+  color: str = 'xkcd:faded red'
 
 # FULL WORLD DEF
 class WorldDef(NamedTuple):
@@ -57,6 +60,7 @@ class WorldDef(NamedTuple):
   objects: List[Object] = []
   gravity: List[float] = [0, -9.81]
   forcetorque: int = 0
+  background_color: str = 'white'
 
 
 # THESE TAKE A PARTIAL ROBOT DESCRIPTION AND BUILD ALL THE JOINTS AND STUFF.
@@ -92,7 +96,7 @@ def make_urchin(robot, G):
       'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
       'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.25)
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.25, color=robot.color)
 
 @register('luxo')
 def make_luxo(robot, G):
@@ -120,7 +124,8 @@ def make_luxo(robot, G):
           'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
           'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
       },
-      bound=2.0
+      bound=2.0,
+      color=robot.color,
       )
 
 
@@ -143,7 +148,7 @@ def make_quad(robot, G):
       'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
       'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5)
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5, color=robot.color)
 
 
 @register('legs')
@@ -161,7 +166,7 @@ def make_legs(robot, G):
       'aleg': Joint('root', -1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
       'bleg': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
   }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5)
+  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5, color=robot.color)
 
 
 
@@ -246,7 +251,7 @@ def make_crab(robot, G):
       'rrclaw0': Joint('relbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
       'rrclaw1': Joint('rrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
   },)
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, bound=2.0)
+  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, bound=2.0, color=robot.color)
 
 # TODO: make armed walker
 @register('walker')

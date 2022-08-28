@@ -109,6 +109,13 @@ class LuxoCubes(WorldEnv):
     w = WorldDef(robots=[Robot(type='luxo', name='luxo0')], objects=[Object(f'object{i}', **cube_settings) for i in range(3)])
     super().__init__(w, G)
 
+@cc(ep_len=150, wh_ratio=1.5)
+class UrchinShapes(WorldEnv):
+  def __init__(self, G={}):
+    objects = [Object(f'object{i}', shape='random', size=0.5, density=0.1, restitution=0.8, dropout=0.5, color='random') for i in range(4)]
+    robots = [Robot(type='urchin', name='urchin0', color='random')]
+    w = WorldDef(robots=robots, objects=objects, background_color='random')
+    super().__init__(w, G)
 
 # MORE ADVANCED
 # (still being designed. and you might want to run these at higher FPS/Hz)
