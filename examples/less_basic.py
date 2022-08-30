@@ -25,7 +25,7 @@ if __name__ == '__main__':
   G = parse_args()
   env = env_map[G.env](G)
   start = env.reset()
-  env.render(mode='human', lcd_mode=G.lcd_mode)
+  env.render(mode='human')
   # monkey patch the env window to get keyboard input
   key_handler = KEY.KeyStateHandler()
   window = env.viewer.window
@@ -90,7 +90,8 @@ if __name__ == '__main__':
         ret = 0
         # env.seed(0)
         start = obs = env.reset()
-    img = env.render(mode='human', lcd_mode=G.lcd_mode)
+    #img = env.render(mode='human', lcd_mode=G.lcd_mode)
+    img = env.render(mode='human')
     time.sleep(delay)
 
     if plotting:

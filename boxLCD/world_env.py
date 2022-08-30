@@ -30,7 +30,7 @@ class WorldEnv(gym.Env, EzPickle):
   enables flexible specification of a box2d environment
   You pass in a world def and a configuration.
   Then this behaves like a regular env given that configuration.
-  But it additionally has lcd_render.
+  But it additionally has _lcd_render.
   """
   metadata = {
       'render.modes': ['human', 'rgb_array'],
@@ -402,7 +402,7 @@ class WorldEnv(gym.Env, EzPickle):
 
     full_state = full_state.arr
     proprio = full_state[self.pobs_idxs] if self.pobs_size != 0 else np.zeros(1)
-    return {'full_state': full_state, 'proprio': proprio, 'lcd': self.lcd_render()}
+    return {'full_state': full_state, 'proprio': proprio, 'lcd': self._lcd_render()}
 
   def step(self, action):
     self.ep_t += 1
@@ -433,11 +433,11 @@ class WorldEnv(gym.Env, EzPickle):
     info = {'timeout': done}
     return self._get_obs(), reward, done, info
 
-  def lcd_render(self, width=None, height=None, lcd_mode='1'):
+  def _lcd_render(self, width=None, height=None):
     """render the env using PIL at potentially very low resolution
     # TODO: deal with scrolling
     """
-    lcd_mode = lcd_mode.upper()
+    lcd_mode = self.world_def.render_mode.upper()
     assert lcd_mode in ['1', 'RGB'], 'lcd_mode must be in one of these PIL supported modes'
 
     if width is None and height is None:
@@ -486,19 +486,22 @@ class WorldEnv(gym.Env, EzPickle):
     lcd_mode = lcd_mode.upper()
     width = int(self.G.lcd_base * self.G.wh_ratio)
     height = self.G.lcd_base
-    lcd = self.lcd_render(width, height, lcd_mode=lcd_mode)
+    lcd = self._lcd_render(width, height)
     if mode == 'rgb_array':
       return lcd
     elif mode == 'human':
       # use a pyglet viewer to show the images to the user in realtime.
       if self.viewer is None:
         self.viewer = Viewer(width * 8, height * 8, self.G)
-      high_res = self.lcd_render(width * 8, height * 8, lcd_mode='RGB').astype(np.uint8)
+      high_res = self._lcd_render(width * 8, height * 8).astype(np.uint8)
       #high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
+      if self.world_def.render_mode != 'rgb':
+        import ipdb; ipdb.set_trace()
       if lcd_mode == 'RGB':
         low_res = lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
       else:
-        low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
+        #low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
+        low_res = 255 * lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
       img = np.concatenate([high_res, np.zeros_like(low_res)[:, :1], low_res], axis=1)
       out = self.viewer.render(img, return_rgb_array=return_pyglet_view)
       if not return_pyglet_view:

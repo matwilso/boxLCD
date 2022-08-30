@@ -61,6 +61,7 @@ class WorldDef(NamedTuple):
   gravity: List[float] = [0, -9.81]
   forcetorque: int = 0
   background_color: str = 'white'
+  render_mode: str = 'rgb'
 
 
 # THESE TAKE A PARTIAL ROBOT DESCRIPTION AND BUILD ALL THE JOINTS AND STUFF.
