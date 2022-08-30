@@ -67,7 +67,7 @@ def config():
   G.vqD = 128
   G.vqK = 128
   G.beta = 0.25
-  G.entropy_bonus = 5e-4 
+  G.entropy_bonus = 0.0
 
 
   G.min_std = 1e-4
@@ -98,6 +98,9 @@ def config():
   G.kl_scale = 1.0
   G.autoreset = 0
 
+  G.make_video = 0
+  G.data_workers = 12
+
   # extra info that we set here for convenience and don't modify 
   G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
   G.commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode('utf-8')
@@ -109,6 +112,5 @@ def config():
   for key, val in ENV_DG.items():
     assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
     G[key] = val
-
 
   return G

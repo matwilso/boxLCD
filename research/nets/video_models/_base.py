@@ -94,7 +94,7 @@ class VideoModel(Net):
       true_proprio = batch['proprio']
       self._proprio_video(epoch, writer, pred_proprio, true_proprio, name='duplicate_proprio', prompt_n=self.G.prompt_n)
 
-  def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
+  def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None, make_video=True):
     n = batch['lcd'].shape[0]
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
 
@@ -112,15 +112,17 @@ class VideoModel(Net):
       self.psnr.update((cpred.flatten(0, 1), ctrue.flatten(0, 1)))
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
-      # visualize reconstruction
-      self._lcd_video(epoch, writer, pred_lcd, true_lcd, prompt_n=self.G.prompt_n)
+      if make_video:
+        # visualize reconstruction
+        self._lcd_video(epoch, writer, pred_lcd, true_lcd, prompt_n=self.G.prompt_n)
 
     if 'proprio' in sample:
       pred_proprio = sample['proprio']
       true_proprio = batch['proprio']
       metrics['eval/proprio_log_mse'] = ((true_proprio[:, self.G.prompt_n:] - pred_proprio[:, self.G.prompt_n:])**2).mean().log().cpu()
-      # visualize reconstruction
-      self._proprio_video(epoch, writer, pred_proprio, true_proprio, prompt_n=self.G.prompt_n)
+      if make_video:
+        # visualize reconstruction
+        self._proprio_video(epoch, writer, pred_proprio, true_proprio, prompt_n=self.G.prompt_n)
 
     if arbiter is not None:
       t_post_prompt = tree_map(lambda x: x[:, self.G.prompt_n:], batch)

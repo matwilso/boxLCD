@@ -335,6 +335,11 @@ def discount_cumsum(x, discount):
   """
   return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
+def to_np(x):
+  if isinstance(x, np.ndarray):
+    return x
+  else:
+    return x.detach().cpu().numpy()
 
 if __name__ == '__main__':
   real = th.rand(1000, 128)

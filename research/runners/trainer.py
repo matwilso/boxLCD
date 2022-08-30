@@ -51,6 +51,7 @@ class Trainer:
       self.arbiter.G = arbiterG
       self.arbiter.eval()
       print('LOADED ARBITER', arbiter_path)
+      self.model.arbiter = self.arbiter
     else:
       self.arbiter = None
 

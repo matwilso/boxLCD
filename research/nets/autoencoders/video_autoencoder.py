@@ -10,7 +10,7 @@ from torch.optim import Adam
 from ._base import Autoencoder, SingleStepAE, MultiStepAE
 from jax.tree_util import tree_map
 
-class MultiStepArbiter(MultiStepAE):
+class VideoAutoencoder(MultiStepAE):
   def __init__(self, env, G):
     super().__init__(env, G)
     self.z_size = 256
@@ -82,17 +82,13 @@ class Encoder(nn.Module):
         nn.Linear(G.window * n, n),
     )
     nf = G.nfilter
-    size = (G.lcd_h * G.lcd_w) // 64
     self.seq = nn.ModuleList([
         nn.Conv2d(G.window, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Conv2d(nf, nf, 3, 2, padding=1),
-        ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
-        nn.Flatten(-3),
-        nn.Linear(size * nf, out_size),
-
+        nn.Conv2d(nf, nf, 3, 1, padding=1),
+        ResBlock(G.window // 4, emb_channels=G.hidden_size, group_size=4),
     ])
 
   def forward(self, batch):
@@ -153,6 +149,7 @@ class Decoder(nn.Module):
     return {'lcd': lcd_dist, 'proprio': state_dist, 'action': act_dist}
 
   def forward(self, x):
+    import ipdb; ipdb.set_trace()
     lcd = self.net(x[..., None, None])
     proprio = self.state_net(x)
     act = self.act_net(x)

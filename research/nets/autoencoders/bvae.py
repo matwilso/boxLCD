@@ -11,6 +11,7 @@ from ._base import Autoencoder, SingleStepAE
 class BVAE(SingleStepAE):
   def __init__(self, env, G):
     super().__init__(env, G)
+    assert self.G.entropy_bonus != 0.0  # you should set entropy bonus if you're going to use this net
     # encoder -> binary -> decoder
     self.encoder = Encoder(env, G)
     self.vq = BinaryQuantize()
