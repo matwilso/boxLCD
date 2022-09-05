@@ -201,6 +201,40 @@ class MultiHead(nn.Module):
     state = self.state(xs)
     return {'lcd': bin, 'proprio': state}
 
+class ResBlock3d(nn.Module):
+  def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0, group_size=16):
+    super().__init__()
+    self.out_channels = out_channels or channels
+
+    self.in_layers = nn.Sequential(
+        nn.GroupNorm(group_size, channels),
+        nn.SiLU(),
+        nn.Conv3d(channels, self.out_channels, 3, padding=1)
+    )
+    self.emb_layers = nn.Sequential(
+        nn.SiLU(),
+        nn.Linear(emb_channels, self.out_channels)
+    )
+    self.out_layers = nn.Sequential(
+        nn.GroupNorm(group_size, self.out_channels),
+        nn.SiLU(),
+        nn.Dropout(p=dropout),
+        zero_module(nn.Conv3d(self.out_channels, self.out_channels, 3, padding=1))
+    )
+    if self.out_channels == channels:
+      self.skip_connection = nn.Identity()
+    else:
+      self.skip_connection = nn.Conv3d(channels, self.out_channels, 1)  # step down size
+
+  def forward(self, x, emb):
+    h = self.in_layers(x)
+    emb_out = self.emb_layers(emb)[..., None, None, None]
+    h = h + emb_out
+    h = self.out_layers(h)
+    return self.skip_connection(x) + h
+
+
+
 class ResBlock(nn.Module):
   def __init__(self, channels, emb_channels, out_channels=None, dropout=0.0, group_size=16):
     super().__init__()

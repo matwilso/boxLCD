@@ -19,6 +19,7 @@ from tqdm import tqdm
 import time
 from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
+from einops import rearrange
 #from jax.tree_util import tree_map, tree_multimap
 
 """
@@ -152,15 +153,13 @@ class RolloutDataset(IterableDataset):
       else:
         curr_file = self.barrel_files[ct]
 
-
       curr_barrel = np.load(curr_file, allow_pickle=True)
       elems = {key: th.as_tensor(curr_barrel[key], dtype=th.float32) for key in curr_barrel.keys()}
       ep_len = elems['lcd'].shape[1]
       #elems = {key: th.as_tensor(np.c_[np.zeros_like(curr_barrel[key])[:self.window], curr_barrel[key]], dtype=th.float32) for key in curr_barrel.keys()}
       pad = self.window - 1
-      elems = {key: th.cat([th.zeros_like(val)[:,:pad], val, th.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
+      #elems = {key: th.cat([th.zeros_like(val)[:,:pad], val, th.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
       lcd = elems['lcd']
-
 
       idxs = np.arange(BARREL_SIZE)
       np.random.shuffle(idxs)
@@ -170,15 +169,19 @@ class RolloutDataset(IterableDataset):
       # TODO: add something like timestamps and clip id to the observation. unique id and then time in that id.
 
       for idx in idxs:
-        #if max_start > 0:
-        #  start = np.random.randint(0, max_start)
-        #  elem = {key: th.as_tensor(val[idx, start:start + self.window], dtype=th.float32) for key, val in elems.items()}
-        #else:
-        #  elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in elems.items()}
+        if max_start > 0:
+          start = np.random.randint(0, max_start)
+          elem = {key: th.as_tensor(val[idx, start:start + self.window], dtype=th.float32) for key, val in elems.items()}
+        else:
+          elem = {key: th.as_tensor(val[idx], dtype=th.float32) for key, val in elems.items()}
 
         #  start = np.random.randint(0, max_start)
-        start = np.random.randint(0, ep_len)
-        elem = {key: th.as_tensor(val[idx, start:start+self.window], dtype=th.float32) for key, val in elems.items()}
+        #start = np.random.randint(0, ep_len)
+        #elem = {key: th.as_tensor(val[idx, start:start+self.window], dtype=th.float32) for key, val in elems.items()}
+        elem['lcd'] = rearrange(elem['lcd'], 't h w c -> c t h w', c=3)
+        elem['lcd'] /= 255.0
+        #if (elem['lcd'] == 0.0).all(dim=0).all(dim=-1).all(dim=-1).any():
+        #  import ipdb; ipdb.set_trace()
         assert elem['lcd'].max() <= 1.0 and elem['lcd'].min() >= 0.0
         yield elem
       curr_barrel.close()
@@ -191,10 +194,12 @@ def load_ds(G):
   #  tree_multi_map(lambda x, *y: )
   #  import ipdb; ipdb.set_trace()
   #  pass
-  train_dset = RolloutDataset(G.datadir / 'train', G.window, refresh_data=G.refresh_data)
   test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False)
-  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
   test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
+
+  train_dset = RolloutDataset(G.datadir / 'train', G.window, refresh_data=G.refresh_data)
+  train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
+
   train_loader.nbarrels = train_dset.nbarrels
   test_loader.nbarrels = test_dset.nbarrels
   return train_loader, test_loader

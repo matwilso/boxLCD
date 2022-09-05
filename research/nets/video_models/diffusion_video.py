@@ -50,7 +50,7 @@ class DiffusionVideo(VideoModel):
 
 
   def loss(self, batch):
-    lcd = (batch['lcd'][:,None] * 2) - 1
+    lcd = (batch['lcd'] * 2) - 1
     t = th.randint(0, self.G.timesteps, (lcd.shape[0],)).to(lcd.device)
     metrics = self.diffusion.training_losses(self.net, lcd, t)
     metrics = {key: val.mean() for key, val in metrics.items()}
@@ -121,7 +121,7 @@ class Down(nn.Module):
   def __init__(self, window, channels, emb_channels, dropout=0.0):
     super().__init__()
     self.seq = nn.ModuleList([
-        Downsample(1, channels, 1),  # not really a downsample, just makes the code simpler to share
+        Downsample(3, channels, 1),  # not really a downsample, just makes the code simpler to share
         #ResBlock(channels, emb_channels, dropout=dropout),
         ResBlock(channels, emb_channels, dropout=dropout),
         TimestepEmbedSequential(ResBlock(channels, emb_channels, channels, dropout=dropout), AttentionBlock(window, channels)),

@@ -5,6 +5,7 @@ from torch.optim import Adam
 import torch.nn as nn
 from research.nets._base import Net
 from research import utils
+from einops import rearrange
 
 class Autoencoder(Net):
   def __init__(self, env, G):
@@ -24,7 +25,8 @@ class Autoencoder(Net):
     mode = {}
     dists = self._decode(z)
     if 'lcd' in dists:
-      mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
+      mode['lcd'] = dists['lcd'].probs
+      #mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
     if 'proprio' in dists:
       mode['proprio'] = dists['proprio'].mean
     if 'action' in dists:
@@ -136,7 +138,8 @@ class SingleStepAE(Autoencoder):
     super().__init__(env, G)
     self.batch_proc = utils.flat_batch
     self.proc = lambda x: x[:,0]
-    self.unproc = lambda x: x[:,None]
+    self.unproc = lambda x: x
+    #self.unproc = lambda x: x[:,None]
 
 class MultiStepAE(Autoencoder):
   def __init__(self, env, G):
@@ -166,15 +169,18 @@ class MultiStepAE(Autoencoder):
     if 'lcd' in decoded:
       pred_lcd = decoded['lcd']
       true_lcd = batch['lcd']
+      swap = lambda x: rearrange(x, 'b c d h w -> (c d) b h w')
       # run basic metrics
-      self.ssim.update((pred_lcd[:,:1], true_lcd[:,:1]))
+      self.ssim.update((swap(pred_lcd), swap(true_lcd)))
       ssim = self.ssim.compute().cpu().detach()
       metrics['eval/ssim'] = ssim
-      self.psnr.update((pred_lcd[:,:1], true_lcd[:,:1]))
+      self.psnr.update((swap(pred_lcd), swap(true_lcd)))
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
       # visualize reconstruction
-      self._plot_lcds(epoch, writer, pred_lcd[:,:3], true_lcd[:,:3])
+      # TODO: maybe plot all
+      idx = np.random.randint(0, pred_lcd.shape[2])
+      self._plot_lcds(epoch, writer, pred_lcd[:,:,idx], true_lcd[:,:,idx])
 
     if 'proprio' in decoded:
       pred_proprio = decoded['proprio']

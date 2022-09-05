@@ -10,7 +10,8 @@ from research import utils
 from research.wrappers.async_vector_env import AsyncVectorEnv
 from jax.tree_util import tree_map
 A = utils.A
-RED, GREEN = A[0.9, 0.2, 0.2], A[0.2, 0.9, 0.2]
+RED, GREEN, YELLOW, BLUE = A[0.9, 0.2, 0.2], A[0.2, 0.9, 0.2], A[0.9, 0.9, 0.2], A[0.2, 0.2, 0.9]
+from einops import rearrange, repeat, parse_shape
 
 class VideoModel(Net):
   def __init__(self, env, G):
@@ -37,15 +38,15 @@ class VideoModel(Net):
     metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
     return metrics
 
-  def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
+  def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None, make_video=True):
     n = batch['lcd'].shape[0]
     action = (th.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(self.G.device)
     sample = self.sample(n, action)
 
-    if 'lcd' in sample:
+    if 'lcd' in sample and make_video:
       self._lcd_video(epoch, writer, sample['lcd'])
 
-    if 'proprio' in sample:
+    if 'proprio' in sample and make_video:
       self._proprio_video(epoch, writer, sample['proprio'])
 
     if arbiter is not None:
@@ -99,17 +100,19 @@ class VideoModel(Net):
     sample = self.sample(n, action=batch['action'], prompts=batch, prompt_n=self.G.prompt_n)
 
     if 'lcd' in sample:
-      assert self.G.prompt_n < sample['lcd'].shape[1]
+      assert self.G.prompt_n < sample['lcd'].shape[2]
       pred_lcd = sample['lcd']
-      true_lcd = batch['lcd'][:, :, None]
-      cpred = pred_lcd[:, self.G.prompt_n:]
-      ctrue = true_lcd[:, self.G.prompt_n:]
+      true_lcd = batch['lcd']
+      cpred = pred_lcd[:, :, self.G.prompt_n:]
+      ctrue = true_lcd[:, :, self.G.prompt_n:]
+
+      flat = lambda x: rearrange(x, 'bs c d h w -> (bs d) c h w')
       # run basic metrics
-      self.ssim.update((cpred.flatten(0, 1), ctrue.flatten(0, 1)))
+      self.ssim.update((flat(cpred), flat(ctrue)))
       ssim = self.ssim.compute().cpu().detach()
       metrics['eval/ssim'] = ssim
       # TODO: try not flat
-      self.psnr.update((cpred.flatten(0, 1), ctrue.flatten(0, 1)))
+      self.psnr.update((flat(cpred), flat(ctrue)))
       psnr = self.psnr.compute().cpu().detach()
       metrics['eval/psnr'] = psnr
       if make_video:
@@ -160,35 +163,31 @@ class VideoModel(Net):
         cosdist = 1 - self.cossim(paz, taz).mean().cpu()
         metrics['eval/cosdist'] = cosdist
 
-  def _lcd_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
+  def _lcd_video(self, epoch, writer, pred, gt=None, name=None, prompt_n=None):
     """visualize lcd reconstructions"""
+
     # visualization
-    pred_lcds = pred[:self.G.video_n].cpu().detach().numpy()
-    if truth is not None:
-      real_lcds = truth[:self.G.video_n].cpu().detach().numpy()
-      error = (pred_lcds - real_lcds + 1.0) / 2.0
-      blank = np.zeros_like(real_lcds)[..., :1, :]
-      out = np.concatenate([real_lcds, blank, pred_lcds, blank, error], 3)
+    pred = pred[:self.G.video_n]
+    if gt is not None:
+      gt = gt[:self.G.video_n]
+      error = (pred - gt + 1.0) / 2.0
+      hoz_div = th.zeros_like(gt)[..., :1, :]
+      hoz_div[:, :, :prompt_n] = th.as_tensor(YELLOW)[None,:,None,None,None]
+      hoz_div[:, :, prompt_n:] = th.as_tensor(GREEN)[None,:,None,None,None]
+      # stack vertically
+      out = th.cat([gt, hoz_div, pred, hoz_div, error], dim=-2)
       name = name or 'prompted_lcd'
     else:
-      out = pred_lcds
+      out = pred
       name = name or 'unprompted_lcd'
-    out = utils.force_shape(out)
-    out = out.repeat(3, 2)
-    if prompt_n is not None:
-      W, H = self.G.lcd_w, self.G.lcd_h
-      out = out.transpose(0, 1, 4, 3, 2)
-      for j in range(7):
-        out[:, :prompt_n, W * (j + 1) + j, :] = GREEN
-        out[:, prompt_n:, W * (j + 1) + j, :] = RED
-      out[:, :prompt_n, :, H] = GREEN
-      out[:, prompt_n:, :, H] = RED
-      out[:, :prompt_n, :, 2 * H + 1] = GREEN
-      out[:, prompt_n:, :, 2 * H + 1] = RED
-      out = out.transpose(0, 1, 4, 3, 2)
 
-    #  out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
-    out = out.repeat(4, -1).repeat(4, -2)
+    out = rearrange(out, 'bs c t h w -> bs t h w c')
+    ver_div = th.zeros_like(out)[..., :1, :]
+    ver_div[:, :prompt_n] = th.as_tensor(YELLOW)
+    ver_div[:, prompt_n:] = th.as_tensor(GREEN)
+    out = th.cat([out, ver_div], dim=-2)
+    out = rearrange(out, 'bs t h w c -> t h (bs w) c')
+    out = repeat(out, 't h w c -> t (h h2) (w w2) c', h2=4, w2=4)
     utils.add_video(writer, name, out, epoch, fps=self.G.fps)
 
   def _proprio_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):

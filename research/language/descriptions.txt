@@ -1,0 +1,45 @@
+#a blue ball at the top left corner of an image
+#a red ball at the top left corner of an image
+#a blue ball at the bottom right corner of an image
+#a red ball at the bottom right corner of an image
+#a red circle in the right and down
+#luxo next to a ball
+#luxo next to a cube
+#a red cartoon lamp next to a ball
+#a red cartoon lamp next to a blue ball
+#a red cartoon lamp next to a blue ball, simple rendering
+#a simple rendering of red cartoon lamp next to a blue ball
+#a red three pointed creature next to a blue ball
+#a red three pointed creature next to a blue circle
+#a red cartoon lamp next to a blue ball, simple rendering
+#low res pixar lamp next to a ball
+#low res polygon structure next to a ball
+#three rectangles connected to a rhombus next to a ball
+#three rectangles connected to a rhombus next to a cube
+#a cartoon kite next to a ball
+#a cartoon kite next to a cube
+#a cartoon kite next to three balls
+#a cartoon lamp next to a ball
+#a cartoon lamp next to three balls
+#an animated lamp next to a ball
+#an animated lamp next to three balls
+Luxo is an animated character that looks like a lamp with wide base and dome head. This is a frame of a video game of Luxo next to a cube.
+Urchin is an animated character with 3 legs sticking out from a central body, looking like a clock. This is a frame of a video game of Urchin next to a cube.
+Urchin, a simple animated character that looks like a clock with 3 hands, next to a cube.
+Luxo is an animated character inspired by the lamp from the Pixar short. This is a frame of a video game of Luxo next to a ball.
+Urchin is an animated character with 3 symmetric legs and no body. This is a frame of a video game of Urchin next to a ball.
+a blue cube on the left of a red cartoon lamp
+a blue cube on the left of a red cartoon lamp
+a red cartoon lamp to the left of a blue cube
+a red cartoon lamp to the right of a blue cube
+a blue cube on the left of a red cartoon lamp
+a blue cube to the right of a red cartoon lamp
+#a blue cube on the left, and a red character on the right
+#a blue cube on the right, and a red character on the left
+#a triangle next to a ball
+#a triangle next to a cube
+#a triangle next to three balls
+#a triangle next to 3 balls
+#an urchin next to a ball
+#just a single red ball on a white background in the top left corner of image
+#just a single red ball on a white background in the bottom right corner of image

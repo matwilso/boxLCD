@@ -96,7 +96,7 @@ class Trainer:
         self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
         self.writer.flush()
         if time.time() - last_save >= 300 or itr % (self.G.log_n * self.G.save_n) == 0:
-          if 'Arbiter' in self.G.model or 'Localizer' in self.G.model:
+          if 'Arbiter' in self.G.model or 'Localizer' in self.G.model or 'VideoAutoencoder' in self.G.model:
             self.model.save(self.G.logdir, self.b(test_batch))
           else:
             self.model.save(self.G.logdir)

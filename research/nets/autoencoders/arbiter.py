@@ -35,12 +35,12 @@ class ArbiterAE(SingleStepAE):
     decoded = self.decoder(z)
     recon_losses = {}
     recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(batch['proprio']).mean()
-    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
+    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd']).mean()
     recon_loss = sum(recon_losses.values())
     metrics = {'loss/recon_total': recon_loss, **recon_losses}
     return recon_loss, metrics
 
-  def encode(self, batch, flatten=None):
+  def encode(self, batch, flatten=None, noise=None):
     return self.encoder(batch)
 
   def _decode(self, z):
@@ -60,7 +60,7 @@ class Encoder(nn.Module):
     nf = G.nfilter
     size = (G.lcd_h * G.lcd_w) // 64
     self.seq = nn.ModuleList([
-        nn.Conv2d(1, nf, 3, 2, padding=1),
+        nn.Conv2d(3, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
@@ -73,9 +73,8 @@ class Encoder(nn.Module):
 
   def forward(self, batch):
     state = batch['proprio']
-    lcd = batch['lcd']
+    x = batch['lcd']
     emb = self.state_embed(state)
-    x = lcd[:, None]
     for layer in self.seq:
       if isinstance(layer, ResBlock):
         x = layer(x, emb)
@@ -89,13 +88,13 @@ class Decoder(nn.Module):
     assert G.lcd_h == 16, G.lcd_w == 32
     nf = G.nfilter
     self.net = nn.Sequential(
-        nn.ConvTranspose2d(in_size, nf, (2, 4), 2),
+        nn.ConvTranspose2d(in_size, nf, (2, 2), 2),
         nn.ReLU(),
         nn.ConvTranspose2d(nf, nf, 4, 4, padding=0),
         nn.ReLU(),
         nn.Conv2d(nf, nf, 3, 1, padding=1),
         nn.ReLU(),
-        nn.ConvTranspose2d(nf, 1, 4, 2, padding=1),
+        nn.ConvTranspose2d(nf, 3, 4, 2, padding=1),
     )
     n = G.hidden_size
     self.state_net = nn.Sequential(
@@ -108,6 +107,6 @@ class Decoder(nn.Module):
     nf = G.nfilter
 
   def forward(self, x):
-    lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]))
+    lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]), validate_args=False)
     state_dist = thd.Normal(self.state_net(x), 1)
     return {'lcd': lcd_dist, 'proprio': state_dist}

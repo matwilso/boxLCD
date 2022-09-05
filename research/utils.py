@@ -11,6 +11,7 @@ import re
 import numpy as np
 from scipy.linalg import fractional_matrix_power
 from torch import nn
+from einops import rearrange
 
 class ConciseNumpyArray:
   """
@@ -205,7 +206,7 @@ def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
   from torch.utils.tensorboard import _convert_np, _utils, summary
   from tensorboard.compat.proto.summary_pb2 import Summary
   tensor = _convert_np.make_np(vid_tensor)
-  tensor = _utils._prepare_video(tensor)
+  #tensor = _utils._prepare_video(tensor)
   scale_factor = summary._calc_scale_factor(tensor)
   tensor = tensor.astype(np.float32)
   tensor = (tensor * scale_factor).astype(np.uint8)
@@ -278,7 +279,7 @@ def compute_fid(x, y):
     return np.nan
 
 def flat_batch(batch):
-  return {key: val.flatten(0, 1) for key, val in batch.items()}
+  return {key: val.flatten(0, 0).flatten(1, 2) for key, val in batch.items()}
 
 def flatten_first(arr):
   shape = arr.shape

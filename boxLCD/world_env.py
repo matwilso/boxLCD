@@ -126,7 +126,8 @@ class WorldEnv(gym.Env, EzPickle):
       spaces['proprio'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
     else:
       spaces['proprio'] = gym.spaces.Box(-1, +1, (self.pobs_size,), dtype=np.float32)
-    spaces['lcd'] = gym.spaces.Box(0, 1, (self.G.lcd_base, int(self.G.lcd_base * self.G.wh_ratio)), dtype=np.bool)
+    spaces['lcd'] = gym.spaces.Box(0, 1, (self.G.lcd_base, int(self.G.lcd_base * self.G.wh_ratio), 3), dtype=np.uint8)
+    #spaces['lcd'] = gym.spaces.Box(0, 1, (self.G.lcd_base, int(self.G.lcd_base * self.G.wh_ratio), 3), dtype=np.bool)
     self.observation_space = gym.spaces.Dict(spaces)
 
     self.act_info = utils.sortdict(self.act_info)
