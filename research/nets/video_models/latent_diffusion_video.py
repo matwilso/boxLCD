@@ -1,26 +1,28 @@
-import yaml
-from research.nets.autoencoders.video_autoencoder import Decoder
 from functools import partial
-from research.nets.video_models.gaussian_diffusion import GaussianDiffusion
 
-from research import utils
-from torch.utils.tensorboard import SummaryWriter
-from torch.optim import Adam
 import torch as th
+import torch.nn.functional as F
+import yaml
+from einops import parse_shape, rearrange, repeat
+from jax.tree_util import tree_map
 from torch import distributions as thd
 from torch import nn
-import torch.nn.functional as F
+from torch.optim import Adam
+from torch.utils.tensorboard import SummaryWriter
+
+from research import utils
+from research.nets.autoencoders.video_autoencoder import Decoder
 from research.nets.common import (
+    ResBlock,
     SelfAttention,
     TimestepEmbedSequential,
-    ResBlock,
+    TransformerBlock,
     timestep_embedding,
     zero_module,
-    TransformerBlock,
 )
+from research.nets.video_models.gaussian_diffusion import GaussianDiffusion
+
 from ._base import VideoModel
-from einops import rearrange, repeat, parse_shape
-from jax.tree_util import tree_map
 
 AE_STRIDE = 4  # TODO: replace with the value from loading it
 AE_H = 4  # TODO: replace with the value from loading it
@@ -110,9 +112,9 @@ class LatentDiffusionVideo(VideoModel):
         self._prompted_eval(
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         )
-        #self._unprompted_eval(
+        # self._unprompted_eval(
         #    epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
-        #)
+        # )
         metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
         return metrics
 
@@ -129,16 +131,24 @@ class LatentDiffusionVideo(VideoModel):
         print('FLUSH')
 
     def forward(self, batch):
-        from fvcore.nn import FlopCountAnalysis, activation_count, ActivationCountAnalysis
-        from fvcore.nn import flop_count_table, flop_count_str, parameter_count, parameter_count_table
-        train_batch = self.b(next(train_iter))
-        #z = th.zeros(32, 32, 4, 4, 4).cuda()
-        #t = th.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
-        #flops = FlopCountAnalysis(self.model.net, (z, t))
-        #flops.total()
-        #import ipdb; ipdb.set_trace()
+        from fvcore.nn import (
+            ActivationCountAnalysis,
+            FlopCountAnalysis,
+            activation_count,
+            flop_count_str,
+            flop_count_table,
+            parameter_count,
+            parameter_count_table,
+        )
 
-        # TODO: make a flop counter thing 
+        train_batch = self.b(next(train_iter))
+        # z = th.zeros(32, 32, 4, 4, 4).cuda()
+        # t = th.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
+        # flops = FlopCountAnalysis(self.model.net, (z, t))
+        # flops.total()
+        # import ipdb; ipdb.set_trace()
+
+        # TODO: make a flop counter thing
         z = self.preproc(batch)
         t = th.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
         z = self.net(z, t).split(z.shape[1], dim=1)
@@ -178,7 +188,11 @@ class LatentDiffusionVideo(VideoModel):
             prompts = self.preproc(prompts)
             prompts = prompts[:, :, : prompt_n // AE_STRIDE]
         all_samples = self.diffusion.p_sample(
-            self.net, vid_shape, noise=noise, prompts=prompts, prompt_n=prompt_n//AE_STRIDE
+            self.net,
+            vid_shape,
+            noise=noise,
+            prompts=prompts,
+            prompt_n=prompt_n // AE_STRIDE,
         )
         samps = [al['sample'] for al in all_samples]
         preds = [al['pred_xstart'] for al in all_samples]

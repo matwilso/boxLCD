@@ -1,78 +1,99 @@
 from collections import defaultdict
+from typing import Dict, List, NamedTuple, Set, Tuple
+
 import Box2D
-from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, frictionJointDef, contactListener, revoluteJointDef)
-from typing import NamedTuple, List, Set, Tuple, Dict
+from Box2D.b2 import (
+    circleShape,
+    contactListener,
+    edgeShape,
+    fixtureDef,
+    frictionJointDef,
+    polygonShape,
+    revoluteJointDef,
+)
+
 from boxLCD import utils
+
 A = utils.A
 
-SCALE = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
+SCALE = 30.0  # affects how fast-paced the game is, forces should be adjusted as well
 
 # STRUCTS THAT ARE USED TO DEFINE A WORLD
 class Object(NamedTuple):
-  name: str
-  shape: str = 'box'
-  size: float = 0.5
-  linearDamping: float = 0.0
-  angularDamping: float = 0.0
-  density: float = 1.0
-  friction: float = 0.5
-  restitution: float = 0.0
-  categoryBits: int = 0x0110
-  rand_angle: int = 1
-  rangex: Tuple[float, float] = None
-  rangey: Tuple[float, float] = None
-  color: str = 'xkcd:windows blue'
-  dropout: float = 0.0
+    name: str
+    shape: str = 'box'
+    size: float = 0.5
+    linearDamping: float = 0.0
+    angularDamping: float = 0.0
+    density: float = 1.0
+    friction: float = 0.5
+    restitution: float = 0.0
+    categoryBits: int = 0x0110
+    rand_angle: int = 1
+    rangex: Tuple[float, float] = None
+    rangey: Tuple[float, float] = None
+    color: str = 'xkcd:windows blue'
+    dropout: float = 0.0
+
 
 # ROBOT PARTS
 class Body(NamedTuple):
-  shape: polygonShape
-  density: float = 1
-  maskBits: int = 0x001
-  categoryBits: int = 0x0020
-  friction: float = 1.0
+    shape: polygonShape
+    density: float = 1
+    maskBits: int = 0x001
+    categoryBits: int = 0x0020
+    friction: float = 1.0
+
 
 class Joint(NamedTuple):
-  parent: str
-  angle: float
-  anchorA: list
-  anchorB: list
-  limits: List[float]
-  limited: bool = True
-  speed: float = 8
-  torque: float = 150
+    parent: str
+    angle: float
+    anchorA: list
+    anchorB: list
+    limits: List[float]
+    limited: bool = True
+    speed: float = 8
+    torque: float = 150
+
 
 class Robot(NamedTuple):
-  type: str
-  name: str
-  root_body: Body = None
-  bodies: Dict[str, Body] = None
-  joints: Dict[str, Joint] = None
-  rand_angle: int = 0
-  angularDamping: float = 0
-  linearDamping: float = 0
-  bound: float = 1.5  # spatial extent of robot. must be set so we don't start robot stuck in a wall
-  color: str = 'xkcd:faded red'
+    type: str
+    name: str
+    root_body: Body = None
+    bodies: Dict[str, Body] = None
+    joints: Dict[str, Joint] = None
+    rand_angle: int = 0
+    angularDamping: float = 0
+    linearDamping: float = 0
+    bound: float = 1.5  # spatial extent of robot. must be set so we don't start robot stuck in a wall
+    color: str = 'xkcd:faded red'
+
 
 # FULL WORLD DEF
 class WorldDef(NamedTuple):
-  robots: List[Robot] = []
-  objects: List[Object] = []
-  gravity: List[float] = [0, -9.81]
-  forcetorque: int = 0
-  background_color: str = 'white'
-  render_mode: str = 'rgb'
+    robots: List[Robot] = []
+    objects: List[Object] = []
+    gravity: List[float] = [0, -9.81]
+    forcetorque: int = 0
+    background_color: str = 'white'
+    render_mode: str = 'rgb'
 
 
 # THESE TAKE A PARTIAL ROBOT DESCRIPTION AND BUILD ALL THE JOINTS AND STUFF.
 ROBOT_FILLER = {}
+
+
 def register(name):
-  def _reg(func):
-    ROBOT_FILLER[name] = func
-    def _thunk(*args, **kwargs):
-      return func(*args, **kwargs)
-    return _thunk
-  return _reg
+    def _reg(func):
+        ROBOT_FILLER[name] = func
+
+        def _thunk(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return _thunk
+
+    return _reg
+
 
 # urchin and luxo are pretty good.
 # the rest need some work.
@@ -80,372 +101,491 @@ def register(name):
 # i guess i maybe oughta have some top down views, but then how do you control with joints?
 # could have a roomba with a gripper or something like that. or a reacher arm.
 
+
 @register('urchin')
 def make_urchin(robot, G):
-  LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
-  SHAPES = {}
-  SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
-  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  root_body = Body(SHAPES['root'])
-  bodies = {
-      'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-  }
-  joints = {
-      'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-      'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-      'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-  }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1, bound=1.25, color=robot.color)
+    LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
+    SHAPES = {}
+    SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
+    SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    root_body = Body(SHAPES['root'])
+    bodies = {
+        'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    }
+    joints = {
+        'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+        'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+        'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+    }
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=root_body,
+        bodies=bodies,
+        joints=joints,
+        rand_angle=1,
+        bound=1.25,
+        color=robot.color,
+    )
+
 
 @register('luxo')
 def make_luxo(robot, G):
-  VERT = 10 / SCALE
-  SIDE = 5 / SCALE
-  LEG_W, LEG_H = 8 / SCALE, 24 / SCALE
-  LL_H = 20 / SCALE
-  LUXO_POLY = A[(-15, +15), (+20, +25), (+20, -25), (-15, -15)] * 0.8
-  SHAPES = {}
-  SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY])
-  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
-  SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W / 2))
-  return Robot(
-      type=robot.type,
-      name=robot.name,
-      root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
-      bodies={
-          'lhip': Body(SHAPES['hip'], maskBits=0x011),
-          'lknee': Body(SHAPES['knee'], maskBits=0x011),
-          'lfoot': Body(SHAPES['foot'], maskBits=0x011),
-      },
-      joints={
-          'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-0.1, 0.1]),
-          'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
-          'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
-      },
-      bound=2.0,
-      color=robot.color,
-      )
+    VERT = 10 / SCALE
+    SIDE = 5 / SCALE
+    LEG_W, LEG_H = 8 / SCALE, 24 / SCALE
+    LL_H = 20 / SCALE
+    LUXO_POLY = A[(-15, +15), (+20, +25), (+20, -25), (-15, -15)] * 0.8
+    SHAPES = {}
+    SHAPES['root'] = polygonShape(
+        vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY]
+    )
+    SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
+    SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W / 2))
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=Body(SHAPES['root'], density=0.1, maskBits=0x011),
+        bodies={
+            'lhip': Body(SHAPES['hip'], maskBits=0x011),
+            'lknee': Body(SHAPES['knee'], maskBits=0x011),
+            'lfoot': Body(SHAPES['foot'], maskBits=0x011),
+        },
+        joints={
+            'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-0.1, 0.1]),
+            'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.9, 0.9]),
+            'lfoot': Joint('lknee', 0.0, (0, -LEG_H / 2), (0, LEG_W / 2), [-0.5, 0.9]),
+        },
+        bound=2.0,
+        color=robot.color,
+    )
 
 
 # TODO: try a bird shape. waddle with legs and has long wings. kind of like a penguin
 
+
 @register('quad')
 def make_quad(robot, G):
-  LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
-  SHAPES = {}
-  SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
-  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  root_body = Body(SHAPES['root'])
-  bodies = {
-      'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-  }
-  joints = {
-      'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-      'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-      'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-  }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5, color=robot.color)
+    LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
+    SHAPES = {}
+    SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
+    SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    root_body = Body(SHAPES['root'])
+    bodies = {
+        'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'cleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    }
+    joints = {
+        'aleg': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+        'bleg': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+        'cleg': Joint('root', 4.2, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+    }
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=root_body,
+        bodies=bodies,
+        joints=joints,
+        rand_angle=0,
+        bound=1.5,
+        color=robot.color,
+    )
 
 
 @register('legs')
 def make_legs(robot, G):
-  LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
-  SHAPES = {}
-  SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
-  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  root_body = Body(SHAPES['root'])
-  bodies = {
-      'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-  }
-  joints = {
-      'aleg': Joint('root', -1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-      'bleg': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
-  }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=0, bound=1.5, color=robot.color)
-
+    LEG_W, LEG_H = 8 / SCALE, 40 / SCALE
+    SHAPES = {}
+    SHAPES['root'] = circleShape(radius=0.8 * LEG_W)
+    SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    root_body = Body(SHAPES['root'])
+    bodies = {
+        'aleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'bleg': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    }
+    joints = {
+        'aleg': Joint('root', -1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+        'bleg': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=True),
+    }
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=root_body,
+        bodies=bodies,
+        joints=joints,
+        rand_angle=0,
+        bound=1.5,
+        color=robot.color,
+    )
 
 
 @register('crab')
 def make_crab(robot, G):
-  SPEEDS = defaultdict(lambda: 8)
-  MOTORS_TORQUE = defaultdict(lambda: 150)
-  SPEEDS = defaultdict(lambda: 6)
-  SPEEDS['hip'] = 10
-  SPEEDS['knee'] = 10
-  MOTORS_TORQUE['hip'] = 150
-  MOTORS_TORQUE['knee'] = 150
-  # TODO: make armless crab version.
-  VERT = 12 / SCALE
-  SIDE = 20 / SCALE
-  LEG_W, LEG_H = 8 / SCALE, 20 / SCALE
-  LL_H = 20 / SCALE
-  #LEG_W, LEG_H = 8/SCALE, 16/SCALE
-  ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
-  CLAW_W, CLAW_H = 4 / SCALE, 16 / SCALE
-  CRAB_POLY = 0.9 * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
-  SHAPES = {}
-  SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY])
-  #SHAPES['root'] = circleShape(radius=20/SCALE)
-  SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
-  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
-  SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
-  SHAPES['foot'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 4))
+    SPEEDS = defaultdict(lambda: 8)
+    MOTORS_TORQUE = defaultdict(lambda: 150)
+    SPEEDS = defaultdict(lambda: 6)
+    SPEEDS['hip'] = 10
+    SPEEDS['knee'] = 10
+    MOTORS_TORQUE['hip'] = 150
+    MOTORS_TORQUE['knee'] = 150
+    # TODO: make armless crab version.
+    VERT = 12 / SCALE
+    SIDE = 20 / SCALE
+    LEG_W, LEG_H = 8 / SCALE, 20 / SCALE
+    LL_H = 20 / SCALE
+    # LEG_W, LEG_H = 8/SCALE, 16/SCALE
+    ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
+    CLAW_W, CLAW_H = 4 / SCALE, 16 / SCALE
+    CRAB_POLY = (
+        0.9 * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
+    )
+    SHAPES = {}
+    SHAPES['root'] = polygonShape(
+        vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY]
+    )
+    # SHAPES['root'] = circleShape(radius=20/SCALE)
+    SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
+    SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
+    SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
+    SHAPES['foot'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 4))
 
-  baseMask = 0x001
-  clawMask = 0x011
-  categoryBits: int = 0x0020
-  if True:
-    maskBits = 0x001
     baseMask = 0x001
-  else:
-    maskBits = clawMask
-    baseMask = clawMask
+    clawMask = 0x011
+    categoryBits: int = 0x0020
+    if True:
+        maskBits = 0x001
+        baseMask = 0x001
+    else:
+        maskBits = clawMask
+        baseMask = clawMask
 
-  bodies = {
-      'lhip': Body(SHAPES['hip'], maskBits=baseMask),
-      'lknee': Body(SHAPES['knee'], maskBits=baseMask),
-      'rhip': Body(SHAPES['hip'], maskBits=baseMask),
-      'rknee': Body(SHAPES['knee'], maskBits=baseMask),
-      'lshoulder': Body(SHAPES['arm'], maskBits=clawMask),
-      'lelbow': Body(SHAPES['arm'], maskBits=clawMask),
-      'rshoulder': Body(SHAPES['arm'], maskBits=clawMask),
-      'relbow': Body(SHAPES['arm'], maskBits=clawMask),
-      # left claw
-      'llclaw0': Body(SHAPES['claw'], maskBits=clawMask),
-      'llclaw1': Body(SHAPES['claw'], maskBits=clawMask),
-      'lrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
-      'lrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
-      # right claw
-      'rlclaw0': Body(SHAPES['claw'], maskBits=clawMask),
-      'rlclaw1': Body(SHAPES['claw'], maskBits=clawMask),
-      'rrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
-      'rrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
-  }
-  joints = {
-      # legs
-      'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-1.5, 0.5]),
-      'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H / 2), [0.5, 1.5]),
-      'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-      'rknee': Joint('rhip', -0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-  }
-  joints.update(**{
-      # arms
-      'lshoulder': Joint('root', 2.0, (-SIDE, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
-      'rshoulder': Joint('root', -2.0, (SIDE, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
-      'lelbow': Joint('lshoulder', 3.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
-      'relbow': Joint('rshoulder', -3.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
-      # left claw
-      'llclaw0': Joint('lelbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
-      'llclaw1': Joint('llclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-      'lrclaw0': Joint('lelbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
-      'lrclaw1': Joint('lrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-      # right claw
-      'rlclaw0': Joint('relbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
-      'rlclaw1': Joint('rlclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-      'rrclaw0': Joint('relbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
-      'rrclaw1': Joint('rrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-  },)
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits), bodies=bodies, joints=joints, bound=2.0, color=robot.color)
+    bodies = {
+        'lhip': Body(SHAPES['hip'], maskBits=baseMask),
+        'lknee': Body(SHAPES['knee'], maskBits=baseMask),
+        'rhip': Body(SHAPES['hip'], maskBits=baseMask),
+        'rknee': Body(SHAPES['knee'], maskBits=baseMask),
+        'lshoulder': Body(SHAPES['arm'], maskBits=clawMask),
+        'lelbow': Body(SHAPES['arm'], maskBits=clawMask),
+        'rshoulder': Body(SHAPES['arm'], maskBits=clawMask),
+        'relbow': Body(SHAPES['arm'], maskBits=clawMask),
+        # left claw
+        'llclaw0': Body(SHAPES['claw'], maskBits=clawMask),
+        'llclaw1': Body(SHAPES['claw'], maskBits=clawMask),
+        'lrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
+        'lrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
+        # right claw
+        'rlclaw0': Body(SHAPES['claw'], maskBits=clawMask),
+        'rlclaw1': Body(SHAPES['claw'], maskBits=clawMask),
+        'rrclaw0': Body(SHAPES['claw'], maskBits=clawMask),
+        'rrclaw1': Body(SHAPES['claw'], maskBits=clawMask),
+    }
+    joints = {
+        # legs
+        'lhip': Joint('root', -0.5, (-SIDE, -VERT), (0, LEG_H / 2), [-1.5, 0.5]),
+        'rhip': Joint('root', 0.5, (SIDE, -VERT), (0, LEG_H / 2), [0.5, 1.5]),
+        'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+        'rknee': Joint('rhip', -0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+    }
+    joints.update(
+        **{
+            # arms
+            'lshoulder': Joint(
+                'root', 2.0, (-SIDE, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False
+            ),
+            'rshoulder': Joint(
+                'root', -2.0, (SIDE, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False
+            ),
+            'lelbow': Joint(
+                'lshoulder',
+                3.0,
+                (0, ARM_H / 2),
+                (0, -ARM_H / 2),
+                [-2.0, 2.0],
+                limited=False,
+            ),
+            'relbow': Joint(
+                'rshoulder',
+                -3.0,
+                (0, ARM_H / 2),
+                (0, -ARM_H / 2),
+                [-2.0, 2.0],
+                limited=False,
+            ),
+            # left claw
+            'llclaw0': Joint(
+                'lelbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]
+            ),
+            'llclaw1': Joint(
+                'llclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]
+            ),
+            'lrclaw0': Joint(
+                'lelbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]
+            ),
+            'lrclaw1': Joint(
+                'lrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]
+            ),
+            # right claw
+            'rlclaw0': Joint(
+                'relbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]
+            ),
+            'rlclaw1': Joint(
+                'rlclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]
+            ),
+            'rrclaw0': Joint(
+                'relbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]
+            ),
+            'rrclaw1': Joint(
+                'rrclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]
+            ),
+        },
+    )
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=Body(
+            SHAPES['root'], density=1.0, maskBits=baseMask, categoryBits=categoryBits
+        ),
+        bodies=bodies,
+        joints=joints,
+        bound=2.0,
+        color=robot.color,
+    )
+
 
 # TODO: make armed walker
 @register('walker')
 def make_walker(robot, G):
-  LEG_DOWN = -6 / SCALE
-  LEG_W, LEG_H = 10 / SCALE, 24 / SCALE
-  ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
-  CLAW_W, CLAW_H = 6 / SCALE, 16 / SCALE
-  HULL_POLY = 0.8 * A[(-30, +9), (+6, +9), (+34, +1), (+34, -8), (-30, -8)]
+    LEG_DOWN = -6 / SCALE
+    LEG_W, LEG_H = 10 / SCALE, 24 / SCALE
+    ARM_W, ARM_H = 8 / SCALE, 20 / SCALE
+    CLAW_W, CLAW_H = 6 / SCALE, 16 / SCALE
+    HULL_POLY = 0.8 * A[(-30, +9), (+6, +9), (+34, +1), (+34, -8), (-30, -8)]
 
-  SHAPES = {}
-  SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in HULL_POLY])
-  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LEG_H / 2))
-  SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
-  SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
+    SHAPES = {}
+    SHAPES['root'] = polygonShape(
+        vertices=[(x / SCALE, y / SCALE) for x, y in HULL_POLY]
+    )
+    SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LEG_H / 2))
+    SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
+    SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
 
-  clawMask = 0x011
-  maskBits = 0x001
-  bodies = {
-      'lhip': Body(SHAPES['hip']),
-      'lknee': Body(SHAPES['knee']),
-      'rhip': Body(SHAPES['hip']),
-      'rknee': Body(SHAPES['knee']),
-      'shoulder': Body(SHAPES['arm'], maskBits=maskBits, density=0.1),
-      'elbow': Body(SHAPES['arm'], maskBits=maskBits, density=0.1),
-      'lclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-      'lclaw1': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-      'rclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-      'rclaw1': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-  }
-  joints = {
-      'lhip': Joint('root', 0.05, (0.0, LEG_DOWN), (0, LEG_H / 2), [-0.8, 1.1]),
-      'lknee': Joint('lhip', 0.05, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.6, -0.1]),
-      'rhip': Joint('root', -0.05, (0.0, LEG_DOWN), (0, LEG_H / 2), [-0.8, 1.1]),
-      'rknee': Joint('rhip', -0.05, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.6, -0.1]),
+    clawMask = 0x011
+    maskBits = 0x001
+    bodies = {
+        'lhip': Body(SHAPES['hip']),
+        'lknee': Body(SHAPES['knee']),
+        'rhip': Body(SHAPES['hip']),
+        'rknee': Body(SHAPES['knee']),
+        'shoulder': Body(SHAPES['arm'], maskBits=maskBits, density=0.1),
+        'elbow': Body(SHAPES['arm'], maskBits=maskBits, density=0.1),
+        'lclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+        'lclaw1': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+        'rclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+        'rclaw1': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+    }
+    joints = {
+        'lhip': Joint('root', 0.05, (0.0, LEG_DOWN), (0, LEG_H / 2), [-0.8, 1.1]),
+        'lknee': Joint('lhip', 0.05, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.6, -0.1]),
+        'rhip': Joint('root', -0.05, (0.0, LEG_DOWN), (0, LEG_H / 2), [-0.8, 1.1]),
+        'rknee': Joint('rhip', -0.05, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.6, -0.1]),
+        'shoulder': Joint(
+            'root', 2.0, (0, 5 / SCALE), (0, -ARM_H / 2), [-3.0, 3.0], limited=False
+        ),
+        'elbow': Joint(
+            'shoulder', 3.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False
+        ),
+        'lclaw0': Joint('elbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
+        'lclaw1': Joint('lclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
+        'rclaw0': Joint('elbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
+        'rclaw1': Joint('rclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
+    }
 
-      'shoulder': Joint('root', 2.0, (0, 5 / SCALE), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
-      'elbow': Joint('shoulder', 3.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
-      'lclaw0': Joint('elbow', 2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
-      'lclaw1': Joint('lclaw0', 3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-      'rclaw0': Joint('elbow', -2.25, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
-      'rclaw1': Joint('rclaw0', -3.75, (0, CLAW_H / 2), (0, -CLAW_H / 2), [0.0, 0.0]),
-  }
-
-  return Robot(
-      type=robot.type,
-      name=robot.name,
-      root_body=Body(SHAPES['root']),
-      bodies=bodies,
-      joints=joints,
-  )
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=Body(SHAPES['root']),
+        bodies=bodies,
+        joints=joints,
+    )
 
 
 @register('gingy')
 def make_gingy(robot, G):
-  # TODO: make armless crab version.
-  VERT = 10 / SCALE
-  SIDE = 2 / SCALE
-  #LEG_W, LEG_H = 8/SCALE, 16/SCALE
-  BODY_W, BODY_H = 8 / SCALE, 25 / SCALE
-  ARM_W, ARM_H = 8 / SCALE, 25 / SCALE
-  LEG_W, LEG_H = 8 / SCALE, 30 / SCALE
-  SHAPES = {}
-  SHAPES['root'] = circleShape(radius=10 / SCALE)
-  SHAPES['body'] = polygonShape(box=(BODY_W / 2, BODY_H / 2))
-  SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
-  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  bodies = {
-      'body': Body(SHAPES['body'], density=1.0),
-      'larm': Body(SHAPES['arm'], maskBits=0x011),
-      'rarm': Body(SHAPES['arm'], maskBits=0x011),
-      'llarm': Body(SHAPES['arm'], maskBits=0x011),
-      'rlarm': Body(SHAPES['arm'], maskBits=0x011),
-      'lleg': Body(SHAPES['leg'], density=1.0),
-      'rleg': Body(SHAPES['leg'], density=1.0),
-  }
-  joints = {
-      # legs
-      'body': Joint('root', 0.0, (0, -VERT), (0, BODY_H / 2), [-0.1, 0.1]),
-      'larm': Joint('body', 1.5, (-SIDE, +VERT), (0, ARM_H / 2), [-1.5, 0.8]),
-      'rarm': Joint('body', -1.5, (SIDE, +VERT), (0, ARM_H / 2), [-1.5, 0.8]),
-      'llarm': Joint('larm', 1.5, (0, -ARM_H / 2), (0, ARM_H / 2), [-1.5, 1.5]),
-      'rlarm': Joint('rarm', -1.5, (0, -ARM_H / 2), (0, ARM_H / 2), [-1.5, 1.5]),
-      'lleg': Joint('body', 0.8, (-SIDE, -VERT), (0, LEG_H / 2), [-0.2, 0.4]),
-      'rleg': Joint('body', -0.8, (SIDE, -VERT), (0, LEG_H / 2), [-0.4, 0.2]),
-  }
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=0.01), bodies=bodies, joints=joints)
+    # TODO: make armless crab version.
+    VERT = 10 / SCALE
+    SIDE = 2 / SCALE
+    # LEG_W, LEG_H = 8/SCALE, 16/SCALE
+    BODY_W, BODY_H = 8 / SCALE, 25 / SCALE
+    ARM_W, ARM_H = 8 / SCALE, 25 / SCALE
+    LEG_W, LEG_H = 8 / SCALE, 30 / SCALE
+    SHAPES = {}
+    SHAPES['root'] = circleShape(radius=10 / SCALE)
+    SHAPES['body'] = polygonShape(box=(BODY_W / 2, BODY_H / 2))
+    SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
+    SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    bodies = {
+        'body': Body(SHAPES['body'], density=1.0),
+        'larm': Body(SHAPES['arm'], maskBits=0x011),
+        'rarm': Body(SHAPES['arm'], maskBits=0x011),
+        'llarm': Body(SHAPES['arm'], maskBits=0x011),
+        'rlarm': Body(SHAPES['arm'], maskBits=0x011),
+        'lleg': Body(SHAPES['leg'], density=1.0),
+        'rleg': Body(SHAPES['leg'], density=1.0),
+    }
+    joints = {
+        # legs
+        'body': Joint('root', 0.0, (0, -VERT), (0, BODY_H / 2), [-0.1, 0.1]),
+        'larm': Joint('body', 1.5, (-SIDE, +VERT), (0, ARM_H / 2), [-1.5, 0.8]),
+        'rarm': Joint('body', -1.5, (SIDE, +VERT), (0, ARM_H / 2), [-1.5, 0.8]),
+        'llarm': Joint('larm', 1.5, (0, -ARM_H / 2), (0, ARM_H / 2), [-1.5, 1.5]),
+        'rlarm': Joint('rarm', -1.5, (0, -ARM_H / 2), (0, ARM_H / 2), [-1.5, 1.5]),
+        'lleg': Joint('body', 0.8, (-SIDE, -VERT), (0, LEG_H / 2), [-0.2, 0.4]),
+        'rleg': Joint('body', -0.8, (SIDE, -VERT), (0, LEG_H / 2), [-0.4, 0.2]),
+    }
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=Body(SHAPES['root'], density=0.01),
+        bodies=bodies,
+        joints=joints,
+    )
+
 
 @register('octo')
 def make_octo(robot, G):
-  LEG_W, LEG_H = 8 / SCALE, 25 / SCALE
-  SHAPES = {}
-  SHAPES['root'] = circleShape(radius=1.5 * LEG_W)
-  SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  root_body = Body(SHAPES['root'], density=0.1)
-  bodies = {
-      'aleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'bleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'cleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'dleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'aleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'bleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'cleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-      'dleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
-  }
-  joints = {
-      'aleg1': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'bleg1': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'cleg1': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'dleg1': Joint('root', 3.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'aleg2': Joint('aleg1', 0.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'bleg2': Joint('bleg1', 1.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'cleg2': Joint('cleg1', 2.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-      'dleg2': Joint('dleg1', 3.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
-
-  }
-  return Robot(type=robot.type, name=robot.name, root_body=root_body, bodies=bodies, joints=joints, rand_angle=1)
+    LEG_W, LEG_H = 8 / SCALE, 25 / SCALE
+    SHAPES = {}
+    SHAPES['root'] = circleShape(radius=1.5 * LEG_W)
+    SHAPES['leg'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    root_body = Body(SHAPES['root'], density=0.1)
+    bodies = {
+        'aleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'bleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'cleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'dleg1': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'aleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'bleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'cleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+        'dleg2': Body(SHAPES['leg'], maskBits=0x011, density=1.0),
+    }
+    joints = {
+        'aleg1': Joint('root', 0.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+        'bleg1': Joint('root', 1.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+        'cleg1': Joint('root', 2.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+        'dleg1': Joint('root', 3.0, (0, 0), (0, LEG_H / 2), [-1.0, 1.0], limited=False),
+        'aleg2': Joint(
+            'aleg1', 0.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False
+        ),
+        'bleg2': Joint(
+            'bleg1', 1.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False
+        ),
+        'cleg2': Joint(
+            'cleg1', 2.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False
+        ),
+        'dleg2': Joint(
+            'dleg1', 3.0, (0, -LEG_H / 2), (0, LEG_H / 2), [-1.0, 1.0], limited=False
+        ),
+    }
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=root_body,
+        bodies=bodies,
+        joints=joints,
+        rand_angle=1,
+    )
 
 
 @register('spider')
 def make_spider(robot, G):
-  SPEEDS = defaultdict(lambda: 8)
-  MOTORS_TORQUE = defaultdict(lambda: 150)
-  SPEEDS = defaultdict(lambda: 6)
-  SPEEDS['hip'] = 10
-  SPEEDS['knee'] = 10
-  MOTORS_TORQUE['hip'] = 150
-  MOTORS_TORQUE['knee'] = 150
-  # TODO: make armless crab version.
-  VERT = 8 / SCALE
-  SIDE = 8 / SCALE
-  LEG_W, LEG_H = 6 / SCALE, 20 / SCALE
-  LL_H = 20 / SCALE
-  #LEG_W, LEG_H = 8/SCALE, 16/SCALE
-  ARM_W, ARM_H = 6 / SCALE, 26 / SCALE
-  CLAW_W, CLAW_H = 4 / SCALE, 22 / SCALE
-  CRAB_POLY = A[0.8, 0.6] * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
-  SHAPES = {}
-  #SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY])
-  SHAPES['root'] = circleShape(radius=10/SCALE)
-  #SHAPES['root'] = polygonShape(box=(5/SCALE, 5/SCALE))
-  #SHAPES['root'] = polygonShape(box=(10/SCALE, 20/SCALE))
-  SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
-  SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
-  SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
-  SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
-  SHAPES['foot'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 4))
+    SPEEDS = defaultdict(lambda: 8)
+    MOTORS_TORQUE = defaultdict(lambda: 150)
+    SPEEDS = defaultdict(lambda: 6)
+    SPEEDS['hip'] = 10
+    SPEEDS['knee'] = 10
+    MOTORS_TORQUE['hip'] = 150
+    MOTORS_TORQUE['knee'] = 150
+    # TODO: make armless crab version.
+    VERT = 8 / SCALE
+    SIDE = 8 / SCALE
+    LEG_W, LEG_H = 6 / SCALE, 20 / SCALE
+    LL_H = 20 / SCALE
+    # LEG_W, LEG_H = 8/SCALE, 16/SCALE
+    ARM_W, ARM_H = 6 / SCALE, 26 / SCALE
+    CLAW_W, CLAW_H = 4 / SCALE, 22 / SCALE
+    CRAB_POLY = (
+        A[0.8, 0.6]
+        * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
+    )
+    SHAPES = {}
+    # SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY])
+    SHAPES['root'] = circleShape(radius=10 / SCALE)
+    # SHAPES['root'] = polygonShape(box=(5/SCALE, 5/SCALE))
+    # SHAPES['root'] = polygonShape(box=(10/SCALE, 20/SCALE))
+    SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
+    SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
+    SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
+    SHAPES['claw'] = polygonShape(box=(CLAW_W / 2, CLAW_H / 2))
+    SHAPES['foot'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 4))
 
-  baseMask = 0x001
-  clawMask = 0x011
-  categoryBits: int = 0x0020
-  if True:
-    maskBits = 0x001
     baseMask = 0x001
-  else:
-    maskBits = clawMask
-    baseMask = clawMask
+    clawMask = 0x011
+    categoryBits: int = 0x0020
+    if True:
+        maskBits = 0x001
+        baseMask = 0x001
+    else:
+        maskBits = clawMask
+        baseMask = clawMask
 
-  bodies = {
-      'lhip': Body(SHAPES['hip'], maskBits=maskBits),
-      'lknee': Body(SHAPES['knee'], maskBits=maskBits),
-      'rhip': Body(SHAPES['hip'], maskBits=maskBits),
-      'rknee': Body(SHAPES['knee'], maskBits=maskBits),
-
-      'ulhip': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
-      'ulknee': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
-      'urhip': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
-      'urknee': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
-
-      'shoulder': Body(SHAPES['arm'], maskBits=clawMask, density=0.5),
-      'elbow': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
-      # left claw
-      'lclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-      'rclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
-  }
-  joints = {
-      # legs
-      'lhip': Joint('root', -1.0, (-SIDE, -VERT), (0, LEG_H / 2), [-1.5, 0.5]),
-      'rhip': Joint('root', 1.0, (SIDE, -VERT), (0, LEG_H / 2), [0.5, 1.5]),
-      'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-      'rknee': Joint('rhip', -0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-
-      'ulhip': Joint('root', 1.5, (-SIDE, VERT), (0, -LEG_H / 2), [-1.5, 0.5]),
-      'urhip': Joint('root', -1.5, (SIDE, VERT), (0, -LEG_H / 2), [0.5, 1.5]),
-      'ulknee': Joint('ulhip', -0.5, (0, LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-      'urknee': Joint('urhip', 0.5, (0, LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
-  }
-  joints.update(**{
-      # arms
-      #'shoulder': Joint('root', 0.0, (0, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
-      ##'elbow': Joint('shoulder', 0.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
-      #'lclaw0': Joint('shoulder', -1.57, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
-      #'rclaw0': Joint('shoulder', 1.57, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
-  },)
-  return Robot(type=robot.type, name=robot.name, root_body=Body(SHAPES['root'], density=1.0, maskBits=clawMask, categoryBits=categoryBits), bodies=bodies, joints=joints, bound=1.3)
+    bodies = {
+        'lhip': Body(SHAPES['hip'], maskBits=maskBits),
+        'lknee': Body(SHAPES['knee'], maskBits=maskBits),
+        'rhip': Body(SHAPES['hip'], maskBits=maskBits),
+        'rknee': Body(SHAPES['knee'], maskBits=maskBits),
+        'ulhip': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
+        'ulknee': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
+        'urhip': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
+        'urknee': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
+        'shoulder': Body(SHAPES['arm'], maskBits=clawMask, density=0.5),
+        'elbow': Body(SHAPES['arm'], maskBits=clawMask, density=0.1),
+        # left claw
+        'lclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+        'rclaw0': Body(SHAPES['claw'], maskBits=clawMask, density=0.1),
+    }
+    joints = {
+        # legs
+        'lhip': Joint('root', -1.0, (-SIDE, -VERT), (0, LEG_H / 2), [-1.5, 0.5]),
+        'rhip': Joint('root', 1.0, (SIDE, -VERT), (0, LEG_H / 2), [0.5, 1.5]),
+        'lknee': Joint('lhip', 0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+        'rknee': Joint('rhip', -0.5, (0, -LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+        'ulhip': Joint('root', 1.5, (-SIDE, VERT), (0, -LEG_H / 2), [-1.5, 0.5]),
+        'urhip': Joint('root', -1.5, (SIDE, VERT), (0, -LEG_H / 2), [0.5, 1.5]),
+        'ulknee': Joint('ulhip', -0.5, (0, LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+        'urknee': Joint('urhip', 0.5, (0, LEG_H / 2), (0, LL_H / 2), [-0.5, 0.5]),
+    }
+    joints.update(
+        **{
+            # arms
+            #'shoulder': Joint('root', 0.0, (0, VERT), (0, -ARM_H / 2), [-3.0, 3.0], limited=False),
+            ##'elbow': Joint('shoulder', 0.0, (0, ARM_H / 2), (0, -ARM_H / 2), [-2.0, 2.0], limited=False),
+            #'lclaw0': Joint('shoulder', -1.57, (0, ARM_H / 2), (0, -CLAW_H / 2), [-2.0, 1.0]),
+            #'rclaw0': Joint('shoulder', 1.57, (0, ARM_H / 2), (0, -CLAW_H / 2), [-1.0, 2.0]),
+        },
+    )
+    return Robot(
+        type=robot.type,
+        name=robot.name,
+        root_body=Body(
+            SHAPES['root'], density=1.0, maskBits=clawMask, categoryBits=categoryBits
+        ),
+        bodies=bodies,
+        joints=joints,
+        bound=1.3,
+    )

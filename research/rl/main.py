@@ -1,6 +1,6 @@
-from research import utils
-from research.define_config import config, args_type, env_fn
 from boxLCD import env_map
+from research import utils
+from research.define_config import args_type, config, env_fn
 from research.rl.ppo import PPO
 from research.rl.sac import SAC
 
@@ -49,29 +49,30 @@ _G.alpha = 0.1  # for SAC w/o learned alpha
 _G.polyak = 0.995
 
 if __name__ == '__main__':
-  #print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
-  import argparse
-  parser = argparse.ArgumentParser()
-  for key, value in config().items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  for key, value in _G.items():
-    parser.add_argument(f'--{key}', type=args_type(value), default=value)
-  parser.add_argument('algo')
-  tempC = parser.parse_args()
-  # grab defaults from the env
-  if tempC.env in env_map:
-    Env = env_map[tempC.env]
-    parser.set_defaults(**Env.ENV_DG)
-    parser.set_defaults(**{'goals': 1, 'autoreset': 1})
+    # print('TODO: metric to compare env vs. algo runtime. where is bottleneck?')
+    import argparse
 
-  G = parser.parse_args()
-  G.lcd_w = int(G.wh_ratio * G.lcd_base)
-  G.lcd_h = G.lcd_base
-  G.imsize = G.lcd_w * G.lcd_h
-  # RUN
-  if G.algo == 'ppo':
-    ppo = PPO(G)
-    ppo.run()
-  elif G.algo == 'sac':
-    sac = SAC(G)
-    sac.run()
+    parser = argparse.ArgumentParser()
+    for key, value in config().items():
+        parser.add_argument(f'--{key}', type=args_type(value), default=value)
+    for key, value in _G.items():
+        parser.add_argument(f'--{key}', type=args_type(value), default=value)
+    parser.add_argument('algo')
+    tempC = parser.parse_args()
+    # grab defaults from the env
+    if tempC.env in env_map:
+        Env = env_map[tempC.env]
+        parser.set_defaults(**Env.ENV_DG)
+        parser.set_defaults(**{'goals': 1, 'autoreset': 1})
+
+    G = parser.parse_args()
+    G.lcd_w = int(G.wh_ratio * G.lcd_base)
+    G.lcd_h = G.lcd_base
+    G.imsize = G.lcd_w * G.lcd_h
+    # RUN
+    if G.algo == 'ppo':
+        ppo = PPO(G)
+        ppo.run()
+    elif G.algo == 'sac':
+        sac = SAC(G)
+        sac.run()
