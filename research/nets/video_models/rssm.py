@@ -17,11 +17,11 @@ from research import utils
 import ignite
 from ._base import VideoModel
 from jax.tree_util import tree_map, tree_multimap
+from einops import rearrange
 
 class RSSM(VideoModel):
   def __init__(self, env, G):
     super().__init__(env, G)
-    import ipdb; ipdb.set_trace()
     self._stoch_size = 64
     self._deter_size = 256
     state_n = env.observation_space.spaces['proprio'].shape[0]
@@ -43,7 +43,9 @@ class RSSM(VideoModel):
     self._init()
 
   def loss(self, batch):
+    batch = rearrange
     flat_batch = tree_map(lambda x: x.flatten(0, 1), batch)
+    import ipdb; ipdb.set_trace()
     embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
     action = batch['action'][:,:-1]
     embed = embed[:,1:]
@@ -54,7 +56,7 @@ class RSSM(VideoModel):
     recon_losses = {}
     chop_flat = tree_map(lambda x: x[:,1:].flatten(0, 1), batch)
     recon_losses['loss/recon_proprio'] = -decoded['proprio'].log_prob(chop_flat['proprio']).mean()
-    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(chop_flat['lcd'][:, None]).mean()
+    recon_losses['loss/recon_lcd'] = -decoded['lcd'].log_prob(chop_flat['lcd']).mean()
     recon_loss = sum(recon_losses.values())
 
     # variational inference loss.
@@ -172,7 +174,7 @@ class Encoder(nn.Module):
     nf = G.nfilter
     size = (G.lcd_h * G.lcd_w) // 64
     self.seq = nn.ModuleList([
-        nn.Conv2d(1, nf, 3, 2, padding=1),
+        nn.Conv2d(3, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
         nn.Conv2d(nf, nf, 3, 2, padding=1),
         ResBlock(nf, emb_channels=G.hidden_size, group_size=4),
@@ -213,7 +215,7 @@ class Decoder(nn.Module):
         nn.ReLU(),
         nn.Conv2d(nf, nf, 3, 1, padding=1),
         nn.ReLU(),
-        nn.ConvTranspose2d(nf, 1, 4, 2, padding=1),
+        nn.ConvTranspose2d(nf, 3, 4, 2, padding=1),
     )
     n = G.hidden_size
     self.state_net = nn.Sequential(

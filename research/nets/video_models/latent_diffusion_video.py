@@ -95,7 +95,7 @@ class LatentDiffusionVideo(VideoModel):
     def evaluate(self, epoch, writer, batch, arbiter=None):
         metrics = {}
 
-        if run_sampling := True:
+        if run_sampling := False:
             n = batch['lcd'].shape[0]
             out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
             # self._diffusion_video(epoch, writer, out['diffusion_sampling'], name='diffusion_sampling', prompt_n=None)
@@ -110,9 +110,9 @@ class LatentDiffusionVideo(VideoModel):
         self._prompted_eval(
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         )
-        self._unprompted_eval(
-            epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
-        )
+        #self._unprompted_eval(
+        #    epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
+        #)
         metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
         return metrics
 
@@ -127,6 +127,23 @@ class LatentDiffusionVideo(VideoModel):
         utils.add_video(writer, name, out, epoch, fps=60)
         writer.flush()
         print('FLUSH')
+
+    def forward(self, batch):
+        from fvcore.nn import FlopCountAnalysis, activation_count, ActivationCountAnalysis
+        from fvcore.nn import flop_count_table, flop_count_str, parameter_count, parameter_count_table
+        train_batch = self.b(next(train_iter))
+        #z = th.zeros(32, 32, 4, 4, 4).cuda()
+        #t = th.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
+        #flops = FlopCountAnalysis(self.model.net, (z, t))
+        #flops.total()
+        #import ipdb; ipdb.set_trace()
+
+        # TODO: make a flop counter thing 
+        z = self.preproc(batch)
+        t = th.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
+        z = self.net(z, t).split(z.shape[1], dim=1)
+        out = self.postproc(z)
+        return out
 
     def proc_batch(self, batch):
         return {key: self.pack[key](val) for key, val in batch.items()}
@@ -161,7 +178,7 @@ class LatentDiffusionVideo(VideoModel):
             prompts = self.preproc(prompts)
             prompts = prompts[:, :, : prompt_n // AE_STRIDE]
         all_samples = self.diffusion.p_sample(
-            self.net, vid_shape, noise=noise, prompts=prompts, prompt_n=None
+            self.net, vid_shape, noise=noise, prompts=prompts, prompt_n=prompt_n//AE_STRIDE
         )
         samps = [al['sample'] for al in all_samples]
         preds = [al['pred_xstart'] for al in all_samples]
@@ -255,11 +272,13 @@ class Down(nn.Module):
                 ResBlock(channels, emb_channels, dropout=dropout),
                 TimestepEmbedSequential(
                     ResBlock(channels, emb_channels, channels, dropout=dropout),
+                    ResBlock(channels, emb_channels, channels, dropout=dropout),
                     AttentionBlock(window, channels),
                 ),
                 Downsample(channels),
                 # ResBlock(channels, emb_channels, dropout=dropout),
                 TimestepEmbedSequential(
+                    ResBlock(channels, emb_channels, channels, dropout=dropout),
                     ResBlock(channels, emb_channels, channels, dropout=dropout),
                     AttentionBlock(window, channels),
                 ),

@@ -23,13 +23,7 @@ class Trainer:
     print('wait dataload')
     self.train_ds, self.test_ds = data.load_ds(G)
     print('dataloaded')
-    #if G.phase == 2:
-    #  G.logdir = G.logdir / 'phase2'
     self.writer = SummaryWriter(G.logdir)
-    #self.writer.add_hparams({
-    #    'lr': G.lr,
-    #    'bs': G.bs,
-    #})
     self.logger = utils.dump_logger({}, self.writer, 0, G)
     self.env = env
     self.model = model
@@ -39,7 +33,6 @@ class Trainer:
     self.b = lambda x: {key: val.to(G.device) for key, val in x.items()}
     self.venv = AsyncVectorEnv([env_fn(G) for _ in range(self.G.num_envs)])
 
-    #import ipdb; ipdb.set_trace()
     if G.arbiterdir.name != '':
       arbiter_path = list(G.arbiterdir.glob('*.pt'))
       if len(arbiter_path) == 0:
@@ -60,6 +53,7 @@ class Trainer:
     epoch_time = time.time()
     last_save = time.time()
     train_iter = iter(self.train_ds)
+
     for itr in itertools.count(1):
       # TRAIN
       with Timer(self.logger, 'sample_batch'):

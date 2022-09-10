@@ -102,6 +102,7 @@ class GaussianDiffusion:
     for i in indices:
       t = th.tensor([i] * shape[0], device=device)
       if prompts is not None:
+        assert prompt_n is not None, "This would overwrite the whole sample with the prompt. Probably not what you want."
         img[:, :, :prompt_n] = prompts[:, :, :prompt_n]
       with th.no_grad():
         out = self._p_sample_step(model, img, t, model_kwargs=model_kwargs)

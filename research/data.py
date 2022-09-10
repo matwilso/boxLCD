@@ -195,7 +195,8 @@ def load_ds(G):
   #  import ipdb; ipdb.set_trace()
   #  pass
   test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False)
-  test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
+  #test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
+  test_loader = DataLoader(test_dset, batch_size=8, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
 
   train_dset = RolloutDataset(G.datadir / 'train', G.window, refresh_data=G.refresh_data)
   train_loader = DataLoader(train_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
