@@ -83,14 +83,17 @@ class PreprocVecEnv:
     def learned_rew(self, obs, info={}):
         assert 'Cube' in self.G.env, 'ya gotta'
         done = torch.zeros(obs['lcd'].shape[0]).to(self.G.device)
-        obs = tree_map(lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), obs)
+        obs = tree_map(
+            lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), obs
+        )
         obj = self.obj_loc(obs).detach()
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
         delta = (obj - goal).abs().mean(-1)
         info['goal_delta'] = (obs['goal:object'] - goal).abs().mean().cpu().detach()
         if self.G.diff_delt:
             last_obs = tree_map(
-                lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs
+                lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device),
+                self.last_obs,
             )
             last_obj = self.obj_loc(last_obs).detach()
             last_delta = (last_obj - goal).abs().mean(-1)
@@ -117,7 +120,9 @@ class PreprocVecEnv:
             # info['preproc_rew'] = preproc_rew
             if 'RewardLenv' in self._env.__class__.__name__:
                 info['og_rew'] = info['og_rew'].cpu().detach()
-                success = torch.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
+                success = (
+                    torch.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
+                )
 
                 def fx(x):
                     if isinstance(x, np.ndarray):
@@ -152,11 +157,9 @@ class PreprocVecEnv:
 if __name__ == '__main__':
     import time
 
-    import matplotlib.pyplot as plt
     import torch
     import utils
     from body_goal import BodyGoalEnv
-    from PIL import Image, ImageDraw, ImageFont
 
     # from research.nets.bvae import BVAE
     from boxLCD import env_map, envs

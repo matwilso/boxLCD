@@ -1,10 +1,8 @@
 import copy
-import itertools
 import time
 from collections import defaultdict
 
 import gym
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from jax.tree_util import tree_map, tree_multimap
@@ -68,9 +66,9 @@ class LearnedEnv:
                 *prompts[1:],
             )
             window_batch = {
-                key: torch.zeros([self.model.G.window, *val.shape], dtype=torch.float32).to(
-                    self.G.device
-                )
+                key: torch.zeros(
+                    [self.model.G.window, *val.shape], dtype=torch.float32
+                ).to(self.G.device)
                 for key, val in self.observation_space.spaces.items()
             }
             window_batch['action'] = torch.zeros(
@@ -89,7 +87,8 @@ class LearnedEnv:
                 self.ptr = 1
             else:
                 window_batch['action'] += (
-                    2.0 * torch.rand(window_batch['action'].shape).to(self.G.device) - 1.0
+                    2.0 * torch.rand(window_batch['action'].shape).to(self.G.device)
+                    - 1.0
                 )
                 with torch.no_grad():
                     for self.ptr in range(10):

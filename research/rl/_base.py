@@ -2,7 +2,6 @@ from collections import defaultdict
 
 import gym
 import numpy as np
-import PIL
 import torch
 from gym.vector.async_vector_env import AsyncVectorEnv
 from jax.tree_util import tree_map, tree_multimap

@@ -1,7 +1,6 @@
 import argparse
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from jax.tree_util import tree_map, tree_multimap

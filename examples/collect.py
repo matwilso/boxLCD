@@ -1,11 +1,7 @@
-import itertools
 import os
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
-import PIL.Image as Image
-import PIL.ImageDraw as ImageDraw
 from tqdm import tqdm
 from utils import parse_args
 

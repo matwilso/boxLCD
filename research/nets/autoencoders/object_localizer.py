@@ -1,5 +1,3 @@
-
-import numpy as np
 import torch
 from torch import distributions as thd
 from torch import nn

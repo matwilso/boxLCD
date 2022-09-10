@@ -1,5 +1,3 @@
-
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from jax.tree_util import tree_map
@@ -48,9 +46,9 @@ class VideoModel(Net):
         self, epoch, writer, metrics, batch, arbiter=None, make_video=True
     ):
         n = batch['lcd'].shape[0]
-        action = (torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
-            self.G.device
-        )
+        action = (
+            torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1
+        ).to(self.G.device)
         sample = self.sample(n, action)
 
         if 'lcd' in sample and make_video:
@@ -228,7 +226,9 @@ class VideoModel(Net):
             gt = gt[: self.G.video_n]
             error = (pred - gt + 1.0) / 2.0
             hoz_div = torch.zeros_like(gt)[..., :1, :]
-            hoz_div[:, :, :prompt_n] = torch.as_tensor(YELLOW)[None, :, None, None, None]
+            hoz_div[:, :, :prompt_n] = torch.as_tensor(YELLOW)[
+                None, :, None, None, None
+            ]
             hoz_div[:, :, prompt_n:] = torch.as_tensor(GREEN)[None, :, None, None, None]
             # stack vertically
             out = torch.cat([gt, hoz_div, pred, hoz_div, error], dim=-2)

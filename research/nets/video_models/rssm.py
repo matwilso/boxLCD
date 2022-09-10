@@ -1,8 +1,3 @@
-from itertools import chain, count
-
-import ignite
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import torch.nn.functional as F
 from einops import rearrange
@@ -11,17 +6,7 @@ from torch import distributions as thd
 from torch import nn
 
 from research import utils
-from research.nets.common import (
-    BinaryHead,
-    ConvBinHead,
-    ConvEmbed,
-    GaussHead,
-    MDNHead,
-    MultiHead,
-    ResBlock,
-    TransformerBlock,
-    aggregate,
-)
+from research.nets.common import ResBlock
 
 from ._base import VideoModel
 
@@ -108,7 +93,9 @@ class RSSM(VideoModel):
             posts += [post]
             priors += [prior]
             state = post
-        posts = tree_multimap(lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:])
+        posts = tree_multimap(
+            lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:]
+        )
         priors = tree_multimap(
             lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
         )

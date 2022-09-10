@@ -1,7 +1,3 @@
-from itertools import chain, count
-
-import ignite
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
@@ -62,7 +58,8 @@ class FIT(VideoModel):
         # SHIFT RIGHT (add a padding on the left)
         x = torch.cat([torch.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
         action = torch.cat(
-            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
+            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]],
+            dim=1,
         )
         # forward the GPT model
         if self.G.conv_io:
@@ -108,11 +105,15 @@ class FIT(VideoModel):
             if action is not None:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(
+                self.G.device
+            )
             batch['action'] = (
                 action
                 if action is not None
-                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(
+                    self.G.device
+                )
             )
             start = 0
             if prompts is not None:

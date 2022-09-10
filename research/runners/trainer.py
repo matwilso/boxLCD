@@ -1,8 +1,6 @@
 import itertools
 import time
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import yaml
 from torch.utils.tensorboard import SummaryWriter

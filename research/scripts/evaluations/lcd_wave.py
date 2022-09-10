@@ -33,7 +33,7 @@ def write_gif(name, frames, fps=30):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
+    pass
 
     parser = argparse.ArgumentParser()
     for key, value in G.items():

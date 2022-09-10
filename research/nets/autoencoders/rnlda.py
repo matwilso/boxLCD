@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 from research import utils

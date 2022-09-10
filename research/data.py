@@ -2,10 +2,7 @@ import itertools
 import time
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
-import PIL.Image as Image
-import PIL.ImageDraw as ImageDraw
 import torch
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm

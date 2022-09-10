@@ -1,5 +1,3 @@
-
-import numpy as np
 import torch
 from jax.tree_util import tree_map
 from torch import distributions as thd

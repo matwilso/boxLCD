@@ -4,7 +4,6 @@ from collections import defaultdict
 
 import Box2D
 import matplotlib.pyplot as plt
-import numpy as np
 import pyglet
 from Box2D.b2 import (
     circleShape,

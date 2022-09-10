@@ -1,7 +1,6 @@
 import itertools
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import utils
@@ -44,9 +43,9 @@ class Trainer:
     def sample(self, i):
         # TODO: prompt to a specific point and sample from there. to compare against ground truth.
         N = 5
-        action = (torch.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(
-            self.G.device
-        )
+        action = (
+            torch.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1
+        ).to(self.G.device)
         sample, sample_loss = self.model.sample(N, action=action)
         self.logger['sample_loss'] += [sample_loss]
         lcd = sample['lcd']

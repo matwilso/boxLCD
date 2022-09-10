@@ -48,7 +48,9 @@ if __name__ == '__main__':
         actions += [action]
         obs = env.step(action)[0]
         obses = tree_multimap(
-            lambda x, y: torch.cat([x, torch.as_tensor(y).float()[None, None]], 1), obses, obs
+            lambda x, y: torch.cat([x, torch.as_tensor(y).float()[None, None]], 1),
+            obses,
+            obs,
         )
     action = np_random.uniform(-1, 1, env.action_space.shape[0])
     actions += [action]

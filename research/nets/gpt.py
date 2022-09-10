@@ -46,7 +46,8 @@ class GPT(nn.Module):
         if cond is not None:
             cond = self.cond_in(cond)
             cond = torch.cat(
-                [torch.zeros(BS, 1, self.G.n_embed).to(self.G.device), cond[:, :-1]], dim=1
+                [torch.zeros(BS, 1, self.G.n_embed).to(self.G.device), cond[:, :-1]],
+                dim=1,
             )
             x += cond
         # add padding on left so that we can't see ourself.

@@ -1,6 +1,3 @@
-from itertools import chain, count
-
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -150,11 +147,15 @@ class GPT(nn.Module):
             if action is not None:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(
+                self.G.device
+            )
             batch['action'] = (
                 action
                 if action is not None
-                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(
+                    self.G.device
+                )
             )
             start = 0
             if prompts is not None:

@@ -1,5 +1,3 @@
-
-import numpy as np
 import torch
 from einops import rearrange
 from einops.layers.torch import Rearrange

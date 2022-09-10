@@ -1,9 +1,7 @@
-import itertools
 import pickle
 from collections import defaultdict
 
 import ignite
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
@@ -150,9 +148,9 @@ class Evaler:
     def unprompted(self, batch):
         # take sample of same size as batch
         n = batch['lcd'].shape[0]
-        action = (torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
-            self.G.device
-        )
+        action = (
+            torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1
+        ).to(self.G.device)
         sample = self.model.sample(n, action)
         # cut off the burnin
         burned = tree_map(lambda x: x[:, self.G.prompt_n :], sample)

@@ -4,8 +4,6 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
-from matplotlib.pyplot import tricontour
-
 from boxLCD.utils import AttrDict
 
 TIER0 = ['Dropbox', 'Bounce', 'Bounce2', 'Object2']

@@ -104,7 +104,6 @@ if __name__ == '__main__':
     import pathlib
     import time
 
-    import matplotlib.pyplot as plt
     import torch
     import utils
     from body_goal import BodyGoalEnv

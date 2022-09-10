@@ -1,4 +1,3 @@
-
 import Box2D
 import gym
 import numpy as np

@@ -1,4 +1,3 @@
-
 from research.nets import autoencoders, video_models
 
 from ._base import Net

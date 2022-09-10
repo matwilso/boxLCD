@@ -1,7 +1,5 @@
-import itertools
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
 import torch
@@ -62,7 +60,9 @@ class PPO(RLAlgo):
         # Policy loss
         pi, logp = self.ac.pi(obs, act)
         ratio = torch.exp(logp - logp_old)
-        clip_adv = torch.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
+        clip_adv = (
+            torch.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
+        )
         loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
         # Useful extra info
         approx_kl = (logp_old - logp).mean().cpu()

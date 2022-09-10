@@ -1,6 +1,3 @@
-
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from torch import nn
 
@@ -50,7 +47,8 @@ class FRNLD(VideoModel):
         # SHIFT RIGHT (add a padding on the left)
         x = torch.cat([torch.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
         action = torch.cat(
-            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
+            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]],
+            dim=1,
         )
         cin = self.cond_in(action)
         if action.ndim == 2:
@@ -100,9 +98,9 @@ class FRNLD(VideoModel):
             else:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(
-                self.G.device
-            )
+            batch['lcd'] = torch.zeros(
+                n, self.block_size, self.G.lcd_h, self.G.lcd_w
+            ).to(self.G.device)
             batch['proprio'] = torch.zeros(n, self.block_size, self.proprio_n).to(
                 self.G.device
             )
@@ -112,9 +110,9 @@ class FRNLD(VideoModel):
                 batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
                 start = prompt_n
             z = self.ronald.encode(batch, noise=False)
-            z_sample = torch.zeros(n, self.block_size, self.ronald.G.vqD * 4 * self.zW).to(
-                self.G.device
-            )
+            z_sample = torch.zeros(
+                n, self.block_size, self.ronald.G.vqD * 4 * self.zW
+            ).to(self.G.device)
             z_sample[:, :prompt_n] = z[:, :prompt_n]
             # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
             z_sample = self.latent_sample(z_sample, action, start, temp)

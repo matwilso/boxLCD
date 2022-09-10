@@ -105,8 +105,6 @@ class BodyGoalEnv:
 if __name__ == '__main__':
     pass
 
-    import matplotlib.pyplot as plt
-    import PIL
     import utils
     from PIL import Image, ImageDraw, ImageFont
     from rl.sacnets import ActorCritic
