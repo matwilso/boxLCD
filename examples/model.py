@@ -5,7 +5,7 @@ from itertools import chain, count
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as torchvision
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 class CausalSelfAttention(nn.Module):
     """
     A vanilla multi-head masked self-attention layer with a projection at the end.
-    It is possible to use th.nn.MultiheadAttention here but I am including an
+    It is possible to use torch.nn.MultiheadAttention here but I am including an
     explicit implementation here to show that there is nothing too scary here.
     """
 
@@ -35,7 +35,7 @@ class CausalSelfAttention(nn.Module):
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer(
             "mask",
-            th.tril(th.ones(self.block_size, self.block_size)).view(
+            torch.tril(torch.ones(self.block_size, self.block_size)).view(
                 1, 1, self.block_size, self.block_size
             ),
         )
@@ -94,7 +94,7 @@ class GPT(nn.Module):
         self.block_size = self.G.ep_len
         self.size = self.imsize
         # embedding
-        self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
+        self.pos_emb = nn.Parameter(torch.zeros(1, self.block_size, G.n_embed))
         self.act_condition = nn.Linear(act_dim, G.n_embed // 2, bias=False)
         self.embed = nn.Linear(self.size, G.n_embed // 2, bias=False)
         # transformer
@@ -108,8 +108,8 @@ class GPT(nn.Module):
 
     def append_location(self, x):
         """add loc coords to every elem"""
-        X = th.linspace(-1, 1, x.shape[-2])
-        return th.cat(
+        X = torch.linspace(-1, 1, x.shape[-2])
+        return torch.cat(
             [x, X[None, ..., None].repeat_interleave(x.shape[0], 0).to(x.device)], -1
         )
 
@@ -130,9 +130,9 @@ class GPT(nn.Module):
         x = self.embed(x)
         cin = self.act_condition(action)
         if action.ndim == 2:
-            x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
+            x = torch.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
         else:
-            x = th.cat([x, cin], -1)
+            x = torch.cat([x, cin], -1)
         x += self.pos_emb  # each position maps to a (learnable) vector
 
         # add padding on left so that we can't see ourself.
@@ -151,15 +151,15 @@ class GPT(nn.Module):
 
     def sample(self, n, action=None, prompts=None):
         # TODO: feed act_n
-        with th.no_grad():
+        with torch.no_grad():
             if action is not None:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.G.device)
             batch['action'] = (
                 action
                 if action is not None
-                else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
             )
             start = 0
             if prompts is not None:

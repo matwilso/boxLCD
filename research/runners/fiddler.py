@@ -8,7 +8,7 @@ from datetime import datetime
 import ignite
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import yaml
 from jax.tree_util import tree_map, tree_multimap
 from torch.optim import Adam
@@ -28,7 +28,7 @@ class Fiddler:
         self.env = env
         self.xkeys = utils.filtlist(self.env._env.obs_keys, 'urchin.*x:p')
         self.xidxs = [self.env._env.obs_keys.index(x) for x in self.xkeys]
-        sd = th.load(G.weightdir / f'{G.model}.pt')
+        sd = torch.load(G.weightdir / f'{G.model}.pt')
         mG = sd.pop('G')
         mG.device = G.device
         model = net_map[G.model](env, mG)
@@ -60,7 +60,7 @@ class Fiddler:
             obses = tree_multimap(lambda x, *y: np.stack([x, *y]), obses[0], *obses[1:])
             # obses = tree_map(lambda x: np.stack([*x], 0), obses)
             obses = tree_map(
-                lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), obses
+                lambda v: torch.as_tensor(v, dtype=torch.float32).to(self.G.device), obses
             )
             out = self.model.encode(obses, noise=False, quantize=False)
             # print(out.var(0).topk(16)[1])
@@ -83,15 +83,15 @@ class Fiddler:
             )
             # obses2 = tree_map(lambda x: np.stack([*x], 0), obses2)
             obses2 = tree_map(
-                lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), obses2
+                lambda v: torch.as_tensor(v, dtype=torch.float32).to(self.G.device), obses2
             )
             out2 = self.model.encode(obses2, noise=False, quantize=False)
             # print(out.var(0).topk(16)[1])
             allz += [(out.var(0) - out2.var(0)).topk(16)[1]]
-        x = th.bincount(th.stack(allz).flatten(), minlength=self.model.z_size)
+        x = torch.bincount(torch.stack(allz).flatten(), minlength=self.model.z_size)
         weights = x / x.max()
         print(weights)
         with open('vec_weights.pkl', 'wb') as f:
             pickle.dump(weights, f)
         y = (x > 3).nonzero()
-        print(th.cat([y, x[y]], -1))
+        print(torch.cat([y, x[y]], -1))

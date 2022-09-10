@@ -1,7 +1,7 @@
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from einops import rearrange
 from einops.layers.torch import Rearrange
@@ -56,13 +56,13 @@ class VideoAutoencoder(MultiStepAE):
 
         enc = TracedEncoder(self.encoder)
         batch = self.batch_proc(batch)
-        jit_enc = th.jit.trace(enc, batch, strict=False)
-        th.jit.save(jit_enc, str(path.with_name('Encoder.pt')))
+        jit_enc = torch.jit.trace(enc, batch, strict=False)
+        torch.jit.save(jit_enc, str(path.with_name('Encoder.pt')))
 
         z = jit_enc(batch)
         dec = TracedDecoder(self.decoder)
-        jit_dec = th.jit.trace(dec, z, strict=False)
-        th.jit.save(jit_dec, str(path.with_name('Decoder.pt')))
+        jit_dec = torch.jit.trace(dec, z, strict=False)
+        torch.jit.save(jit_dec, str(path.with_name('Decoder.pt')))
         print(path)
 
     def loss(self, batch):

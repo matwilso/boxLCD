@@ -10,7 +10,7 @@ import gym
 import numpy as np
 import PIL
 import scipy.signal
-import torch as th
+import torch
 import torch.distributions as thd
 import torch.nn as nn
 import torch.nn.functional as F
@@ -40,7 +40,7 @@ class Actor(nn.Module):
     def __init__(self, obs_space, act_dim, goal_key, G):
         super().__init__()
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
-        self.log_std = th.nn.Parameter(th.as_tensor(log_std))
+        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.goal_key = goal_key
         gsize = obs_space[goal_key].shape[-1]
         if True:
@@ -65,11 +65,11 @@ class Actor(nn.Module):
     def _distribution(self, obs):
         if True:
             g = self.goal_preproc(obs[self.goal_key])
-            x = th.cat([obs[self.G.state_key], g], -1)
+            x = torch.cat([obs[self.G.state_key], g], -1)
         else:
-            x = th.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
+            x = torch.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
         mu = self.net(x)
-        std = th.exp(self.log_std)
+        std = torch.exp(self.log_std)
         return thd.Normal(mu, std)
 
 
@@ -89,9 +89,9 @@ class Critic(nn.Module):
     def forward(self, obs):
         if True:
             g = self.goal_preproc(obs[self.goal_key])
-            x = th.cat([obs[self.G.state_key], g], -1)
+            x = torch.cat([obs[self.G.state_key], g], -1)
         else:
-            x = th.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
+            x = torch.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
         return self.base(x).squeeze(-1)
 
 
@@ -106,10 +106,10 @@ class ActorCritic(nn.Module):
 
     def step(self, obs):
         obs = {
-            key: th.as_tensor(1.0 * val, dtype=th.float32).to(self.G.device)
+            key: torch.as_tensor(1.0 * val, dtype=torch.float32).to(self.G.device)
             for key, val in obs.items()
         }
-        with th.no_grad():
+        with torch.no_grad():
             pi = self.pi._distribution(obs)
             a = pi.sample()
             logp_a = self.pi._log_prob_from_distribution(pi, a)
@@ -127,12 +127,12 @@ class ActorCritic(nn.Module):
         path = dir / f'ppo_ac.pt'
         sd = self.state_dict()
         sd['G'] = self.G
-        th.save(sd, path)
+        torch.save(sd, path)
         print(path)
 
     def load(self, dir):
         path = dir / f'ppo_ac.pt'
-        sd = th.load(path, map_location=self.G.device)
+        sd = torch.load(path, map_location=self.G.device)
         G = sd.pop('G')
         self.load_state_dict(sd)
         print(f'LOADED PPO {path}')

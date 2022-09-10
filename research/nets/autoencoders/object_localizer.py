@@ -1,7 +1,7 @@
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -29,8 +29,8 @@ class ObjectLocalizer(SingleStepAE):
     def save(self, dir, batch):
         print("SAVED MODEL", dir)
         path = dir / f'{self.name}.pt'
-        jit_enc = th.jit.trace(self.encoder, self.batch_proc(batch))
-        th.jit.save(jit_enc, str(path))
+        jit_enc = torch.jit.trace(self.encoder, self.batch_proc(batch))
+        torch.jit.save(jit_enc, str(path))
         print(path)
 
     def loss(self, batch):
@@ -80,4 +80,4 @@ class Encoder(nn.Module):
             else:
                 x = layer(x)
         mean, log_std = x.chunk(2, -1)
-        return mean, th.exp(log_std)
+        return mean, torch.exp(log_std)

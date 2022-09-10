@@ -2,7 +2,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 from jax.tree_util import tree_map, tree_multimap
 
 from boxLCD import env_map

@@ -2,7 +2,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 from jax.tree_util import tree_map, tree_multimap
 
 from boxLCD import env_map
@@ -24,8 +24,8 @@ if __name__ == '__main__':
     G = parser.parse_args()
     G.device = 'cpu'
     env = env_fn(G)()
-    device = th.device(G.device)
-    sd = th.load(G.weightdir / f'{G.model}.pt', map_location=device)
+    device = torch.device(G.device)
+    sd = torch.load(G.weightdir / f'{G.model}.pt', map_location=device)
     mG = sd.pop('G')
     mG.device = G.device
     model = net_map[G.model](env, mG)
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # env.seed(7)
     np_random = np.random.RandomState(5)
     # TODO: burn in the env for a few steps first.
-    obses = tree_map(lambda x: th.as_tensor(x).float()[None, None], env.reset())
+    obses = tree_map(lambda x: torch.as_tensor(x).float()[None, None], env.reset())
     actions = []
     for i in range(mG.window - 1):
         # for i in range(mG.ep_len - 1):
@@ -48,11 +48,11 @@ if __name__ == '__main__':
         actions += [action]
         obs = env.step(action)[0]
         obses = tree_multimap(
-            lambda x, y: th.cat([x, th.as_tensor(y).float()[None, None]], 1), obses, obs
+            lambda x, y: torch.cat([x, torch.as_tensor(y).float()[None, None]], 1), obses, obs
         )
     action = np_random.uniform(-1, 1, env.action_space.shape[0])
     actions += [action]
-    action = th.as_tensor(np.stack(actions)).float()[None]
+    action = torch.as_tensor(np.stack(actions)).float()[None]
     obses['action'] = action
     PN = 1
     sample = model.sample(1, action=action, prompts=obses, prompt_n=PN)

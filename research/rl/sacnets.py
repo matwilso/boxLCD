@@ -10,7 +10,7 @@ import gym
 import numpy as np
 import PIL
 import scipy.signal
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
@@ -67,8 +67,8 @@ class BaseCNN(nn.Module):
             # x = s
             x = g - s
         else:
-            x = th.cat([s, g], -1)
-        x = th.cat([x, obs['goal:compact'], obs['proprio']], -1)
+            x = torch.cat([s, g], -1)
+        x = torch.cat([x, obs['goal:compact'], obs['proprio']], -1)
         x = self.linear(x)
         return x
 
@@ -96,7 +96,7 @@ class BaseCMLP(nn.Module):
             x = g - s
             # x = s
         else:
-            x = th.cat([s, g], -1)
+            x = torch.cat([s, g], -1)
         x = self.linear(x)
         return x
 
@@ -141,7 +141,7 @@ class QFunction(nn.Module):
 
     def forward(self, obs, act):
         if self.G.net == 'mlp':
-            x = th.cat([obs[self.G.state_key], obs[self.goal_key], act], -1)
+            x = torch.cat([obs[self.G.state_key], obs[self.goal_key], act], -1)
             return self.base(x).squeeze(-1)
         elif self.G.net == 'bvae':
             x = self.preproc.encode(obs).detach()
@@ -150,16 +150,16 @@ class QFunction(nn.Module):
                 # goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
                 # gx = self.preproc.encode(goals).detach()
                 # gx = self.goalie(gx)
-                x = th.cat([x, obs[self.goal_key]], -1)
+                x = torch.cat([x, obs[self.goal_key]], -1)
                 # x = x + gx
             xa = self.actin(act)
-            x = th.cat([x, xa], -1)
+            x = torch.cat([x, xa], -1)
             x = self.act_head(x)
             return x.squeeze(-1)
         else:
             x = self.base(obs)
             act = self.actin(act)
-            x = th.cat([x, act], -1)
+            x = torch.cat([x, act], -1)
             x = self.act_head(x)
             return x.squeeze(-1)
 
@@ -195,7 +195,7 @@ class SquashedGaussianActor(nn.Module):
 
     def forward(self, obs, deterministic=False, with_logprob=True):
         if self.G.net == 'mlp':
-            x = th.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
+            x = torch.cat([obs[self.G.state_key], obs[self.goal_key]], -1)
         elif self.G.net == 'bvae':
             z = self.preproc.encode(obs).detach()
             x = self.statie(z)
@@ -203,18 +203,18 @@ class SquashedGaussianActor(nn.Module):
                 # goals = utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])
                 # gz = self.preproc.encode(goals).detach()
                 # gx = self.goalie(gz)
-                # x = th.cat([x, gx], -1)
-                x = th.cat([x, obs[self.goal_key]], -1)
-                # 1 - th.logical_and(z, gz).sum(-1) / th.logical_or(z,gz).sum(-1)
+                # x = torch.cat([x, gx], -1)
+                x = torch.cat([x, obs[self.goal_key]], -1)
+                # 1 - torch.logical_and(z, gz).sum(-1) / torch.logical_or(z,gz).sum(-1)
                 # x = x + gx
         else:
             x = obs
 
         net_out = self.net(x)
-        mu, log_std = th.split(net_out, self.act_dim, dim=-1)
+        mu, log_std = torch.split(net_out, self.act_dim, dim=-1)
 
-        log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
-        std = th.exp(log_std)
+        log_std = torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
+        std = torch.exp(log_std)
 
         # Pre-squash distribution and sample
         pi_distribution = Normal(mu, std)
@@ -237,8 +237,8 @@ class SquashedGaussianActor(nn.Module):
         else:
             logp_pi = None
 
-        pi_action = th.tanh(pi_action)
-        return pi_action, logp_pi, {'mean': th.tanh(mu), 'std': std}
+        pi_action = torch.tanh(pi_action)
+        return pi_action, logp_pi, {'mean': torch.tanh(mu), 'std': std}
 
 
 class ActorCritic(nn.Module):
@@ -255,16 +255,16 @@ class ActorCritic(nn.Module):
         self.q2 = QFunction(obs_space, act_dim, goal_key, G=G, preproc=self.preproc)
         if G.learned_alpha:
             self.target_entropy = -np.prod(act_space.shape)
-            self.log_alpha = th.nn.Parameter(-0.5 * th.ones(1))
+            self.log_alpha = torch.nn.Parameter(-0.5 * torch.ones(1))
         self.G = G
 
     def act(self, obs, deterministic=False):
-        with th.no_grad():
+        with torch.no_grad():
             a, _, ainfo = self.pi(obs, deterministic, False)
             return a
 
     def value(self, obs, act):
-        with th.no_grad():
+        with torch.no_grad():
             q1 = self.q1(obs, act)
             q2 = self.q1(obs, act)
             return (q1 + q2) / 2

@@ -1,5 +1,5 @@
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -17,7 +17,7 @@ class GPT(nn.Module):
         self.block_size = block_size
         self.in_size = in_size
         self.pos_emb = nn.Parameter(
-            th.zeros(1, self.block_size, G.n_embed)
+            torch.zeros(1, self.block_size, G.n_embed)
         )  # learned position embedding
         self.embed = nn.Linear(self.in_size, G.n_embed, bias=False)
         self.blocks = nn.Sequential(
@@ -41,13 +41,13 @@ class GPT(nn.Module):
     def forward(self, x, cond=None):
         BS, T, G = x.shape
         # SHIFT RIGHT (add a padding on the left) so you can't see yourself
-        x = th.cat([th.zeros(BS, 1, G).to(self.G.device), x[:, :-1]], dim=1)
+        x = torch.cat([th.zeros(BS, 1, G).to(self.G.device), x[:, :-1]], dim=1)
         # forward the GPT model
         x = self.embed(x)
         x += self.pos_emb  # each position maps to a (learnable) vector
         if cond is not None:
             cond = self.cond_in(cond)
-            cond = th.cat(
+            cond = torch.cat(
                 [th.zeros(BS, 1, self.G.n_embed).to(self.G.device), cond[:, :-1]], dim=1
             )
             x += cond
@@ -58,7 +58,7 @@ class GPT(nn.Module):
 
     def sample(self, n):
         steps = []
-        batch = th.zeros(n, self.block_size, self.in_size).to(self.G.device)
+        batch = torch.zeros(n, self.block_size, self.in_size).to(self.G.device)
         for i in range(self.block_size):
             dist = self.forward(batch)
             batch[:, i] = dist.sample()[:, i]
@@ -69,7 +69,7 @@ class GPT(nn.Module):
 class CausalSelfAttention(nn.Module):
     """
     A vanilla multi-head masked self-attention layer with a projection at the end.
-    It is possible to use th.nn.MultiheadAttention here but I am including an
+    It is possible to use torch.nn.MultiheadAttention here but I am including an
     explicit implementation here to show that there is nothing too scary here.
     """
 
@@ -86,7 +86,7 @@ class CausalSelfAttention(nn.Module):
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer(
             "mask",
-            th.tril(th.ones(self.block_size, self.block_size)).view(
+            torch.tril(torch.ones(self.block_size, self.block_size)).view(
                 1, 1, self.block_size, self.block_size
             ),
         )

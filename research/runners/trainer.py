@@ -6,7 +6,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import yaml
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset
@@ -42,7 +42,7 @@ class Trainer:
                     False
                 ), f'probably wrong arbiter path that you pointed to {G.arbiterdir}'
             arbiter_path = arbiter_path[0]
-            self.arbiter = th.jit.load(str(arbiter_path))
+            self.arbiter = torch.jit.load(str(arbiter_path))
             with (arbiter_path.parent / 'hps.yaml').open('r') as f:
                 arbiterG = yaml.load(f, Loader=yaml.Loader)
             self.arbiter.G = arbiterG
@@ -74,7 +74,7 @@ class Trainer:
 
             if itr % self.G.log_n == 0 or self.G.skip_train:
                 self.model.eval()
-                with th.no_grad():
+                with torch.no_grad():
                     with Timer(self.logger, 'test'):
                         # compute loss on all data
                         for test_batch in self.test_ds:

@@ -4,7 +4,7 @@ from re import I
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 import yaml
 from torch import distributions as thd
@@ -22,7 +22,7 @@ class FRNLD(VideoModel):
     def __init__(self, env, G):
         super().__init__(env, G)
         # <LOAD ronald>
-        sd = th.load(G.weightdir / 'RNLDA.pt', map_location=th.device(G.device))
+        sd = torch.load(G.weightdir / 'RNLDA.pt', map_location=torch.device(G.device))
         ronaldG = sd.pop('G')
         ronaldG.device = G.device
         self.ronald = RNLDA(env, ronaldG)
@@ -37,7 +37,7 @@ class FRNLD(VideoModel):
         self.z_size = self.ronald.z_size
         self.block_size = self.G.window
         # GPT STUFF
-        self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
+        self.pos_emb = nn.Parameter(torch.zeros(1, self.block_size, G.n_embed))
         self.cond_in = nn.Linear(self.act_n, G.n_embed // 2, bias=False)
         # input embedding stem
         self.embed = nn.Linear(self.size, G.n_embed // 2, bias=False)
@@ -55,15 +55,15 @@ class FRNLD(VideoModel):
         # forward the GPT model
         BS, T, E = x.shape
         # SHIFT RIGHT (add a padding on the left)
-        x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
-        action = th.cat(
+        x = torch.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+        action = torch.cat(
             [th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
         )
         cin = self.cond_in(action)
         if action.ndim == 2:
-            x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
+            x = torch.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
         else:
-            x = th.cat([x, cin], -1)
+            x = torch.cat([x, cin], -1)
         x += self.pos_emb  # each position maps to a (learnable) vector
         x = self.blocks(x)
         logits = self.ln_f(x)
@@ -72,7 +72,7 @@ class FRNLD(VideoModel):
     def loss(self, batch):
         z = self.ronald.encode(batch, noise=False).detach()
         logits = self.forward(z, batch['action'])
-        loss = ((th.tanh(logits) - z) ** 2).mean()
+        loss = ((torch.tanh(logits) - z) ** 2).mean()
         return loss, {'loss/total': loss}
 
     def onestep(self, batch, i, temp=1.0):
@@ -98,19 +98,19 @@ class FRNLD(VideoModel):
 
     def sample(self, n, action=None, prompts=None, prompt_n=10, temp=1.0):
         # TODO: feed act_n
-        with th.no_grad():
+        with torch.no_grad():
             # CREATE PROMPT
             if action is None:
-                action = (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(
+                action = (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(
                     self.G.device
                 )
             else:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = th.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(
+            batch['lcd'] = torch.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(
                 self.G.device
             )
-            batch['proprio'] = th.zeros(n, self.block_size, self.proprio_n).to(
+            batch['proprio'] = torch.zeros(n, self.block_size, self.proprio_n).to(
                 self.G.device
             )
             start = 0
@@ -119,7 +119,7 @@ class FRNLD(VideoModel):
                 batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
                 start = prompt_n
             z = self.ronald.encode(batch, noise=False)
-            z_sample = th.zeros(n, self.block_size, self.ronald.G.vqD * 4 * self.zW).to(
+            z_sample = torch.zeros(n, self.block_size, self.ronald.G.vqD * 4 * self.zW).to(
                 self.G.device
             )
             z_sample[:, :prompt_n] = z[:, :prompt_n]

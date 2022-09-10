@@ -7,7 +7,7 @@ Then it was improved here: https://github.com/openai/improved-diffusion
 Then matwilso cut everything but base features and a single choice of settings, so that the code was as short and simple as possible.
 """
 import numpy as np
-import torch as th
+import torch
 
 from .losses import discretized_gaussian_log_likelihood, mean_flat, normal_kl
 
@@ -84,12 +84,12 @@ class GaussianDiffusion:
         """
         # Pass x_t through model and compute eps
         model_out = model(x, t, **model_kwargs)
-        eps, model_var = th.split(model_out, x.shape[1], dim=1)
+        eps, model_var = torch.split(model_out, x.shape[1], dim=1)
         if model_kwargs != {}:
             guide = model_kwargs['guide'].clone()
             guide[:] = -1
             free_model_out = model(x, t, guide=guide)
-            free_eps, _ = th.split(free_model_out, x.shape[1], dim=1)
+            free_eps, _ = torch.split(free_model_out, x.shape[1], dim=1)
             eps = (1 + 0.5) * eps - 0.5 * free_eps
 
         # Compute variance by interpolating between min and max values (equation 15, improved paper)
@@ -97,7 +97,7 @@ class GaussianDiffusion:
         max_log = self.log_betas[t]
         frac = (model_var + 1) / 2  # The model_var is [-1, 1] for [min_var, max_var].
         model_log_variance = frac * max_log + (1 - frac) * min_log
-        model_variance = th.exp(model_log_variance)
+        model_variance = torch.exp(model_log_variance)
         # Predict x_0 from eps. at any point, this is our best guess of the true output. it will vary and become refined as we reduce noise.
         pred_xstart = (
             self.sqrt_recip_alphas_cumprod[t] * x
@@ -120,11 +120,11 @@ class GaussianDiffusion:
     def _p_sample_step(self, model, x, t, model_kwargs={}):
         """Sample x_{t-1} ~ p(x_{t-1}|x_t) using the model."""
         out = self.p_dist(model, x, t, model_kwargs=model_kwargs)
-        noise = th.randn_like(x)
+        noise = torch.randn_like(x)
         nonzero_mask = (
             (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
         )  # no noise when t == 0
-        sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
+        sample = out["mean"] + nonzero_mask * torch.exp(0.5 * out["log_variance"]) * noise
         return {"sample": sample, "pred_xstart": out["pred_xstart"]}
 
     def p_sample(
@@ -133,17 +133,17 @@ class GaussianDiffusion:
         """Generate a full sample from the model and keep history"""
         device = next(model.parameters()).device
         assert isinstance(shape, (tuple, list))
-        img = noise if noise is not None else th.randn(*shape, device=device)
+        img = noise if noise is not None else torch.randn(*shape, device=device)
         indices = list(range(self.num_timesteps))[::-1]
         outs = []
         for i in indices:
-            t = th.tensor([i] * shape[0], device=device)
+            t = torch.tensor([i] * shape[0], device=device)
             if prompts is not None:
                 assert (
                     prompt_n is not None
                 ), "This would overwrite the whole sample with the prompt. Probably not what you want."
                 img[:, :, :prompt_n] = prompts[:, :, :prompt_n]
-            with th.no_grad():
+            with torch.no_grad():
                 out = self._p_sample_step(model, img, t, model_kwargs=model_kwargs)
                 outs += [out]
                 img = out["sample"]
@@ -154,15 +154,15 @@ class GaussianDiffusion:
         """Compute training losses for an image and timesteps"""
         terms = {}
         # add diffusion noise according to the t values
-        noise = th.randn_like(x_start)
+        noise = torch.randn_like(x_start)
         x_t = self.q_sample(x_start, t, noise=noise)
 
         # pass the noisy image to the model and learn to predict the noise and variance.
         model_output = model(x_t, t, **model_kwargs)
-        eps, model_var = th.split(model_output, x_t.shape[1], dim=1)
+        eps, model_var = torch.split(model_output, x_t.shape[1], dim=1)
         terms["mse"] = mean_flat((noise - eps) ** 2)
         # learn the variance using the variational bound, but don't let it affect our mean prediction.
-        frozen_out = th.cat([eps.detach(), model_var], dim=1)
+        frozen_out = torch.cat([eps.detach(), model_var], dim=1)
         terms["vb"] = self._vb_terms_bpd(
             model=lambda *args, r=frozen_out: r, x_start=x_start, x_t=x_t, t=t
         )["output"]
@@ -192,7 +192,7 @@ class GaussianDiffusion:
             x_start, means=out["mean"], log_scales=0.5 * out["log_variance"]
         )
         decoder_nll = mean_flat(decoder_nll) / np.log(2.0)
-        output = th.where(
+        output = torch.where(
             (t == 0), decoder_nll, kl
         )  # use reconstruction loss only if t == 0
         return {"output": output, "pred_xstart": out["pred_xstart"]}
@@ -205,7 +205,7 @@ class Extractable:
         self.arr = arr
 
     def __getitem__(self, t):
-        res = th.from_numpy(self.arr).to(device=t.device)[t].float()
+        res = torch.from_numpy(self.arr).to(device=t.device)[t].float()
         return res[
             :, None, None, None, None
         ]  # reshape (BS,) --> (BS, T=1, C=1, H=1, W=1) to make image size

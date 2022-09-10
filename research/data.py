@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
-import torch as th
+import torch
 import yaml
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -168,7 +168,7 @@ class RolloutDataset(IterableDataset):
         assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
     def __iter__(self):
-        worker_info = th.utils.data.get_worker_info()
+        worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
             np.random.seed(worker_info.id + round(time.time()))
 
@@ -182,13 +182,13 @@ class RolloutDataset(IterableDataset):
 
             curr_barrel = np.load(curr_file, allow_pickle=True)
             elems = {
-                key: th.as_tensor(curr_barrel[key], dtype=th.float32)
+                key: torch.as_tensor(curr_barrel[key], dtype=torch.float32)
                 for key in curr_barrel.keys()
             }
             ep_len = elems['lcd'].shape[1]
-            # elems = {key: th.as_tensor(np.c_[np.zeros_like(curr_barrel[key])[:self.window], curr_barrel[key]], dtype=th.float32) for key in curr_barrel.keys()}
+            # elems = {key: torch.as_tensor(np.c_[np.zeros_like(curr_barrel[key])[:self.window], curr_barrel[key]], dtype=torch.float32) for key in curr_barrel.keys()}
             pad = self.window - 1
-            # elems = {key: th.cat([th.zeros_like(val)[:,:pad], val, th.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
+            # elems = {key: torch.cat([th.zeros_like(val)[:,:pad], val, torch.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
             lcd = elems['lcd']
 
             idxs = np.arange(BARREL_SIZE)
@@ -202,20 +202,20 @@ class RolloutDataset(IterableDataset):
                 if max_start > 0:
                     start = np.random.randint(0, max_start)
                     elem = {
-                        key: th.as_tensor(
-                            val[idx, start : start + self.window], dtype=th.float32
+                        key: torch.as_tensor(
+                            val[idx, start : start + self.window], dtype=torch.float32
                         )
                         for key, val in elems.items()
                     }
                 else:
                     elem = {
-                        key: th.as_tensor(val[idx], dtype=th.float32)
+                        key: torch.as_tensor(val[idx], dtype=torch.float32)
                         for key, val in elems.items()
                     }
 
                 #  start = np.random.randint(0, max_start)
                 # start = np.random.randint(0, ep_len)
-                # elem = {key: th.as_tensor(val[idx, start:start+self.window], dtype=th.float32) for key, val in elems.items()}
+                # elem = {key: torch.as_tensor(val[idx, start:start+self.window], dtype=torch.float32) for key, val in elems.items()}
                 elem['lcd'] = rearrange(elem['lcd'], 't h w c -> c t h w', c=3)
                 elem['lcd'] /= 255.0
                 # if (elem['lcd'] == 0.0).all(dim=0).all(dim=-1).all(dim=-1).any():

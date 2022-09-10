@@ -3,7 +3,7 @@ from os import pipe, stat
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -32,8 +32,8 @@ class ArbiterAE(SingleStepAE):
     def save(self, dir, batch):
         print("SAVED MODEL", dir)
         path = dir / f'{self.name}.pt'
-        jit_enc = th.jit.trace(self.encoder, self.batch_proc(batch))
-        th.jit.save(jit_enc, str(path))
+        jit_enc = torch.jit.trace(self.encoder, self.batch_proc(batch))
+        torch.jit.save(jit_enc, str(path))
         print(path)
 
     def loss(self, batch):

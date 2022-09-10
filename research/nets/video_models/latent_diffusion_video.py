@@ -1,6 +1,6 @@
 from functools import partial
 
-import torch as th
+import torch
 import torch.nn.functional as F
 import yaml
 from einops import parse_shape, rearrange, repeat
@@ -46,7 +46,7 @@ class LatentDiffusionVideo(VideoModel):
 
         # <LOAD ae>
         ae_path = G.weightdir / 'Encoder.pt'
-        self.pre_encoder = th.jit.load(ae_path)
+        self.pre_encoder = torch.jit.load(ae_path)
         with (ae_path.parent / 'hps.yaml').open('r') as f:
             aeG = yaml.load(f, Loader=yaml.Loader)
         self.pre_encoder.G = aeG
@@ -55,7 +55,7 @@ class LatentDiffusionVideo(VideoModel):
         self.pre_encoder.eval()
 
         ae_path = G.weightdir / 'Decoder.pt'
-        self.pre_decoder = th.jit.load(ae_path)
+        self.pre_decoder = torch.jit.load(ae_path)
         with (ae_path.parent / 'hps.yaml').open('r') as f:
             aeG = yaml.load(f, Loader=yaml.Loader)
         self.pre_decoder.G = aeG
@@ -115,15 +115,15 @@ class LatentDiffusionVideo(VideoModel):
         # self._unprompted_eval(
         #    epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         # )
-        metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
+        metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
     def _diffusion_video(
         self, epoch, writer, pred, truth=None, name=None, prompt_n=None
     ):
         out = pred[:, :4]  # video_n
-        out = th.cat([out, th.zeros_like(out[:, :, :, :, :1])], axis=4)
-        out = th.cat([out, th.zeros_like(out[:, :, :, :, :, :1])], axis=5)
+        out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :1])], axis=4)
+        out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :, :1])], axis=5)
         out = rearrange(out, 's bs c t h w -> s (bs h) (t w) c')
         out = repeat(out, 's h w c -> s (h h2) (w w2) c', h2=2, w2=2)
         utils.add_video(writer, name, out, epoch, fps=60)
@@ -142,15 +142,15 @@ class LatentDiffusionVideo(VideoModel):
         )
 
         train_batch = self.b(next(train_iter))
-        # z = th.zeros(32, 32, 4, 4, 4).cuda()
-        # t = th.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
+        # z = torch.zeros(32, 32, 4, 4, 4).cuda()
+        # t = torch.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
         # flops = FlopCountAnalysis(self.model.net, (z, t))
         # flops.total()
         # import ipdb; ipdb.set_trace()
 
         # TODO: make a flop counter thing
         z = self.preproc(batch)
-        t = th.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
+        t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
         z = self.net(z, t).split(z.shape[1], dim=1)
         out = self.postproc(z)
         return out
@@ -174,7 +174,7 @@ class LatentDiffusionVideo(VideoModel):
 
     def loss(self, batch):
         z = self.preproc(batch)
-        t = th.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
+        t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
         metrics = self.diffusion.training_losses(self.net, z, t)
         metrics = {key: val.mean() for key, val in metrics.items()}
         loss = metrics['loss']
@@ -182,8 +182,8 @@ class LatentDiffusionVideo(VideoModel):
 
     def sample(self, n, action=None, prompts=None, prompt_n=None):
         vid_shape = (n, AE_Z, self.G.window // AE_STRIDE, AE_W, AE_H)
-        th.manual_seed(0)
-        noise = th.randn(vid_shape, device=self.G.device)
+        torch.manual_seed(0)
+        noise = torch.randn(vid_shape, device=self.G.device)
         if prompts is not None:
             prompts = self.preproc(prompts)
             prompts = prompts[:, :, : prompt_n // AE_STRIDE]
@@ -206,8 +206,8 @@ class LatentDiffusionVideo(VideoModel):
         if do_diffusion := True:
             samps = [self.postproc(ds) for ds in samps]
             preds = [self.postproc(dp) for dp in preds]
-            diffusion_sampling = th.stack(samps)
-            diffusion_pred = th.stack(preds)
+            diffusion_sampling = torch.stack(samps)
+            diffusion_pred = torch.stack(preds)
 
         return {
             'lcd': raw_samples,
@@ -355,7 +355,7 @@ class Up(nn.Module):
         pass_through = pass_through[::-1]
         for i in range(len(self.seq)):
             layer, hoz_skip = self.seq[i], pass_through[i]
-            x = th.cat([x, hoz_skip], 1)
+            x = torch.cat([x, hoz_skip], 1)
             x = layer(x, emb)
         return x
 
@@ -368,7 +368,7 @@ class AttentionBlock(nn.Module):
         # self.attn = SelfAttention(n, n_embed, n_head, causal=False)
         self.register_buffer(
             "time_embed",
-            timestep_embedding(th.linspace(0, 1, n), n_embed, max_period=1).T,
+            timestep_embedding(torch.linspace(0, 1, n), n_embed, max_period=1).T,
         )
 
     def forward(self, x, emb=None):

@@ -7,7 +7,7 @@ from shutil import ignore_patterns
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as torchvision
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import distributions as thd
@@ -62,7 +62,7 @@ class VQVAE(nn.Module):
         pred_lcd = 1.0 * (decoded['lcd'].probs > 0.5)[:8]
         lcd = flatter_batch['lcd'][:8, None]
         error = (pred_lcd - lcd + 1.0) / 2.0
-        stack = th.cat([lcd, pred_lcd, error], -2)
+        stack = torch.cat([lcd, pred_lcd, error], -2)
         writer.add_image('image/decode', utils.combine_imgs(stack, 1, 8)[None], epoch)
 
         import ipdb

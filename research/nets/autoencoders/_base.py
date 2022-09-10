@@ -1,5 +1,5 @@
 import numpy as np
-import torch as th
+import torch
 import torch.nn as nn
 from einops import rearrange
 from torch import distributions as thd
@@ -59,7 +59,7 @@ class Autoencoder(Net):
         if truth is not None:
             truth = self.unproc(truth[viz_idxs]).cpu()
             error = (pred - truth + 1.0) / 2.0
-            stack = th.cat([truth, pred, error], -2)
+            stack = torch.cat([truth, pred, error], -2)
             writer.add_image(
                 'recon_lcd', utils.combine_rgbs(stack, 1, self.G.video_n), epoch
             )

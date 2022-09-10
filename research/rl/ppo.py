@@ -7,7 +7,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import yaml
@@ -68,14 +68,14 @@ class PPO(RLAlgo):
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
         # Policy loss
         pi, logp = self.ac.pi(obs, act)
-        ratio = th.exp(logp - logp_old)
-        clip_adv = th.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
-        loss_pi = -(th.min(ratio * adv, clip_adv)).mean()
+        ratio = torch.exp(logp - logp_old)
+        clip_adv = torch.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
+        loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
         # Useful extra info
         approx_kl = (logp_old - logp).mean().cpu()
         ent = pi.entropy().mean().cpu()
         clipped = ratio.gt(1 + self.G.clip_ratio) | ratio.lt(1 - self.G.clip_ratio)
-        clipfrac = th.as_tensor(clipped, dtype=th.float32).mean().cpu()
+        clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().cpu()
         pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
         return loss_pi, pi_info
 
@@ -131,11 +131,11 @@ class PPO(RLAlgo):
         if self.G.lenv:
             o, ep_ret, ep_len = (
                 self.env.reset(np.arange(self.G.num_envs)),
-                th.zeros(self.G.num_envs).to(self.G.device),
+                torch.zeros(self.G.num_envs).to(self.G.device),
                 np.zeros(self.G.num_envs),
             )  # .to(G.device)
-            success = th.zeros(self.G.num_envs).to(self.G.device)
-            time_to_succ = self.G.ep_len * th.ones(self.G.num_envs).to(self.G.device)
+            success = torch.zeros(self.G.num_envs).to(self.G.device)
+            time_to_succ = self.G.ep_len * torch.ones(self.G.num_envs).to(self.G.device)
             pf = th
         else:
             o, ep_ret, ep_len = (

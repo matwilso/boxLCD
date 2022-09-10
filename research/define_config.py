@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 import gym
-import torch as th
+import torch
 
 import boxLCD.utils
 from boxLCD import ENV_DG, env_map, envs

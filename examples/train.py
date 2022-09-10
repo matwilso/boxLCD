@@ -9,7 +9,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import utils
 import yaml
 from model import GPT
@@ -52,7 +52,7 @@ class Trainer:
     def sample(self, i):
         # TODO: prompt to a specific point and sample from there. to compare against ground truth.
         N = 5
-        action = (th.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(
+        action = (torch.rand(N, self.G.ep_len, self.env.action_space.shape[0]) * 2 - 1).to(
             self.G.device
         )
         sample, sample_loss = self.model.sample(N, action=action)
@@ -97,9 +97,9 @@ class Trainer:
             acts[ii] += [np.zeros_like(act)]
         obses = {key: np.array(val) for key, val in obses.items()}
         action = np.array(acts)
-        action = th.as_tensor(action, dtype=th.float32).to(self.G.device)
+        action = torch.as_tensor(action, dtype=torch.float32).to(self.G.device)
         prompts = {
-            key: th.as_tensor(1.0 * val[:, :10]).to(self.G.device)
+            key: torch.as_tensor(1.0 * val[:, :10]).to(self.G.device)
             for key, val in obses.items()
         }
         prompted_samples, prompt_loss = self.model.sample(
@@ -117,7 +117,7 @@ class Trainer:
 
     def test(self, i):
         self.model.eval()
-        with th.no_grad():
+        with torch.no_grad():
             for batch in self.test_ds:
                 batch = {key: val.to(self.G.device) for key, val in batch.items()}
                 loss = self.model.loss(batch)

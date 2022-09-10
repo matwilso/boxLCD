@@ -4,7 +4,7 @@ from shutil import ignore_patterns
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 from jax.tree_util import tree_map, tree_multimap
 
 from boxLCD import env_map
@@ -36,7 +36,7 @@ if __name__ == '__main__':
         goal_key = 'goal:proprio'
     elif env.__class__.__name__ == 'CubeGoalEnv':
         goal_key = 'goal:object'
-    mG = th.load(G.weightdir / 'ppo_ac.pt')['G']
+    mG = torch.load(G.weightdir / 'ppo_ac.pt')['G']
     mG.lenv = 0
     ac = ActorCritic(env.observation_space, env.action_space, goal_key, G=mG).to(
         G.device

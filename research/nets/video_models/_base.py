@@ -2,7 +2,7 @@ from re import I
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import torch.nn as nn
 from jax.tree_util import tree_map
 from torch import distributions as thd
@@ -45,14 +45,14 @@ class VideoModel(Net):
         # self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
         self._prompted_eval(epoch, writer, metrics, batch, arbiter)
         # self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
-        metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
+        metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
     def _unprompted_eval(
         self, epoch, writer, metrics, batch, arbiter=None, make_video=True
     ):
         n = batch['lcd'].shape[0]
-        action = (th.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
+        action = (torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
             self.G.device
         )
         sample = self.sample(n, action)
@@ -231,21 +231,21 @@ class VideoModel(Net):
         if gt is not None:
             gt = gt[: self.G.video_n]
             error = (pred - gt + 1.0) / 2.0
-            hoz_div = th.zeros_like(gt)[..., :1, :]
-            hoz_div[:, :, :prompt_n] = th.as_tensor(YELLOW)[None, :, None, None, None]
-            hoz_div[:, :, prompt_n:] = th.as_tensor(GREEN)[None, :, None, None, None]
+            hoz_div = torch.zeros_like(gt)[..., :1, :]
+            hoz_div[:, :, :prompt_n] = torch.as_tensor(YELLOW)[None, :, None, None, None]
+            hoz_div[:, :, prompt_n:] = torch.as_tensor(GREEN)[None, :, None, None, None]
             # stack vertically
-            out = th.cat([gt, hoz_div, pred, hoz_div, error], dim=-2)
+            out = torch.cat([gt, hoz_div, pred, hoz_div, error], dim=-2)
             name = name or 'prompted_lcd'
         else:
             out = pred
             name = name or 'unprompted_lcd'
 
         out = rearrange(out, 'bs c t h w -> bs t h w c')
-        ver_div = th.zeros_like(out)[..., :1, :]
-        ver_div[:, :prompt_n] = th.as_tensor(YELLOW)
-        ver_div[:, prompt_n:] = th.as_tensor(GREEN)
-        out = th.cat([out, ver_div], dim=-2)
+        ver_div = torch.zeros_like(out)[..., :1, :]
+        ver_div[:, :prompt_n] = torch.as_tensor(YELLOW)
+        ver_div[:, prompt_n:] = torch.as_tensor(GREEN)
+        out = torch.cat([out, ver_div], dim=-2)
         out = rearrange(out, 'bs t h w c -> t h (bs w) c')
         out = repeat(out, 't h w c -> t (h h2) (w w2) c', h2=4, w2=4)
         utils.add_video(writer, name, out, epoch, fps=self.G.fps)

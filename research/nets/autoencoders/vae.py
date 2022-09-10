@@ -1,7 +1,7 @@
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -22,7 +22,7 @@ class VAE(SingleStepAE):
         self._init()
 
     def sample_z(self, n):
-        z = th.randn(n, self.G.z_size).to(self.G.device)
+        z = torch.randn(n, self.G.z_size).to(self.G.device)
         return z
 
     def loss(self, batch):

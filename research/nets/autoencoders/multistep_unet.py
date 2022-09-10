@@ -3,7 +3,7 @@ from collections import namedtuple
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from jax.tree_util import tree_map
 from torch import distributions as thd
@@ -46,7 +46,7 @@ class Unet3d(MultiStepAE):
 
     def loss(self, batch):
         lcd = self._unroll_lcd(batch)
-        out = th.sigmoid(self.unet(lcd))
+        out = torch.sigmoid(self.unet(lcd))
         recon_losses = {}
         recon_losses['loss/recon_lcd'] = (out - lcd).pow(2).mean()
         recon_loss = sum(recon_losses.values())
@@ -58,7 +58,7 @@ class Unet3d(MultiStepAE):
 
     def _decode(self, z):
         X = namedtuple('X', 'probs')
-        return {'lcd': X(th.sigmoid(self.unet(z))[:, 0])}
+        return {'lcd': X(torch.sigmoid(self.unet(z))[:, 0])}
 
 
 class SimpleUnet3d(nn.Module):
@@ -84,7 +84,7 @@ class SimpleUnet3d(nn.Module):
         self.G = G
 
     def forward(self, x, timesteps=None):
-        timesteps = th.arange(x.shape[0], device=x.device)
+        timesteps = torch.arange(x.shape[0], device=x.device)
         emb = self.time_embed(
             timestep_embedding(timesteps.float(), 64, timesteps.shape[0])
         )
@@ -180,7 +180,7 @@ class Up(nn.Module):
         cache = cache[::-1]
         for i in range(len(self.seq)):
             layer, hoz_skip = self.seq[i], cache[i]
-            x = th.cat([x, hoz_skip], 1)
+            x = torch.cat([x, hoz_skip], 1)
             x = layer(x, emb)
         return x
 

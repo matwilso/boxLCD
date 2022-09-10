@@ -1,5 +1,5 @@
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -28,7 +28,7 @@ class RNLDA(SingleStepAE):
 
     def sample_z(self, n):
         z = (
-            th.bernoulli(0.5 * th.ones(n, self.z_size))
+            torch.bernoulli(0.5 * torch.ones(n, self.z_size))
             .to(self.G.device)
             .reshape([n, -1, self.zH, self.zW])
         )
@@ -53,10 +53,10 @@ class RNLDA(SingleStepAE):
             'loss/total': loss,
             **recon_losses,
             'loss/recon_total': recon_loss,
-            'idx0_frac': th.mean(1.0 * (idxs == 0)),
-            'idx1_frac': th.mean(1.0 * (idxs == 1)),
-            'idx2_frac': th.mean(1.0 * (idxs == 2)),
-            'idx3_frac': th.mean(1.0 * (idxs == 3)),
+            'idx0_frac': torch.mean(1.0 * (idxs == 0)),
+            'idx1_frac': torch.mean(1.0 * (idxs == 1)),
+            'idx2_frac': torch.mean(1.0 * (idxs == 2)),
+            'idx3_frac': torch.mean(1.0 * (idxs == 3)),
         }
         return loss, metrics
 

@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -18,7 +18,7 @@ def zero_module(module):
 class SelfAttention(nn.Module):
     """
     A vanilla multi-head masked self-attention layer with a projection at the end.
-    It is possible to use th.nn.MultiheadAttention here but I am including an
+    It is possible to use torch.nn.MultiheadAttention here but I am including an
     explicit implementation here to show that there is nothing too scary here.
     """
 
@@ -35,13 +35,13 @@ class SelfAttention(nn.Module):
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer(
             "mask",
-            th.tril(th.ones(self.block_size, self.block_size)).view(
+            torch.tril(torch.ones(self.block_size, self.block_size)).view(
                 1, 1, self.block_size, self.block_size
             ),
         )
         self.n_head = n_head
         if not causal:
-            self.mask = th.ones_like(self.mask)
+            self.mask = torch.ones_like(self.mask)
 
     def forward(self, x, layer_past=None):
         B, T, G = x.size()
@@ -102,7 +102,7 @@ class GaussHead(nn.Module):
             mu = mu + past_z
         # dist = thd.Independent(thd.Normal(mu, std), 1)
         # dist = thd.Normal(mu, std)
-        dist = thd.MultivariateNormal(mu, th.diag_embed(std))
+        dist = thd.MultivariateNormal(mu, torch.diag_embed(std))
         return dist
 
 
@@ -125,7 +125,7 @@ class MDNHead(nn.Module):
         std = std.reshape(list(std.shape[:-1]) + [self.G.mdn_k, -1])
         cat = thd.Categorical(logits=logits)
         dist = thd.MixtureSameFamily(
-            cat, thd.MultivariateNormal(mu, scale_tril=th.diag_embed(std))
+            cat, thd.MultivariateNormal(mu, scale_tril=torch.diag_embed(std))
         )
         return dist
 
@@ -319,11 +319,11 @@ def aggregate(x, dim=1, catdim=-1):
     returns (BS, 4E) where 4E is min, max, std, mean aggregations.
                      using all of these rather than just one leads to better coverage. see paper
     """
-    min = th.min(x, dim=dim)[0]
-    max = th.max(x, dim=dim)[0]
-    std = th.std(x, dim=dim)
-    mean = th.mean(x, dim=dim)
-    return th.cat([min, max, std, mean], dim=catdim)
+    min = torch.min(x, dim=dim)[0]
+    max = torch.max(x, dim=dim)[0]
+    std = torch.std(x, dim=dim)
+    mean = torch.mean(x, dim=dim)
+    return torch.cat([min, max, std, mean], dim=catdim)
 
 
 class TimestepEmbedSequential(nn.Sequential):
@@ -352,11 +352,11 @@ def timestep_embedding(timesteps, dim, max_period):
     :return: an [N x dim] Tensor of positional embeddings.
     """
     half = dim // 2
-    freqs = th.exp(
-        -math.log(max_period) * th.arange(start=0, end=half, dtype=th.float32) / half
+    freqs = torch.exp(
+        -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
     ).to(device=timesteps.device)
     args = timesteps[:, None].float() * freqs[None]
-    embedding = th.cat([th.cos(args), th.sin(args)], dim=-1)
+    embedding = torch.cat([th.cos(args), torch.sin(args)], dim=-1)
     if dim % 2:
-        embedding = th.cat([embedding, th.zeros_like(embedding[:, :1])], dim=-1)
+        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
     return embedding

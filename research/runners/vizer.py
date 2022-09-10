@@ -7,7 +7,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pyglet
-import torch as th
+import torch
 import yaml
 from pyglet.gl import glClearColor
 from torch.utils.data import DataLoader, Dataset
@@ -67,7 +67,7 @@ class AutoEnv:
         truth = obs['lcd']
         self.window_batch['action'][:, self.count] = act[None]
         batch = {
-            key: th.as_tensor(1.0 * val).float().to(self.G.device)
+            key: torch.as_tensor(1.0 * val).float().to(self.G.device)
             for key, val in self.window_batch.items()
         }
         lcd_shape = batch['lcd'].shape
@@ -148,12 +148,12 @@ class Vizer:
             return False
 
     def opt_through(self, o, a, g):
-        o = th.as_tensor(o, dtype=th.float32).to(self.H.device)
-        a = th.as_tensor(a, dtype=th.float32).to(self.H.device)
-        g = th.as_tensor(g, dtype=th.float32).to(self.H.device)
+        o = torch.as_tensor(o, dtype=torch.float32).to(self.H.device)
+        a = torch.as_tensor(a, dtype=torch.float32).to(self.H.device)
+        g = torch.as_tensor(g, dtype=torch.float32).to(self.H.device)
         og = g.data.clone().detach()
         g.requires_grad = True
-        coords = th.as_tensor(self.gxy_coords, dtype=th.long).to(self.H.device)
+        coords = torch.as_tensor(self.gxy_coords, dtype=torch.long).to(self.H.device)
 
         for i in range(5):
             loss = -self.ac.q1(o, a, g).mean()
@@ -163,7 +163,7 @@ class Vizer:
             g.data.add_(-0.0001 * g.grad)
             g.data.clamp_(-1, 1)
             g.grad[:] = 0.0
-        print('delta', th.linalg.norm(g - og))
+        print('delta', torch.linalg.norm(g - og))
         return g.detach().cpu().numpy()
 
     def look_ahead(self, prompto, a):
@@ -171,15 +171,15 @@ class Vizer:
         return sample['lcd']
 
     def sample_traj(self, prompto, prompta, g):
-        prompto = th.as_tensor(1.0 * np.stack(prompto), dtype=th.float32).to(
+        prompto = torch.as_tensor(1.0 * np.stack(prompto), dtype=torch.float32).to(
             self.G.device
         )[None]
         prompta = 1.0 * np.stack(prompta)
-        g = th.as_tensor(1.0 * g, dtype=th.float32).to(self.G.device)[None]
+        g = torch.as_tensor(1.0 * g, dtype=torch.float32).to(self.G.device)[None]
         N, A = prompta.shape
         extra = np.random.uniform(-1, 1, size=(self.G.window - N, A))
         a = np.concatenate([prompta, extra])
-        a = th.as_tensor(a, dtype=th.float32).to(self.G.device)[None]
+        a = torch.as_tensor(a, dtype=torch.float32).to(self.G.device)[None]
         oa = a.data.clone().detach()
         a.requires_grad = True
         for i in range(10):
@@ -289,9 +289,9 @@ class Vizer:
         acts += [np.zeros_like(act)]
         obses = {key: np.stack(val, 0)[None] for key, val in obses.items()}
         action = np.stack(acts, 0)
-        action = th.as_tensor(action, dtype=th.float32).to(self.G.device)[None]
+        action = torch.as_tensor(action, dtype=torch.float32).to(self.G.device)[None]
         prompts = {
-            key: th.as_tensor(1.0 * val[:, :5]).to(self.G.device)
+            key: torch.as_tensor(1.0 * val[:, :5]).to(self.G.device)
             for key, val in obses.items()
         }
         lcds = []

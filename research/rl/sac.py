@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import scipy.signal
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import yaml
@@ -83,7 +83,7 @@ class SAC(RLAlgo):
         alpha = (
             self.G.alpha
             if not self.G.learned_alpha
-            else th.exp(self.ac.log_alpha).detach()
+            else torch.exp(self.ac.log_alpha).detach()
         )
         o, a, r, o2, d = (
             data['obs'],
@@ -98,14 +98,14 @@ class SAC(RLAlgo):
         q2 = self.ac.q2(o, a)
 
         # Bellman backup for Q functions
-        with th.no_grad():
+        with torch.no_grad():
             # Target actions come from *current* policy
             a2, logp_a2, ainfo = self.ac.pi(o2)
 
             # Target Q-values
             q1_pi_targ = self.ac_targ.q1(o2, a2)
             q2_pi_targ = self.ac_targ.q2(o2, a2)
-            q_pi_targ = th.min(q1_pi_targ, q2_pi_targ)
+            q_pi_targ = torch.min(q1_pi_targ, q2_pi_targ)
             backup = r + self.G.gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
 
         # MSE loss against Bellman backup
@@ -131,13 +131,13 @@ class SAC(RLAlgo):
         alpha = (
             self.G.alpha
             if not self.G.learned_alpha
-            else th.exp(self.ac.log_alpha).detach()
+            else torch.exp(self.ac.log_alpha).detach()
         )
         o = data['obs']
         pi, logp_pi, ainfo = self.ac.pi(o)
         q1_pi = self.ac.q1(o, pi)
         q2_pi = self.ac.q2(o, pi)
-        q_pi = th.min(q1_pi, q2_pi)
+        q_pi = torch.min(q1_pi, q2_pi)
 
         # Entropy-regularized policy loss
         loss_pi = (alpha * logp_pi - q_pi).mean()
@@ -153,7 +153,7 @@ class SAC(RLAlgo):
             loss_alpha = (
                 -1.0
                 * (
-                    th.exp(self.ac.log_alpha)
+                    torch.exp(self.ac.log_alpha)
                     * (logp_pi + self.ac.target_entropy).detach()
                 )
             ).mean()
@@ -215,7 +215,7 @@ class SAC(RLAlgo):
             self.logger[key] += [pi_info[key]]
 
         # Finally, update target networks by polyak averaging.
-        with th.no_grad():
+        with torch.no_grad():
             for p, p_targ in zip(self.ac.parameters(), self.ac_targ.parameters()):
                 # NB: We use an in-place operations "mul_", "add_" to update target
                 # params, as opposed to "mul" and "add", which would make new tensors.
@@ -224,7 +224,7 @@ class SAC(RLAlgo):
 
     def get_action(self, o, deterministic=False):
         o = {
-            key: th.as_tensor(1.0 * val, dtype=th.float32).to(self.G.device)
+            key: torch.as_tensor(1.0 * val, dtype=torch.float32).to(self.G.device)
             for key, val in o.items()
         }
         act = self.ac.act(o, deterministic)
@@ -233,9 +233,9 @@ class SAC(RLAlgo):
         return act
 
     def get_av(self, o, deterministic=False):
-        with th.no_grad():
+        with torch.no_grad():
             o = {
-                key: th.as_tensor(1.0 * val, dtype=th.float32).to(self.G.device)
+                key: torch.as_tensor(1.0 * val, dtype=torch.float32).to(self.G.device)
                 for key, val in o.items()
             }
             a, _, ainfo = self.ac.pi(o, deterministic, False)
@@ -293,11 +293,11 @@ class SAC(RLAlgo):
         if self.G.lenv:
             o, ep_ret, ep_len = (
                 self.env.reset(),
-                th.zeros(self.G.num_envs).to(self.G.device),
-                th.zeros(self.G.num_envs).to(self.G.device),
+                torch.zeros(self.G.num_envs).to(self.G.device),
+                torch.zeros(self.G.num_envs).to(self.G.device),
             )
-            success = th.zeros(self.G.num_envs).to(self.G.device)
-            time_to_succ = self.G.ep_len * th.ones(self.G.num_envs).to(self.G.device)
+            success = torch.zeros(self.G.num_envs).to(self.G.device)
+            time_to_succ = self.G.ep_len * torch.ones(self.G.num_envs).to(self.G.device)
             pf = th
         else:
             o, ep_ret, ep_len = (
@@ -349,8 +349,8 @@ class SAC(RLAlgo):
 
             # End of trajectory handling
             if self.G.lenv:
-                done = th.logical_or(d, ep_len == self.G.ep_len)
-                dixs = th.nonzero(done)
+                done = torch.logical_or(d, ep_len == self.G.ep_len)
+                dixs = torch.nonzero(done)
 
                 def proc(x):
                     return x.cpu().float()
@@ -402,7 +402,7 @@ class SAC(RLAlgo):
 
                 # Save model
                 if (epoch % self.G.save_freq == 0) or (itr == self.G.total_steps):
-                    th.save(self.ac, self.G.logdir / 'weights.pt')
+                    torch.save(self.ac, self.G.logdir / 'weights.pt')
 
                 if (self.G.logdir / 'pause.marker').exists():
                     import ipdb

@@ -1,7 +1,7 @@
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from jax.tree_util import tree_map
 from torch import distributions as thd
@@ -47,8 +47,8 @@ class MultiStepArbiter(MultiStepAE):
                 return z, dec[2]
 
         d = TracedArbiter(self.encoder, self.decoder)
-        jit_enc = th.jit.trace(d, self.batch_proc(batch))
-        th.jit.save(jit_enc, str(path))
+        jit_enc = torch.jit.trace(d, self.batch_proc(batch))
+        torch.jit.save(jit_enc, str(path))
         print(path)
 
     def loss(self, batch):

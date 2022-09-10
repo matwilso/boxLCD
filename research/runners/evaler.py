@@ -9,7 +9,7 @@ from datetime import datetime
 import ignite
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import yaml
 from jax.tree_util import tree_map
 from torch import nn
@@ -35,7 +35,7 @@ class Evaler:
         ), "usually we assume 10 barrels of test data to run this."
         print('dataloaded')
         self.env = env
-        sd = th.load(G.weightdir / f'{G.model}.pt')
+        sd = torch.load(G.weightdir / f'{G.model}.pt')
         mG = sd.pop('G')
         mG.device = G.device
         model = net_map[G.model](env, mG)
@@ -48,7 +48,7 @@ class Evaler:
         if G.arbiterdir.name != '':
             arbiter_path = list(G.arbiterdir.glob('*.pt'))
             arbiter_path = arbiter_path[0]
-            self.arbiter = th.jit.load(str(arbiter_path))
+            self.arbiter = torch.jit.load(str(arbiter_path))
             with (arbiter_path.parent / 'hps.yaml').open('r') as f:
                 arbiterG = yaml.load(f, Loader=yaml.Loader)
             self.arbiter.G = arbiterG
@@ -73,7 +73,7 @@ class Evaler:
     def run(self):
         self.model.eval()
         self.N = 1e4
-        with th.no_grad():
+        with torch.no_grad():
             logger = defaultdict(lambda: [])
             for i in range(5):
                 test_logger = self.do_ds(self.test_ds)
@@ -133,9 +133,9 @@ class Evaler:
             print((i + 1) * self.G.bs)
             if (i + 1) * self.G.bs >= self.N:
                 break
-        paz = th.cat(all_paz)
-        upaz = th.cat(all_upaz)
-        taz = th.cat(all_taz)
+        paz = torch.cat(all_paz)
+        upaz = torch.cat(all_upaz)
+        taz = torch.cat(all_taz)
         for key, val in self.compute_agged(upaz, taz).items():
             logger['u:' + key] += [val]
         for key, val in self.compute_agged(paz, taz).items():
@@ -157,7 +157,7 @@ class Evaler:
     def unprompted(self, batch):
         # take sample of same size as batch
         n = batch['lcd'].shape[0]
-        action = (th.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
+        action = (torch.rand(n, self.G.window, self.env.action_space.shape[0]) * 2 - 1).to(
             self.G.device
         )
         sample = self.model.sample(n, action)

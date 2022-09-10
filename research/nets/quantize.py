@@ -5,7 +5,7 @@ import numpy as np
 
 # from research.nets.common import GaussHead, MDNHead, CausalSelfAttention, TransformerBlock, BinaryHead, aggregate, MultiHead, ConvEmbed
 import torch as torchvision
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import distributions as thd
@@ -32,17 +32,17 @@ class RNLD(nn.Module):
         self.noise_level = noise_level
 
     def forward(self, z, noise):
-        z = th.tanh(z)
-        # zn = z + noise * (2 * th.rand(z.shape).to(z.device) - 1)
+        z = torch.tanh(z)
+        # zn = z + noise * (2 * torch.rand(z.shape).to(z.device) - 1)
         if noise:
-            zn = z + self.noise_level * (2 * th.rand(z.shape).to(z.device) - 1)
+            zn = z + self.noise_level * (2 * torch.rand(z.shape).to(z.device) - 1)
         else:
             zn = z
 
         z_q = (
             -0.75 * (zn < -0.5)
-            + -0.25 * (th.logical_and(zn >= -0.5, zn < 0.0))
-            + 0.25 * (th.logical_and(zn >= 0.0, zn < 0.5))
+            + -0.25 * (torch.logical_and(zn >= -0.5, zn < 0.0))
+            + 0.25 * (torch.logical_and(zn >= 0.0, zn < 0.5))
             + 0.75 * (zn >= 0.5)
         )
         # z_q += zn - zn.detach()
@@ -50,8 +50,8 @@ class RNLD(nn.Module):
 
         idxs = (
             0 * (zn < -0.5)
-            + 1 * (th.logical_and(zn >= -0.5, zn < 0.0))
-            + 2 * (th.logical_and(zn >= 0.0, zn < 0.5))
+            + 1 * (torch.logical_and(zn >= -0.5, zn < 0.0))
+            + 2 * (torch.logical_and(zn >= 0.0, zn < 0.5))
             + 3 * (zn >= 0.5)
         )
         return z_q, idxs
@@ -83,7 +83,7 @@ class VectorQuantizer(nn.Module):
         self.embedding.weight.data.uniform_(-1.0 / self.K, 1.0 / self.K)
 
     def idx_to_encoding(self, one_hots):
-        z_q = th.matmul(one_hots, self.embedding.weight)
+        z_q = torch.matmul(one_hots, self.embedding.weight)
         return z_q
 
     def forward(self, z):
@@ -93,25 +93,25 @@ class VectorQuantizer(nn.Module):
         z_flattened = z.view(-1, self.D)
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
         d = (
-            th.sum(z_flattened**2, dim=1, keepdim=True)
-            + th.sum(self.embedding.weight**2, dim=1)
-            - 2 * th.matmul(z_flattened, self.embedding.weight.t())
+            torch.sum(z_flattened**2, dim=1, keepdim=True)
+            + torch.sum(self.embedding.weight**2, dim=1)
+            - 2 * torch.matmul(z_flattened, self.embedding.weight.t())
         )
         # find closest encodings
-        min_encoding_indices = th.argmin(d, dim=1).unsqueeze(1)
-        min_encodings = th.zeros(min_encoding_indices.shape[0], self.K).to(z.device)
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], self.K).to(z.device)
         min_encodings.scatter_(1, min_encoding_indices, 1)
         # get quantized latent vectors
-        z_q = th.matmul(min_encodings, self.embedding.weight).view(z.shape)
+        z_q = torch.matmul(min_encodings, self.embedding.weight).view(z.shape)
         # compute loss for embedding
-        loss = th.mean((z_q.detach() - z) ** 2) + self.beta * th.mean(
+        loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * torch.mean(
             (z_q - z.detach()) ** 2
         )
         # preserve gradients
         z_q = z + (z_q - z).detach()
         # perplexity
-        e_mean = th.mean(min_encodings, dim=0)
-        perplexity = th.exp(-th.sum(e_mean * th.log(e_mean + 1e-10)))
+        e_mean = torch.mean(min_encodings, dim=0)
+        perplexity = torch.exp(-th.sum(e_mean * torch.log(e_mean + 1e-10)))
         # reshape back to match original input shape
         if z.ndim == 4:
             z_q = z_q.permute(0, 3, 1, 2).contiguous()

@@ -3,7 +3,7 @@ from collections import defaultdict
 import gym
 import numpy as np
 import PIL
-import torch as th
+import torch
 from gym.vector.async_vector_env import AsyncVectorEnv
 from jax.tree_util import tree_map, tree_multimap
 from PIL import Image, ImageDraw, ImageFont
@@ -20,7 +20,7 @@ class RLAlgo:
     def __init__(self, G):
         self.G = G
         print(G.full_cmd)
-        # th.manual_seed(G.seed)
+        # torch.manual_seed(G.seed)
         # np.random.seed(G.seed)
         # Set up logger and save configuration
         self.logger = defaultdict(lambda: [])
@@ -30,7 +30,7 @@ class RLAlgo:
         self.act_space = self.tenv.action_space
         self.real_tvenv = AsyncVectorEnv([env_fn(G) for _ in range(TN)])
         if G.lenv:
-            sd = th.load(G.weightdir / f'{G.model}.pt')
+            sd = torch.load(G.weightdir / f'{G.model}.pt')
             mG = sd.pop('G')
             mG.device = G.device
             model = net_map[G.model](self.tenv, mG)
@@ -69,7 +69,7 @@ class RLAlgo:
             self.env = AsyncVectorEnv([env_fn(G) for _ in range(G.num_envs)])
             self.tvenv = self.real_tvenv
             if G.preproc:
-                sd = th.load(G.weightdir / f'{G.model}.pt')
+                sd = torch.load(G.weightdir / f'{G.model}.pt')
                 mG = sd.pop('G')
                 mG.device = G.device
                 preproc = net_map[G.model](self.tenv, mG)
@@ -106,8 +106,8 @@ class RLAlgo:
             _env = self.learned_tvenv
             o, ep_ret, ep_len = (
                 _env.reset(),
-                th.zeros(TN).to(self.G.device),
-                th.zeros(TN).to(self.G.device),
+                torch.zeros(TN).to(self.G.device),
+                torch.zeros(TN).to(self.G.device),
             )
         else:
             pf = np
@@ -159,7 +159,7 @@ class RLAlgo:
             prefix = 'real'
         if len(frames) != 0:
             if use_lenv:
-                frames = th.stack(frames)
+                frames = torch.stack(frames)
                 frames = frames.detach().cpu().numpy()
             else:
                 frames = np.stack(frames)

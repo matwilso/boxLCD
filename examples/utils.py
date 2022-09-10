@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-import torch as th
+import torch
 import yaml
 from torch.utils.data import DataLoader, Dataset
 
@@ -58,7 +58,7 @@ def parse_args():
 class RolloutDataset(Dataset):
     def __init__(self, npzfile, train=True, G=None):
         data = np.load(npzfile, allow_pickle=True)
-        self.bufs = {key: th.as_tensor(data[key]) for key in data.keys()}
+        self.bufs = {key: torch.as_tensor(data[key]) for key in data.keys()}
         cut = int(len(self.bufs['action']) * 0.8)
         if train:
             self.bufs = {key: val[:cut] for key, val in self.bufs.items()}
@@ -70,7 +70,7 @@ class RolloutDataset(Dataset):
 
     def __getitem__(self, idx):
         elem = {
-            key: th.as_tensor(val[idx], dtype=th.float32)
+            key: torch.as_tensor(val[idx], dtype=torch.float32)
             for key, val in self.bufs.items()
         }
         return elem
@@ -129,6 +129,6 @@ def force_shape(out):
         )
     else:
         out = out.permute(1, 2, 3, 0, 4)
-        out = th.cat([out, th.zeros(out.shape[:-1])[..., None]], -1)
+        out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
     out = out.reshape(T, C, H, N * (W + 1))[None]
     return out

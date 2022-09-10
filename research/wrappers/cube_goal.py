@@ -104,7 +104,7 @@ if __name__ == '__main__':
     import time
 
     import matplotlib.pyplot as plt
-    import torch as th
+    import torch
     import utils
     from PIL import Image, ImageDraw, ImageFont
     from rl.sacnets import ActorCritic
@@ -136,7 +136,7 @@ if __name__ == '__main__':
         env.render(mode='human')
         act = env.action_space.sample()
         obs, rew, done, info = env.step(act)
-        # o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(G.device) for key, val in obs.items()}
+        # o = {key: torch.as_tensor(val[None].astype(np.float32), dtype=torch.float32).to(G.device) for key, val in obs.items()}
         lcds += [obs['lcd']]
         glcds += [obs['goal:lcd']]
         rews += [rew]

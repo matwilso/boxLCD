@@ -7,7 +7,7 @@ import ignite
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as torchvision
-import torch as th
+import torch
 import torch.nn.functional as F
 from einops import rearrange
 from jax.tree_util import tree_map, tree_multimap
@@ -86,7 +86,7 @@ class RSSM(VideoModel):
         post_dist = self.get_dist(post)
         # TODO: assert they are same size
         div = thd.kl_divergence(post_dist, prior_dist)
-        div = th.max(div, self.G.free_nats * th.ones_like(div)).mean()
+        div = torch.max(div, self.G.free_nats * torch.ones_like(div)).mean()
         div_loss = self.G.kl_scale * div
         loss = recon_loss + div_loss
         return loss, {
@@ -98,10 +98,10 @@ class RSSM(VideoModel):
 
     def initial(self, batch_size):
         state = dict(
-            mean=th.zeros([batch_size, self._stoch_size]),
-            std=th.zeros([batch_size, self._stoch_size]),
-            stoch=th.zeros([batch_size, self._stoch_size]),
-            deter=th.zeros([batch_size, self._deter_size]),
+            mean=torch.zeros([batch_size, self._stoch_size]),
+            std=torch.zeros([batch_size, self._stoch_size]),
+            stoch=torch.zeros([batch_size, self._stoch_size]),
+            deter=torch.zeros([batch_size, self._deter_size]),
         )
         return tree_map(lambda x: x.to(self.G.device), state)
 
@@ -114,28 +114,28 @@ class RSSM(VideoModel):
             posts += [post]
             priors += [prior]
             state = post
-        posts = tree_multimap(lambda x, *y: th.stack([x, *y], 1), posts[0], *posts[1:])
+        posts = tree_multimap(lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:])
         priors = tree_multimap(
-            lambda x, *y: th.stack([x, *y], 1), priors[0], *priors[1:]
+            lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
         )
         return posts, priors
 
     def obs_step(self, prev_state, prev_action, embed):
         prior = self.img_step(prev_state, prev_action)
-        x = th.cat([prior['deter'], embed], -1)
+        x = torch.cat([prior['deter'], embed], -1)
         x = self.obs_net(x)
-        mean, std = th.chunk(x, 2, -1)
+        mean, std = torch.chunk(x, 2, -1)
         std = F.softplus(std) + 0.1
         stoch = self.get_dist({'mean': mean, 'std': std}).rsample()
         post = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': prior['deter']}
         return post, prior
 
     def img_step(self, prev_state, prev_action):
-        x = th.cat([prev_state['stoch'], prev_action], -1)
+        x = torch.cat([prev_state['stoch'], prev_action], -1)
         x = F.relu(self.img1(x))
         x = deter = self.cell(x, prev_state['deter'])
         x = self.img_net(x)
-        mean, std = th.chunk(x, 2, -1)
+        mean, std = torch.chunk(x, 2, -1)
         std = F.softplus(std) + 0.1
         stoch = self.get_dist({'mean': mean, 'std': std}).rsample()
         prior = {'mean': mean, 'std': std, 'stoch': stoch, 'deter': deter}
@@ -150,16 +150,16 @@ class RSSM(VideoModel):
             priors += [prior]
             state = prior
         priors = tree_multimap(
-            lambda x, *y: th.stack([x, *y], 1), priors[0], *priors[1:]
+            lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
         )
         return priors
 
     def sample(self, n, action=None, prompts=None, prompt_n=10):
-        with th.no_grad():
+        with torch.no_grad():
             if action is not None:
                 n = action.shape[0]
             else:
-                action = (th.rand(n, self.G.window, self.act_n) * 2 - 1).to(
+                action = (torch.rand(n, self.G.window, self.act_n) * 2 - 1).to(
                     self.G.device
                 )
             if prompts is None:
@@ -180,7 +180,7 @@ class RSSM(VideoModel):
                 embed = self.encoder(flat_batch).unflatten(
                     0, (*batch['lcd'].shape[:2],)
                 )
-                action = th.cat([th.zeros_like(action)[:, :1], action[:, :-1]], 1)
+                action = torch.cat([th.zeros_like(action)[:, :1], action[:, :-1]], 1)
                 post, prior = self.observe(embed, action[:, :prompt_n])
                 prior = self.imagine(
                     action[:, prompt_n:], state=tree_map(lambda x: x[:, -1], post)
@@ -197,7 +197,7 @@ class RSSM(VideoModel):
                 )
                 prompts['lcd'] = prompts['lcd'][:, :, None]
                 gen = tree_multimap(
-                    lambda x, y: th.cat([x[:, :prompt_n], y], 1),
+                    lambda x, y: torch.cat([x[:, :prompt_n], y], 1),
                     utils.subdict(prompts, ['lcd', 'proprio']),
                     gen,
                 )
@@ -205,11 +205,11 @@ class RSSM(VideoModel):
         return gen
 
     def get_feat(self, state):
-        return th.cat([state['stoch'], state['deter']], -1)
+        return torch.cat([state['stoch'], state['deter']], -1)
 
     def get_dist(self, state):
         return thd.Normal(state['mean'], state['std'])
-        # return thd.MultivariateNormal(state['mean'], scale_tril=th.diag_embed(state['std']))
+        # return thd.MultivariateNormal(state['mean'], scale_tril=torch.diag_embed(state['std']))
 
 
 class Encoder(nn.Module):

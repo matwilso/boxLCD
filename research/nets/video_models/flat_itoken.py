@@ -6,7 +6,7 @@ import ignite
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as torchvision
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -41,7 +41,7 @@ class FIT(VideoModel):
         self.dist = self.G.decode
         self.block_size = self.G.window
 
-        self.pos_emb = nn.Parameter(th.zeros(1, self.block_size, G.n_embed))
+        self.pos_emb = nn.Parameter(torch.zeros(1, self.block_size, G.n_embed))
         self.cond_in = nn.Linear(self.act_n, G.n_embed // 2, bias=False)
         # input embedding stem
         self.embed = nn.Linear(self.gpt_size, G.n_embed // 2, bias=False)
@@ -66,8 +66,8 @@ class FIT(VideoModel):
         x = lcd
         BS, T, E = x.shape
         # SHIFT RIGHT (add a padding on the left)
-        x = th.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
-        action = th.cat(
+        x = torch.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+        action = torch.cat(
             [th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
         )
         # forward the GPT model
@@ -76,9 +76,9 @@ class FIT(VideoModel):
         x = self.embed(x)
         cin = self.cond_in(action)
         if action.ndim == 2:
-            x = th.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
+            x = torch.cat([x, cin[:, None].repeat_interleave(self.block_size, 1)], -1)
         else:
-            x = th.cat([x, cin], -1)
+            x = torch.cat([x, cin], -1)
         x += self.pos_emb  # each position maps to a (learnable) vector
         x = self.blocks(x)
         logits = self.ln_f(x)
@@ -110,15 +110,15 @@ class FIT(VideoModel):
 
     def sample(self, n, action=None, prompts=None, prompt_n=10):
         # TODO: feed act_n
-        with th.no_grad():
+        with torch.no_grad():
             if action is not None:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = th.zeros(n, self.block_size, self.imsize).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.G.device)
             batch['action'] = (
                 action
                 if action is not None
-                else (th.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
+                else (torch.rand(n, self.block_size, self.act_n) * 2 - 1).to(self.G.device)
             )
             start = 0
             if prompts is not None:
@@ -132,7 +132,7 @@ class FIT(VideoModel):
                 dist = self.dist_head(logits)
                 batch['lcd'][:, i] = dist.sample()[:, i]
         batch['lcd'] = batch['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-        batch['proprio'] = th.zeros(
+        batch['proprio'] = torch.zeros(
             [*batch['lcd'].shape[:2], self.env.observation_space['proprio'].shape[0]]
         ).to(batch['lcd'].device)
         return batch

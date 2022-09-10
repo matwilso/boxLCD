@@ -3,7 +3,7 @@ from re import I
 
 import gym
 import numpy as np
-import torch as th
+import torch
 from gym.utils import EzPickle, seeding
 from jax.tree_util import tree_map, tree_multimap
 from scipy.spatial.distance import cosine
@@ -30,7 +30,7 @@ class PreprocVecEnv:
                 arbiter_path = list(self.G.arbiterdir.glob('*.pt'))
                 if len(arbiter_path) > 0:
                     arbiter_path = arbiter_path[0]
-                self.obj_loc = th.jit.load(str(arbiter_path))
+                self.obj_loc = torch.jit.load(str(arbiter_path))
                 self.obj_loc.eval()
                 print('LOADED OBJECT LOCALIZER')
             else:
@@ -53,7 +53,7 @@ class PreprocVecEnv:
 
     def _preproc_obs(self, obs):
         batch_obs = {
-            key: th.as_tensor(1.0 * val).float().to(self.device)
+            key: torch.as_tensor(1.0 * val).float().to(self.device)
             for key, val in obs.items()
         }
         zstate = self.model.encode(batch_obs, noise=False, quantize=False)
@@ -84,15 +84,15 @@ class PreprocVecEnv:
 
     def learned_rew(self, obs, info={}):
         assert 'Cube' in self.G.env, 'ya gotta'
-        done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
-        obs = tree_map(lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), obs)
+        done = torch.zeros(obs['lcd'].shape[0]).to(self.G.device)
+        obs = tree_map(lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), obs)
         obj = self.obj_loc(obs).detach()
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
         delta = (obj - goal).abs().mean(-1)
         info['goal_delta'] = (obs['goal:object'] - goal).abs().mean().cpu().detach()
         if self.G.diff_delt:
             last_obs = tree_map(
-                lambda x: th.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs
+                lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), self.last_obs
             )
             last_obj = self.obj_loc(last_obs).detach()
             last_delta = (last_obj - goal).abs().mean(-1)
@@ -119,7 +119,7 @@ class PreprocVecEnv:
             # info['preproc_rew'] = preproc_rew
             if 'RewardLenv' in self._env.__class__.__name__:
                 info['og_rew'] = info['og_rew'].cpu().detach()
-                success = th.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
+                success = torch.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
 
                 def fx(x):
                     if isinstance(x, np.ndarray):
@@ -142,9 +142,9 @@ class PreprocVecEnv:
             info['rew_delta'] = info['og_rew'] - rew
         self.last_obs = tree_map(lambda x: np.array(x), obs)
         if 'RewardLenv' in self._env.__class__.__name__:
-            rew = th.as_tensor(rew).to(self.G.device)
-            done = th.as_tensor(done).to(self.G.device)
-            obs = tree_map(lambda x: th.as_tensor(x).to(self.G.device), obs)
+            rew = torch.as_tensor(rew).to(self.G.device)
+            done = torch.as_tensor(done).to(self.G.device)
+            obs = tree_map(lambda x: torch.as_tensor(x).to(self.G.device), obs)
         return obs, rew, done, info
 
     def close(self):
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     import time
 
     import matplotlib.pyplot as plt
-    import torch as th
+    import torch
     import utils
     from body_goal import BodyGoalEnv
     from PIL import Image, ImageDraw, ImageFont
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     weightdir = 'logs/april22a/autoencoder/RNLDA/UrchinCube/'
     model_name = 'RNLDA'
 
-    sd = th.load(weightdir / f'{model_name}.pt')
+    sd = torch.load(weightdir / f'{model_name}.pt')
     mG = sd.pop('G')
     mG.device = G.device
     preproc = net_map[G.model](env, mG)
@@ -227,8 +227,8 @@ if __name__ == '__main__':
         lcds += [obs['lcd']]
         glcds += [obs['goal:lcd']]
     env.close()
-    lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
-    glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
+    lcds = torch.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
+    glcds = torch.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
     lcds = (1.0 * lcds - 1.0 * glcds + 1.0) / 2.0
     print('dt', time.time() - start)
     utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)

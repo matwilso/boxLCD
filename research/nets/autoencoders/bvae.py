@@ -1,5 +1,5 @@
 import numpy as np
-import torch as th
+import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
@@ -28,7 +28,7 @@ class BVAE(SingleStepAE):
 
     def sample_z(self, n):
         z = (
-            th.bernoulli(0.5 * th.ones(n, self.z_size))
+            torch.bernoulli(0.5 * torch.ones(n, self.z_size))
             .to(self.G.device)
             .reshape([n, -1, self.zH, self.zW])
         )
@@ -54,7 +54,7 @@ class BVAE(SingleStepAE):
             'loss/entropy': entropy,
             **recon_losses,
             'loss/recon_total': recon_loss,
-            'bvae_abs_probs': th.abs(probs - 0.5).mean(),
+            'bvae_abs_probs': torch.abs(probs - 0.5).mean(),
         }
         return loss, metrics
 

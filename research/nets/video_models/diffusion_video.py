@@ -1,6 +1,6 @@
 import copy
 
-import torch as th
+import torch
 import torch.nn.functional as F
 from einops import parse_shape, rearrange, repeat
 from jax.tree_util import tree_map
@@ -53,15 +53,15 @@ class DiffusionVideo(VideoModel):
         self._prompted_eval(
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         )
-        metrics = tree_map(lambda x: th.as_tensor(x).cpu(), metrics)
+        metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
     def _diffusion_video(
         self, epoch, writer, pred, truth=None, name=None, prompt_n=None
     ):
         pred = pred[:, :4]
-        pred = th.cat([pred, th.zeros_like(pred[:, :, :, :, :1])], axis=4)
-        pred = th.cat([pred, th.zeros_like(pred[:, :, :, :, :, :1])], axis=5)
+        pred = torch.cat([pred, torch.zeros_like(pred[:, :, :, :, :1])], axis=4)
+        pred = torch.cat([pred, torch.zeros_like(pred[:, :, :, :, :, :1])], axis=5)
         out = rearrange(pred, 's bs n t h w -> n s (bs h) (t w)')
         out = repeat(out, 'n s h w -> n s c h w', c=3)
         out = repeat(out, 'n s c h w -> n s c (h h2) (w w2)', h2=2, w2=2)
@@ -71,7 +71,7 @@ class DiffusionVideo(VideoModel):
 
     def loss(self, batch):
         lcd = (batch['lcd'] * 2) - 1
-        t = th.randint(0, self.G.timesteps, (lcd.shape[0],)).to(lcd.device)
+        t = torch.randint(0, self.G.timesteps, (lcd.shape[0],)).to(lcd.device)
         metrics = self.diffusion.training_losses(self.net, lcd, t)
         metrics = {key: val.mean() for key, val in metrics.items()}
         loss = metrics['loss']
@@ -79,8 +79,8 @@ class DiffusionVideo(VideoModel):
 
     def sample(self, n, action=None, prompts=None, prompt_n=None):
         vid_shape = (n, 1, self.G.window, self.G.lcd_h, self.G.lcd_w)
-        th.manual_seed(0)
-        noise = th.randn(vid_shape, device=self.G.device)
+        torch.manual_seed(0)
+        noise = torch.randn(vid_shape, device=self.G.device)
         if prompts is not None:
             prompts = (prompts['lcd'][:, None] * 2) - 1
             # prompts[:, :, :] = prompts[0,None,:,0,None]
@@ -89,8 +89,8 @@ class DiffusionVideo(VideoModel):
         )
         samps = [al['sample'] for al in all_samples]
         preds = [al['pred_xstart'] for al in all_samples]
-        diffusion_sampling = th.stack(samps)
-        diffusion_pred = th.stack(preds)
+        diffusion_sampling = torch.stack(samps)
+        diffusion_pred = torch.stack(preds)
         raw_samples = all_samples[-1]['sample']
         raw_samples = (raw_samples + 1) / 2
         return {
@@ -235,7 +235,7 @@ class Up(nn.Module):
         pass_through = pass_through[::-1]
         for i in range(len(self.seq)):
             layer, hoz_skip = self.seq[i], pass_through[i]
-            x = th.cat([x, hoz_skip], 1)
+            x = torch.cat([x, hoz_skip], 1)
             x = layer(x, emb)
         return x
 
@@ -248,7 +248,7 @@ class AttentionBlock(nn.Module):
         # self.attn = SelfAttention(n, n_embed, n_head, causal=False)
         self.register_buffer(
             "time_embed",
-            timestep_embedding(th.linspace(0, 1, n), n_embed, max_period=1).T,
+            timestep_embedding(torch.linspace(0, 1, n), n_embed, max_period=1).T,
         )
 
     def forward(self, x, emb=None):

@@ -9,7 +9,7 @@ from re import I
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 import yaml
 from jax.tree_util import tree_map, tree_multimap
 from torch.utils.data import DataLoader, Dataset
@@ -50,7 +50,7 @@ class LearnedEnv:
             p.requires_grad = False
 
         def act_sample():
-            return 2.0 * th.rand(self.action_space.shape).to(G.device) - 1.0
+            return 2.0 * torch.rand(self.action_space.shape).to(G.device) - 1.0
 
         self.action_space.sample = act_sample
         spaces = {}
@@ -66,20 +66,20 @@ class LearnedEnv:
         self.observation_space = gym.spaces.Dict(spaces)
 
     def reset(self, *args, update_window_batch=True, **kwargs):
-        with th.no_grad():
+        with torch.no_grad():
             prompts = [self.real_env.reset() for _ in range(self.num_envs)]
             prompts = tree_multimap(
-                lambda x, *y: th.as_tensor(np.stack([x, *y])).to(self.G.device),
+                lambda x, *y: torch.as_tensor(np.stack([x, *y])).to(self.G.device),
                 prompts[0],
                 *prompts[1:],
             )
             window_batch = {
-                key: th.zeros([self.model.G.window, *val.shape], dtype=th.float32).to(
+                key: torch.zeros([self.model.G.window, *val.shape], dtype=torch.float32).to(
                     self.G.device
                 )
                 for key, val in self.observation_space.spaces.items()
             }
-            window_batch['action'] = th.zeros(
+            window_batch['action'] = torch.zeros(
                 [self.model.G.window, *self.action_space.shape]
             ).to(self.G.device)
             window_batch = {
@@ -90,20 +90,20 @@ class LearnedEnv:
 
             # TODO: do more than one step.
             if self.G.reset_prompt:
-                # with th.no_grad():
+                # with torch.no_grad():
                 #  window_batch = self.model.onestep(window_batch, self.ptr, temp=self.G.lenv_temp)
                 self.ptr = 1
             else:
                 window_batch['action'] += (
-                    2.0 * th.rand(window_batch['action'].shape).to(self.G.device) - 1.0
+                    2.0 * torch.rand(window_batch['action'].shape).to(self.G.device) - 1.0
                 )
-                with th.no_grad():
+                with torch.no_grad():
                     for self.ptr in range(10):
                         window_batch = self.model.onestep(
                             window_batch, self.ptr, temp=self.G.lenv_temp
                         )
                     window_batch = {
-                        key: th.cat([val[:, 5:], th.zeros_like(val)[:, :5]], 1)
+                        key: torch.cat([val[:, 5:], torch.zeros_like(val)[:, :5]], 1)
                         for key, val in window_batch.items()
                     }
                     self.ptr = 4
@@ -119,10 +119,10 @@ class LearnedEnv:
             return obs
 
     def step(self, act):
-        with th.no_grad():
+        with torch.no_grad():
             self.ep_t += 1
-            with th.no_grad():
-                self.window_batch['action'][:, self.ptr - 1] = th.as_tensor(act).to(
+            with torch.no_grad():
+                self.window_batch['action'][:, self.ptr - 1] = torch.as_tensor(act).to(
                     self.G.device
                 )
                 self.window_batch = self.model.onestep(
@@ -136,11 +136,11 @@ class LearnedEnv:
                 self.ptr = min(1 + self.ptr, self.model.G.window - 1)
                 if self.ptr == self.model.G.window - 1:
                     self.window_batch = {
-                        key: th.cat([val[:, 1:], th.zeros_like(val)[:, :1]], 1)
+                        key: torch.cat([val[:, 1:], torch.zeros_like(val)[:, :1]], 1)
                         for key, val in self.window_batch.items()
                     }
                     self.ptr -= 1
-            rew, done = th.zeros(self.num_envs).to(self.G.device), th.zeros(
+            rew, done = torch.zeros(self.num_envs).to(self.G.device), torch.zeros(
                 self.num_envs
             ).to(self.G.device)
             done[:] = self.ep_t >= self.G.ep_len
@@ -157,7 +157,7 @@ class RewardLenv:
         self.pobs_keys = self.lenv.pobs_keys
         self.obs_keys = self.lenv.obs_keys
         self.goal = {
-            key: th.zeros(space.shape).to(self.G.device).float()
+            key: torch.zeros(space.shape).to(self.G.device).float()
             for key, space in self.observation_space.spaces.items()
             if 'goal' in key
         }
@@ -166,7 +166,7 @@ class RewardLenv:
                 arbiter_path = list(self.G.arbiterdir.glob('*.pt'))
                 if len(arbiter_path) > 0:
                     arbiter_path = arbiter_path[0]
-                self.obj_loc = th.jit.load(str(arbiter_path))
+                self.obj_loc = torch.jit.load(str(arbiter_path))
                 self.obj_loc.eval()
                 print('LOADED OBJECT LOCALIZER')
             else:
@@ -189,7 +189,7 @@ class RewardLenv:
         return base_space
 
     def step(self, act, logger=defaultdict(lambda: [])):
-        with th.no_grad():
+        with torch.no_grad():
             with utils.Timer(logger, 'lenv_step'):
                 obs, rew, ep_done, info = self.lenv.step(act)
             obs['goal:proprio'] = self.goal['goal:proprio'].detach().clone()
@@ -199,24 +199,24 @@ class RewardLenv:
 
             with utils.Timer(logger, 'comp_rew_done'):
                 rew, goal_done = self.comp_rew_done(obs, info)
-            success = th.logical_and(goal_done.bool(), ~ep_done.bool())
+            success = torch.logical_and(goal_done.bool(), ~ep_done.bool())
             rew[success] += 1.0
-            done = th.logical_or(ep_done.bool(), goal_done.bool())
+            done = torch.logical_or(ep_done.bool(), goal_done.bool())
             with utils.Timer(logger, 'post_proc'):
                 rew = rew * self.G.rew_scale
                 if self.G.autoreset:
-                    if th.all(ep_done):
+                    if torch.all(ep_done):
                         with utils.Timer(logger, 'reset_env'):
                             obs = self.reset()
                     else:
                         with utils.Timer(logger, 'reset_goals'):
-                            if th.any(goal_done):
+                            if torch.any(goal_done):
                                 self._reset_goals(goal_done, logger)
             self.last_obs = tree_map(lambda x: x.detach().clone(), obs)
             return obs, rew, done, info
 
     def _reset_goals(self, mask, logger=defaultdict(lambda: [])):
-        with th.no_grad():
+        with torch.no_grad():
             mask = mask.bool()
             if self.G.lenv_goals:
                 # assert not self.G.reset_prompt, 'we dont want to use prompts for this because its slow'
@@ -239,7 +239,7 @@ class RewardLenv:
                         for _ in np.arange(self.lenv.num_envs)
                     ]
                     new_goal = tree_multimap(
-                        lambda x, *y: th.as_tensor(np.stack([x, *y]))
+                        lambda x, *y: torch.as_tensor(np.stack([x, *y]))
                         .to(self.G.device)
                         .float(),
                         new_goal[0],
@@ -260,9 +260,9 @@ class RewardLenv:
                 )
 
     def reset(self, *args, **kwargs):
-        with th.no_grad():
+        with torch.no_grad():
             self._reset_goals(
-                th.ones(self.lenv.num_envs, dtype=th.int32).to(self.G.device)
+                torch.ones(self.lenv.num_envs, dtype=torch.int32).to(self.G.device)
             )
             obs = self.lenv.reset(*args, **kwargs)
             obs['goal:lcd'] = self.goal['goal:lcd'].detach().clone()
@@ -276,7 +276,7 @@ class RewardLenv:
         self.lenv.render(*args, **kwargs)
 
     def comp_rew_done(self, obs, info={}):
-        done = th.zeros(obs['lcd'].shape[0]).to(self.G.device)
+        done = torch.zeros(obs['lcd'].shape[0]).to(self.G.device)
         if 'BodyGoal' in self.real_env.__class__.__name__:
             keys = utils.filtlist(self.pobs_keys, '.*(x|y):p')
             idxs = [self.pobs_keys.index(x) for x in keys]
@@ -343,7 +343,7 @@ if __name__ == '__main__':
 
     env = env_fn(G)()
 
-    sd = th.load(G.weightdir / f'{G.model}.pt')
+    sd = torch.load(G.weightdir / f'{G.model}.pt')
     mG = sd.pop('G')
     mG.device = G.device
     model = net_map[G.model](env, mG)
@@ -371,8 +371,8 @@ if __name__ == '__main__':
         rews += [rew.detach().cpu().numpy()]
         deltas += [info['delta'].cpu().numpy()]
 
-    lcds = th.stack(lcds).flatten(1, 2).cpu().numpy()
-    glcds = th.stack(glcds).flatten(1, 2).cpu().numpy()
+    lcds = torch.stack(lcds).flatten(1, 2).cpu().numpy()
+    glcds = torch.stack(glcds).flatten(1, 2).cpu().numpy()
     lcds = (lcds - glcds + 1.0) / 2.0
     print('1', time.time() - start)
     lcds = outproc(lcds)
@@ -418,8 +418,8 @@ if __name__ == '__main__':
     #  glcds += [obs['goal:lcd']]
     # venv.close()
     # print('3', time.time() - vstart)
-    # lcds = th.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
-    # glcds = th.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
+    # lcds = torch.as_tensor(np.stack(lcds)).flatten(1, 2).cpu().numpy()
+    # glcds = torch.as_tensor(np.stack(glcds)).flatten(1, 2).cpu().numpy()
     # lcds = (1.0*lcds - 1.0*glcds + 1.0) / 2.0
     # print('1', time.time() - start)
     # utils.write_gif('realtest.gif', outproc(lcds), fps=G.fps)

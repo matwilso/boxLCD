@@ -2,7 +2,7 @@ from collections import defaultdict
 from re import I
 
 import numpy as np
-import torch as th
+import torch
 from jax.tree_util import tree_map, tree_multimap
 
 from research import utils
@@ -64,7 +64,7 @@ class OGRB:
         batch['obs2'] = o2
         # assert np.isclose(np.mean((o['goal:proprio'] - o2['goal:proprio'])**2), 0.0), "AHH"
         return tree_map(
-            lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch
+            lambda v: torch.as_tensor(v, dtype=torch.float32).to(self.G.device), batch
         )
 
 
@@ -124,7 +124,7 @@ class ReplayBuffer:
         batch['obs2'] = o2
         # assert np.isclose(np.mean((o['goal:proprio'] - o2['goal:proprio'])**2), 0.0), "AHH"
         return tree_map(
-            lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), batch
+            lambda v: torch.as_tensor(v, dtype=torch.float32).to(self.G.device), batch
         )
 
 
@@ -210,5 +210,5 @@ class PPOBuffer:
         data = utils.nfiltdict(data, '(o:|o2:)')
         data['obs'] = o
         return tree_map(
-            lambda v: th.as_tensor(v, dtype=th.float32).to(self.G.device), data
+            lambda v: torch.as_tensor(v, dtype=torch.float32).to(self.G.device), data
         )

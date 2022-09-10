@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
-import torch as th
+import torch
 import yaml
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset

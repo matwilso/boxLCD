@@ -1,5 +1,5 @@
 import ignite
-import torch as th
+import torch
 from torch import nn
 from torch.optim import Adam
 
@@ -30,12 +30,12 @@ class Net(nn.Module):
         path = dir / f'{self.name}.pt'
         sd = self.state_dict()
         sd['G'] = self.G
-        th.save(sd, path)
+        torch.save(sd, path)
         print(path)
 
     def load(self, dir, device=None):
         path = dir / f'{self.name}.pt'
-        sd = th.load(path, map_location=self.G.device)
+        sd = torch.load(path, map_location=self.G.device)
         G = sd.pop('G')
         self.load_state_dict(sd)
         print(f'LOADED {path}')

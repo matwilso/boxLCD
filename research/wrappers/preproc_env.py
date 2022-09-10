@@ -4,7 +4,7 @@ from re import I
 
 import gym
 import numpy as np
-import torch as th
+import torch
 from gym.utils import EzPickle, seeding
 from scipy.spatial.distance import cosine
 
@@ -20,12 +20,12 @@ class PreprocEnv:
 
     def __init__(self, env, G, device='cpu'):
         # weightdir = pathlib.Path('./logs/qvae/binary_vqd32_save5_64_again')
-        # MC = th.load(weightdir / 'bvae.pt').pop('G')
+        # MC = torch.load(weightdir / 'bvae.pt').pop('G')
         # self.model = BVAE(env, MC)
         # self.model.load(weightdir)
 
         weightdir = pathlib.Path('./logs/qvae/urchincube/justvae_64_2/')
-        MC = th.load(weightdir / 'vae.pt').pop('G')
+        MC = torch.load(weightdir / 'vae.pt').pop('G')
         self.model = VAE(MC)
         self.model.load(weightdir)
 
@@ -54,7 +54,7 @@ class PreprocEnv:
 
     def _preproc_obs(self, obs):
         batch_obs = {
-            key: th.as_tensor(1.0 * val[None]).float().to(self.G.device)
+            key: torch.as_tensor(1.0 * val[None]).float().to(self.G.device)
             for key, val in obs.items()
         }
         zstate = self.model.encode(batch_obs)
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     import time
 
     import matplotlib.pyplot as plt
-    import torch as th
+    import torch
     import utils
     from body_goal import BodyGoalEnv
     from cube_goal import CubeGoalEnv
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     G.goal_thresh = 0.01
     # env = envs.Luxo(G)
     # weightdir = pathlib.Path('./logs/qvae/binary_vqd32_save5_64_again')
-    # MC = th.load(weightdir / 'bvae.pt').pop('G')
+    # MC = torch.load(weightdir / 'bvae.pt').pop('G')
     # model = BVAE(env, MC)
     # model.load(weightdir)
     env = envs.UrchinCube(G)
@@ -158,7 +158,7 @@ if __name__ == '__main__':
         # env.render(mode='human')
         act = env.action_space.sample()
         obs, rew, done, info = env.step(act)
-        # o = {key: th.as_tensor(val[None].astype(np.float32), dtype=th.float32).to(G.device) for key, val in obs.items()}
+        # o = {key: torch.as_tensor(val[None].astype(np.float32), dtype=torch.float32).to(G.device) for key, val in obs.items()}
         lcds += [obs['lcd']]
         glcds += [obs['goal:lcd']]
         rews += [rew]

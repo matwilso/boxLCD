@@ -8,7 +8,7 @@ from shutil import copyfile
 
 import numpy as np
 import scipy
-import torch as th
+import torch
 import yaml
 from einops import rearrange
 from scipy.linalg import fractional_matrix_power
@@ -94,7 +94,7 @@ class AttrDict(dict):
 
 
 def tileN(x, N):
-    return th.tile(x[None], [N] + [1] * len(x.shape))
+    return torch.tile(x[None], [N] + [1] * len(x.shape))
 
 
 def combined_shape(length, shape=None):
@@ -112,7 +112,7 @@ def dump_logger(logger, writer, i, G, verbose=True):
     print(i)
     for key in logger:
         check = logger[key][0] if isinstance(logger[key], list) else logger[key]
-        if th.is_tensor(check):
+        if torch.is_tensor(check):
             assert (
                 check.device.type == 'cpu'
             ), f'all metrics should be on the cpu before logging. {key} is on {check.device}'
@@ -175,7 +175,7 @@ def force_shape(out):
         )
     else:
         out = out.permute(1, 2, 3, 0, 4)
-        out = th.cat([out, th.zeros(out.shape[:-1])[..., None]], -1)
+        out = torch.cat([out, torch.zeros(out.shape[:-1])[..., None]], -1)
     out = out.reshape(T, C, H, N * (W + 1))[None]
     return out
 
@@ -285,7 +285,7 @@ class Timer:
 
 
 def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
-    th._C._log_api_usage_once("tensorboard.logging.add_video")
+    torch._C._log_api_usage_once("tensorboard.logging.add_video")
     from tensorboard.compat.proto.summary_pb2 import Summary
     from torch.utils.tensorboard import _convert_np, _utils, summary
 
@@ -340,14 +340,14 @@ def make_video(tensor, fps):
 
 
 def compute_grad_norm(parameters):
-    if isinstance(parameters, th.Tensor):
+    if isinstance(parameters, torch.Tensor):
         parameters = [parameters]
     parameters = [p for p in parameters if p.grad is not None]
     if len(parameters) == 0:
-        return th.tensor(0.0)
+        return torch.tensor(0.0)
     device = parameters[0].grad.device
-    total_norm = th.norm(
-        th.stack([th.norm(p.grad.detach()).to(device) for p in parameters])
+    total_norm = torch.norm(
+        torch.stack([th.norm(p.grad.detach()).to(device) for p in parameters])
     )
     return total_norm
 
@@ -389,12 +389,12 @@ def manifold_estimate(set_a, set_b, k=3):
     """https://arxiv.org/abs/1904.06991"""
     # compute manifold
     # with PTimer('cdist1'):
-    d = th.cdist(set_a, set_a)
+    d = torch.cdist(set_a, set_a)
     # with PTimer('topk'):
-    radii = th.topk(d, k + 1, largest=False)[0][..., -1:]
+    radii = torch.topk(d, k + 1, largest=False)[0][..., -1:]
     # eval
     # with PTimer('cdist2'):
-    d2 = th.cdist(set_a, set_b)
+    d2 = torch.cdist(set_a, set_b)
     return (d2 < radii).any(0).float().mean()
 
 
@@ -448,9 +448,9 @@ def to_np(x):
 
 
 if __name__ == '__main__':
-    real = th.rand(1000, 128)
-    gen = th.randn(1000, 128)
-    dist = th.cdist(real, gen)
+    real = torch.rand(1000, 128)
+    gen = torch.randn(1000, 128)
+    dist = torch.cdist(real, gen)
     # precision = realistic, recall = coverage.
     # precision = manifold_estimate(real, gen, 3)
     # recall = manifold_estimate(gen, real, 3)
