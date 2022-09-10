@@ -53,9 +53,9 @@ class FBT(VideoModel):
         # forward the GPT model
         BS, T, E = x.shape
         # SHIFT RIGHT (add a padding on the left)
-        x = torch.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+        x = torch.cat([torch.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
         action = torch.cat(
-            [th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
+            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
         )
         cin = self.cond_in(action)
         if action.ndim == 2:

@@ -60,9 +60,9 @@ class FIT(VideoModel):
         x = lcd
         BS, T, E = x.shape
         # SHIFT RIGHT (add a padding on the left)
-        x = torch.cat([th.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
+        x = torch.cat([torch.zeros(BS, 1, E).to(self.G.device), x[:, :-1]], dim=1)
         action = torch.cat(
-            [th.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
+            [torch.zeros(BS, 1, action.shape[-1]).to(self.G.device), action[:, :-1]], dim=1
         )
         # forward the GPT model
         if self.G.conv_io:

@@ -174,7 +174,7 @@ class RSSM(VideoModel):
                 embed = self.encoder(flat_batch).unflatten(
                     0, (*batch['lcd'].shape[:2],)
                 )
-                action = torch.cat([th.zeros_like(action)[:, :1], action[:, :-1]], 1)
+                action = torch.cat([torch.zeros_like(action)[:, :1], action[:, :-1]], 1)
                 post, prior = self.observe(embed, action[:, :prompt_n])
                 prior = self.imagine(
                     action[:, prompt_n:], state=tree_map(lambda x: x[:, -1], post)

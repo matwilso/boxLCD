@@ -181,7 +181,7 @@ class RolloutDataset(IterableDataset):
             ep_len = elems['lcd'].shape[1]
             # elems = {key: torch.as_tensor(np.c_[np.zeros_like(curr_barrel[key])[:self.window], curr_barrel[key]], dtype=torch.float32) for key in curr_barrel.keys()}
             pad = self.window - 1
-            # elems = {key: torch.cat([th.zeros_like(val)[:,:pad], val, torch.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
+            # elems = {key: torch.cat([torch.zeros_like(val)[:,:pad], val, torch.zeros_like(val)[:,:pad]], axis=1) for key, val in elems.items()}
             lcd = elems['lcd']
 
             idxs = np.arange(BARREL_SIZE)

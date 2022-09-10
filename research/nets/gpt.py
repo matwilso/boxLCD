@@ -39,14 +39,14 @@ class GPT(nn.Module):
     def forward(self, x, cond=None):
         BS, T, G = x.shape
         # SHIFT RIGHT (add a padding on the left) so you can't see yourself
-        x = torch.cat([th.zeros(BS, 1, G).to(self.G.device), x[:, :-1]], dim=1)
+        x = torch.cat([torch.zeros(BS, 1, G).to(self.G.device), x[:, :-1]], dim=1)
         # forward the GPT model
         x = self.embed(x)
         x += self.pos_emb  # each position maps to a (learnable) vector
         if cond is not None:
             cond = self.cond_in(cond)
             cond = torch.cat(
-                [th.zeros(BS, 1, self.G.n_embed).to(self.G.device), cond[:, :-1]], dim=1
+                [torch.zeros(BS, 1, self.G.n_embed).to(self.G.device), cond[:, :-1]], dim=1
             )
             x += cond
         # add padding on left so that we can't see ourself.

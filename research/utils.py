@@ -346,7 +346,7 @@ def compute_grad_norm(parameters):
         return torch.tensor(0.0)
     device = parameters[0].grad.device
     total_norm = torch.norm(
-        torch.stack([th.norm(p.grad.detach()).to(device) for p in parameters])
+        torch.stack([torch.norm(p.grad.detach()).to(device) for p in parameters])
     )
     return total_norm
 

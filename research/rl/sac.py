@@ -196,7 +196,7 @@ class SAC(RLAlgo):
             loss_alpha.backward()
             self.alpha_optimizer.step()
             self.logger['LossAlpha'] += [loss_alpha.detach().cpu()]
-            self.logger['Alpha'] += [th.exp(self.ac.log_alpha.detach().cpu())]
+            self.logger['Alpha'] += [torch.exp(self.ac.log_alpha.detach().cpu())]
 
         # Unfreeze Q-networks so you can optimize it at next DDPG step.
         for p in self.q_params:
