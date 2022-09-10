@@ -1,13 +1,8 @@
-import argparse
-import copy
 import itertools
-import math
-import sys
 import time
 from collections import defaultdict
 
 import Box2D
-import gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pyglet
@@ -19,8 +14,6 @@ from Box2D.b2 import (
     frictionJointDef,
     polygonShape,
 )
-from gym import spaces
-from gym.utils import EzPickle, seeding
 from pyglet.gl import glClearColor
 
 from boxLCD import ENV_DG, env_map, envs, utils

@@ -5,10 +5,7 @@ import torch.nn.functional as F
 import yaml
 from einops import parse_shape, rearrange, repeat
 from jax.tree_util import tree_map
-from torch import distributions as thd
 from torch import nn
-from torch.optim import Adam
-from torch.utils.tensorboard import SummaryWriter
 
 from research import utils
 from research.nets.autoencoders.video_autoencoder import Decoder

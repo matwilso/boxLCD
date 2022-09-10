@@ -1,20 +1,13 @@
-import argparse
 import itertools
 import time
-import uuid
 from datetime import datetime
-from re import I
-from sys import maxsize
 
 import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
 import torch
-import yaml
-from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm
 
 from boxLCD.utils import A

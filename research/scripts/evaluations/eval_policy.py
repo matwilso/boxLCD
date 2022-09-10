@@ -1,6 +1,5 @@
 import argparse
 from collections import defaultdict
-from shutil import ignore_patterns
 
 import matplotlib.pyplot as plt
 import numpy as np

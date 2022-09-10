@@ -3,7 +3,6 @@ import argparse
 import subprocess
 from collections import defaultdict
 from pathlib import Path
-from re import sub
 
 from matplotlib.pyplot import tricontour
 

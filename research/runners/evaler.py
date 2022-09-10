@@ -1,10 +1,6 @@
-import argparse
-import copy
 import itertools
 import pickle
-import time
 from collections import defaultdict
-from datetime import datetime
 
 import ignite
 import matplotlib.pyplot as plt
@@ -13,9 +9,6 @@ import torch
 import yaml
 from jax.tree_util import tree_map
 from torch import nn
-from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.tensorboard import SummaryWriter
 
 from boxLCD.utils import A
 from research import data, utils

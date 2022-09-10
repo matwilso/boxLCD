@@ -1,19 +1,13 @@
-import sys
-from collections import defaultdict
 from itertools import chain, count
-from os import stat
-from shutil import ignore_patterns
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as torchvision
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
 from torch.optim import Adam
-from torch.utils.tensorboard import SummaryWriter
 
 from research import utils
 from research.nets.common import (

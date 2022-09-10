@@ -1,11 +1,8 @@
-import copy
 import pathlib
-from re import I
 
 import gym
 import numpy as np
 import torch
-from gym.utils import EzPickle, seeding
 from scipy.spatial.distance import cosine
 
 from research import utils

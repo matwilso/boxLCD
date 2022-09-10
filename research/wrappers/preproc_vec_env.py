@@ -1,10 +1,8 @@
 import copy
-from re import I
 
 import gym
 import numpy as np
 import torch
-from gym.utils import EzPickle, seeding
 from jax.tree_util import tree_map, tree_multimap
 from scipy.spatial.distance import cosine
 
@@ -152,7 +150,6 @@ class PreprocVecEnv:
 
 
 if __name__ == '__main__':
-    import pathlib
     import time
 
     import matplotlib.pyplot as plt

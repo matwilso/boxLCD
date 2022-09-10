@@ -1,8 +1,6 @@
 import copy
 
-import gym
 import numpy as np
-from gym.utils import EzPickle, seeding
 
 from research import utils
 
@@ -100,11 +98,9 @@ class CubeGoalEnv:
 
 
 if __name__ == '__main__':
-    import pathlib
-    import time
+    pass
 
     import matplotlib.pyplot as plt
-    import torch
     import utils
     from PIL import Image, ImageDraw, ImageFont
     from rl.sacnets import ActorCritic

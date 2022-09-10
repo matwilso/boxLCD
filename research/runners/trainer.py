@@ -1,15 +1,10 @@
-import argparse
-import copy
 import itertools
 import time
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
-from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from boxLCD.utils import A

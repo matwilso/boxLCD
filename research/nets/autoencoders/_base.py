@@ -1,9 +1,6 @@
 import numpy as np
 import torch
-import torch.nn as nn
 from einops import rearrange
-from torch import distributions as thd
-from torch.optim import Adam
 
 from research import utils
 from research.nets._base import Net

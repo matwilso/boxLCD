@@ -1,20 +1,13 @@
 import itertools
 import time
-from collections import defaultdict
-from copy import deepcopy
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import yaml
 
 # from research.nets.flat_everything import FlatEverything
 from jax.tree_util import tree_map, tree_multimap
-from torch.distributions.normal import Normal
 from torch.optim import Adam
 
 import boxLCD
@@ -121,7 +114,6 @@ class PPO(RLAlgo):
 
     def run_firehose(self):
         """run w/o leaving GPU"""
-        pass
 
     def run(self):
         # Prepare for interaction with environment

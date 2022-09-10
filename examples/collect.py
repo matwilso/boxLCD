@@ -1,18 +1,11 @@
-import argparse
 import itertools
 import os
 import time
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
-import torch
-import yaml
-from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils import parse_args
 

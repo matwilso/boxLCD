@@ -3,8 +3,6 @@
 
 import io
 import os
-import sys
-from shutil import rmtree
 
 from setuptools import Command, find_packages, setup
 

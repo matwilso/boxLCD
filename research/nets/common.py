@@ -5,7 +5,6 @@ import torch
 import torch.nn.functional as F
 from torch import distributions as thd
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 
 
 def zero_module(module):

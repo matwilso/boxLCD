@@ -1,13 +1,6 @@
-import atexit
 import copy
-import functools
-import sys
-import threading
-import traceback
 
-import gym
 import numpy as np
-from gym.utils import EzPickle, seeding
 from PIL import Image
 
 from research import utils
@@ -110,12 +103,10 @@ class BodyGoalEnv:
 
 
 if __name__ == '__main__':
-    import pathlib
-    import time
+    pass
 
     import matplotlib.pyplot as plt
     import PIL
-    import torch
     import utils
     from PIL import Image, ImageDraw, ImageFont
     from rl.sacnets import ActorCritic

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, List, NamedTuple, Set, Tuple
+from typing import Dict, List, NamedTuple, Tuple
 
 import Box2D
 from Box2D.b2 import (

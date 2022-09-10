@@ -1,17 +1,12 @@
-import copy
 import itertools
 import time
 from collections import defaultdict
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pyglet
 import torch
-import yaml
 from pyglet.gl import glClearColor
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.tensorboard import SummaryWriter
 
 from boxLCD.utils import A, NamedArray
 from research import data, utils

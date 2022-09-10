@@ -1,20 +1,14 @@
-import sys
-from collections import defaultdict
 from itertools import chain, count
-from re import I
 
 import ignite
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as torchvision
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 from jax.tree_util import tree_map, tree_multimap
 from torch import distributions as thd
 from torch import nn
-from torch.optim import Adam
-from torch.utils.tensorboard import SummaryWriter
 
 from research import utils
 from research.nets.common import (

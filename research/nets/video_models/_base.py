@@ -1,12 +1,8 @@
-from re import I
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
 from jax.tree_util import tree_map
-from torch import distributions as thd
-from torch.optim import Adam
 
 from research import utils
 from research.nets._base import Net

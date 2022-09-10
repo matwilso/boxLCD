@@ -1,20 +1,12 @@
-import argparse
-import copy
 import itertools
-import os
-import pathlib
 import time
-from collections import defaultdict
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import utils
-import yaml
 from model import GPT
 from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils import parse_args

@@ -1,12 +1,5 @@
-import argparse
 import itertools
-import time
-from collections import defaultdict
-from copy import deepcopy
-from datetime import datetime
-from re import I
 
-import gym
 import numpy as np
 import PIL
 import scipy.signal
@@ -14,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from torch.optim import Adam
 
 from research import utils
 from research.wrappers.cube_goal import CubeGoalEnv

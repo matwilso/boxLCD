@@ -1,7 +1,6 @@
 import os
 import pathlib
 import re
-import subprocess
 import time
 from collections import defaultdict
 from shutil import copyfile
@@ -287,7 +286,7 @@ class Timer:
 def add_video(writer, tag, vid_tensor, global_step=None, fps=4, walltime=None):
     torch._C._log_api_usage_once("tensorboard.logging.add_video")
     from tensorboard.compat.proto.summary_pb2 import Summary
-    from torch.utils.tensorboard import _convert_np, _utils, summary
+    from torch.utils.tensorboard import _convert_np, summary
 
     tensor = _convert_np.make_np(vid_tensor)
     # tensor = _utils._prepare_video(tensor)

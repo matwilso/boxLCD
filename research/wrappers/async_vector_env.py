@@ -3,7 +3,6 @@ import sys
 import time
 from copy import deepcopy
 from enum import Enum
-from re import I
 
 import numpy as np
 from gym import logger

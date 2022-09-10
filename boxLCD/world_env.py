@@ -1,5 +1,3 @@
-import time
-from functools import partial
 
 import Box2D
 import gym
@@ -15,7 +13,6 @@ from Box2D.b2 import (
     polygonShape,
     revoluteJointDef,
 )
-from gym.envs.classic_control import rendering
 from gym.utils import EzPickle, seeding
 from matplotlib import colors
 
