@@ -1,5 +1,4 @@
 from .evaler import Evaler
-from .fiddler import Fiddler
 from .trainer import Trainer
 from .vizer import Vizer
 

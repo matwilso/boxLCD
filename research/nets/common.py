@@ -341,7 +341,7 @@ def zero_module(module):
     return module
 
 
-def timestep_embedding(timesteps, dim, max_period):
+def timestep_embedding(*, timesteps, dim, max_period):
     """
     Create sinusoidal timestep embeddings.
 

@@ -188,16 +188,6 @@ class WorldEnv(gym.Env, EzPickle):
             ur = -lr
         return utils.mapto(self.np_random.uniform(lr, ur), self.obs_info[f'{namex}'])
 
-    def _comp_angle(self, name, body, base_pos):
-        import ipdb
-
-        ipdb.set_trace()
-        cxy = (self._sample(f'{name}:kx:p'), self._sample(f'{name}:ky:p')) - A[base_pos]
-        base_angle = np.arctan2(*body.shape.vertices[-1][::-1])
-        offset_angle = np.arctan2(*cxy[::-1])
-        ang = offset_angle - base_angle
-        return np.arctan2(np.sin(ang), np.cos(ang))
-
     def close(self):
         if self.viewer is not None:
             self.viewer.window.close()

@@ -1,6 +1,7 @@
 import itertools
 import time
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
@@ -143,17 +144,18 @@ def fill_barrels_slow(env, num_barrels, prefix, G):
 
 
 class RolloutDataset(IterableDataset):
-    def __init__(self, barrel_path, window=int(1e9), infinite=True, refresh_data=False):
+    def __init__(self, barrel_path, window=int(1e9), infinite=True, refresh_data=False, max_barrels=None):
         super().__init__()
         self.window = window
         self.infinite = infinite
         self.barrel_path = barrel_path
         self.refresh_data = refresh_data
+        self.max_barrels = max_barrels
         self._refresh()
 
     def _refresh(self):
         """recheck the directory for new barrels"""
-        self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))
+        self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))[:self.max_barrels]
         self.nbarrels = len(self.barrel_files)
         assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
@@ -218,15 +220,10 @@ class RolloutDataset(IterableDataset):
 
 
 def load_ds(G):
-    # def collate_fn(*args, **kwargs):
-    #  print(args, kwargs)
-    #  tree_multi_map(lambda x, *y: )
-    #  import ipdb; ipdb.set_trace()
-    #  pass
-    test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False)
-    # test_loader = DataLoader(test_dset, batch_size=G.bs, pin_memory=G.device == 'cuda', num_workers=G.data_workers, drop_last=True)
+    test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False, max_barrels=1)
     test_loader = DataLoader(
         test_dset,
+        #batch_size=G.bs,
         batch_size=8,
         pin_memory=G.device == 'cuda',
         num_workers=G.data_workers,
@@ -246,4 +243,6 @@ def load_ds(G):
 
     train_loader.nbarrels = train_dset.nbarrels
     test_loader.nbarrels = test_dset.nbarrels
+    print(f"Number of train barrels {train_dset.nbarrels}")
+    print(f"Number of test barrels {test_dset.nbarrels}")
     return train_loader, test_loader

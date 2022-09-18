@@ -444,14 +444,3 @@ def to_np(x):
         return x
     else:
         return x.detach().cpu().numpy()
-
-
-if __name__ == '__main__':
-    real = torch.rand(1000, 128)
-    gen = torch.randn(1000, 128)
-    dist = torch.cdist(real, gen)
-    # precision = realistic, recall = coverage.
-    # precision = manifold_estimate(real, gen, 3)
-    # recall = manifold_estimate(gen, real, 3)
-    # f1 = 2 * (precision * recall) / (precision + recall)
-    # print(precision, recall, f1)

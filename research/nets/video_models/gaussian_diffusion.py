@@ -28,7 +28,7 @@ class GaussianDiffusion:
             0.0001, 0.02, self.num_timesteps, dtype=np.float64
         )  # linear version
         self.log_betas = np.log(self.betas)
-        alphas = 1.0 - self.betas
+        self.alphas = alphas = 1.0 - self.betas
         self.alphas_cumprod = np.cumprod(alphas, axis=0)
         self.alphas_cumprod_prev = np.append(1.0, self.alphas_cumprod[:-1])
         self.alphas_cumprod_next = np.append(self.alphas_cumprod[1:], 0.0)
@@ -77,11 +77,14 @@ class GaussianDiffusion:
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     # REVERSE DIFFUSION
-    def p_dist(self, model, x, t, model_kwargs={}):
+    def p_dist(self, model, x, t, prompt_n=None, model_kwargs={}):
         """
         Apply the model to get p(x_{t-1} | x_t), as well as a prediction of
-        the initial x, x_0.
+        the initial x (ie. x_0).
         """
+        if prompt_n is not None:
+            x = x.detach()
+            x.requires_grad = True
         # Pass x_t through model and compute eps
         model_out = model(x, t, **model_kwargs)
         eps, model_var = torch.split(model_out, x.shape[1], dim=1)
@@ -103,6 +106,19 @@ class GaussianDiffusion:
             self.sqrt_recip_alphas_cumprod[t] * x
             - self.sqrt_recipm1_alphas_cumprod[t] * eps
         )
+
+        if prompt_n is not None:
+        #if False:
+            prompt = x[:, :, :prompt_n].detach()
+            pred_prompt = pred_xstart[:, :, :prompt_n]
+            conditional_loss = (prompt - pred_prompt).pow(2).mean()
+            conditional_loss.backward()
+            conditional_grad = x.grad
+            conditional_dir = -conditional_grad / (2*self.alphas[t])
+            #print('condir', conditional_dir.abs().mean())
+            pred_xstart = pred_xstart + conditional_dir
+            # TODO: use gradients within a no_grad or lessen the scope of no grad
+
         pred_xstart = pred_xstart.clamp(-1, 1)
 
         # using the reparamerization, the mean is defined via the posterior distribution equation. (see equation 13, improved paper)
@@ -117,9 +133,9 @@ class GaussianDiffusion:
             "pred_xstart": pred_xstart,
         }
 
-    def _p_sample_step(self, model, x, t, model_kwargs={}):
+    def _p_sample_step(self, model, x, t, prompt_n=None, model_kwargs={}):
         """Sample x_{t-1} ~ p(x_{t-1}|x_t) using the model."""
-        out = self.p_dist(model, x, t, model_kwargs=model_kwargs)
+        out = self.p_dist(model, x, t, prompt_n=prompt_n, model_kwargs=model_kwargs)
         noise = torch.randn_like(x)
         nonzero_mask = (
             (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
@@ -145,10 +161,15 @@ class GaussianDiffusion:
                     prompt_n is not None
                 ), "This would overwrite the whole sample with the prompt. Probably not what you want."
                 img[:, :, :prompt_n] = prompts[:, :, :prompt_n]
-            with torch.no_grad():
-                out = self._p_sample_step(model, img, t, model_kwargs=model_kwargs)
-                outs += [out]
-                img = out["sample"]
+
+                out = self._p_sample_step(model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs)
+            else:
+                with torch.no_grad():
+                    out = self._p_sample_step(model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs)
+
+            out = {key: val.detach() for key, val in out.items()}
+            outs += [out]
+            img = out["sample"]
         return outs
 
     # LOSSES AND LOSS TERMS
@@ -171,6 +192,7 @@ class GaussianDiffusion:
         terms["vb"] *= (
             self.num_timesteps / 1000.0
         )  # Divide by 1000 for equivalence with initial implementation. else VB term hurts the MSE term.
+        terms['vb'] *= 0.0
         terms["loss"] = terms["mse"] + terms["vb"]
         return terms
 

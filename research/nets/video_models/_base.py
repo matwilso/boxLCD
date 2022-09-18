@@ -216,6 +216,7 @@ class VideoModel(Net):
                 taz = arbiter.forward(utils.flat_batch(batch))
                 cosdist = 1 - self.cossim(paz, taz).mean().cpu()
                 metrics['eval/cosdist'] = cosdist
+        return sample
 
     def _lcd_video(self, epoch, writer, pred, gt=None, name=None, prompt_n=None):
         """visualize lcd reconstructions"""
@@ -223,6 +224,7 @@ class VideoModel(Net):
         # visualization
         pred = pred[: self.G.video_n]
         if gt is not None:
+            # TODO: change order of channel earlier so we can use logic like below. maybe we should keep it in C last usually and reshape for conv
             gt = gt[: self.G.video_n]
             error = (pred - gt + 1.0) / 2.0
             hoz_div = torch.zeros_like(gt)[..., :1, :]
@@ -255,37 +257,29 @@ class VideoModel(Net):
                 np.arange(self.G.video_n), proprio=pred_proprio[:, i]
             )['lcd']
             pred_lcds += [lcd]
-        pred_lcds = 1.0 * np.stack(pred_lcds, 1)[:, :, None]
+        pred_lcds = 1.0 * np.stack(pred_lcds, 1)
 
         if truth is not None:
             true_proprio = truth[: self.G.video_n].cpu().detach().numpy()
             true_lcds = []
             for i in range(true_proprio.shape[1]):
-                lcd = self.venv.reset(
-                    np.arange(self.G.video_n), proprio=true_proprio[:, i]
-                )['lcd']
+                lcd = self.venv.reset(np.arange(self.G.video_n), proprio=true_proprio[:, i])['lcd']
                 true_lcds += [lcd]
-            true_lcds = 1.0 * np.stack(true_lcds, 1)[:, :, None]
+            true_lcds = 1.0 * np.stack(true_lcds, 1)
             error = (pred_lcds - true_lcds + 1.0) / 2.0
-            blank = np.zeros_like(true_lcds)[..., :1, :]
-            out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], 3)
+            blank = np.zeros_like(true_lcds)[..., :1, :, :]
+            blank[:, :prompt_n] = YELLOW
+            blank[:, prompt_n:] = GREEN
+            out = np.concatenate([true_lcds, blank, pred_lcds, blank, error], axis=-3)
             name = name or 'prompted_proprio'
         else:
             name = name or 'unprompted_proprio'
             out = pred_lcds
-        out = utils.force_shape(out)
-        out = out.repeat(3, 2)
-        if prompt_n is not None:
-            W, H = self.G.lcd_w, self.G.lcd_h
-            out = out.transpose(0, 1, 4, 3, 2)
-            for j in range(7):
-                out[:, :prompt_n, W * (j + 1) + j, :] = GREEN
-                out[:, prompt_n:, W * (j + 1) + j, :] = RED
-            out[:, :prompt_n, :, H] = GREEN
-            out[:, prompt_n:, :, H] = RED
-            out[:, :prompt_n, :, 2 * H + 1] = GREEN
-            out[:, prompt_n:, :, 2 * H + 1] = RED
-            out = out.transpose(0, 1, 4, 3, 2)
-            # out[:,:prompt_n] = np.where(out==[0.0,0.0,0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0])[:,:prompt_n]
-        out = out.repeat(4, -1).repeat(4, -2)
+
+        ver_div = np.zeros_like(out)[..., :1, :]
+        ver_div[:, :prompt_n] = YELLOW
+        ver_div[:, prompt_n:] = GREEN
+        out = np.concatenate([out, ver_div], axis=-2)
+        out = rearrange(out, 'bs t h w c -> t h (bs w) c')
+        out = repeat(out, 't h w c -> t (h h2) (w w2) c', h2=4, w2=4)
         utils.add_video(writer, name, out, epoch, fps=self.G.fps)

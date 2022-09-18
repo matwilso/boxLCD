@@ -67,25 +67,28 @@ class Trainer:
 
             if itr % self.G.log_n == 0 or self.G.skip_train:
                 self.model.eval()
-                with torch.no_grad():
-                    with Timer(self.logger, 'test'):
+                with Timer(self.logger, 'test'):
+                    with torch.no_grad():
                         # compute loss on all data
                         for test_batch in self.test_ds:
+                            proc_test_batch = self.b(test_batch)
                             metrics = self.model.train_step(
-                                self.b(test_batch), dry=True
+                                proc_test_batch, dry=True
                             )
                             for key in metrics:
                                 self.logger['test/' + key] += [
                                     metrics[key].detach().cpu()
                                 ]
                             break
-                    with Timer(self.logger, 'evaluate'):
-                        # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-                        eval_metrics = self.model.evaluate(
-                            itr, self.writer, self.b(test_batch), arbiter=self.arbiter
-                        )
-                        for key in eval_metrics:
-                            self.logger[key] += [eval_metrics[key]]
+                with Timer(self.logger, 'evaluate'):
+                    # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
+                    testb = {key: val for key, val in proc_test_batch.items()}
+                    #testb = {key: val[:8] for key, val in proc_test_batch.items()}
+                    eval_metrics = self.model.evaluate(
+                        itr, self.writer, testb, arbiter=self.arbiter
+                    )
+                    for key in eval_metrics:
+                        self.logger[key] += [eval_metrics[key]]
                 self.model.train()
 
                 # LOGGING

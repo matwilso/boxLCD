@@ -10,6 +10,8 @@ from research.nets.common import ResBlock
 
 from ._base import VideoModel
 
+from einops import parse_shape, rearrange
+
 
 class RSSM(VideoModel):
     def __init__(self, env, G):
@@ -37,25 +39,38 @@ class RSSM(VideoModel):
         self._init()
 
     def loss(self, batch):
-        batch = rearrange
-        flat_batch = tree_map(lambda x: x.flatten(0, 1), batch)
-        import ipdb
+        bs = batch['lcd'].shape[0]
 
-        ipdb.set_trace()
-        embed = self.encoder(flat_batch).unflatten(0, (*batch['lcd'].shape[:2],))
+        # TODO: write utility to pack and unpack different dims
+        def flatten(key, val, trim=None):
+            if key == 'lcd':
+                return rearrange(val[:,:,trim:], 'b c t h w -> (b t) c h w')
+            else:
+                return rearrange(val[:,trim:], 'b t x -> (b t) x')
+
+        def unflatten(key, val):
+            if key == 'lcd':
+                return rearrange(val, '(b t) c h w -> b c t h w', b=bs)
+            else:
+                return rearrange(val, '(b t) x -> b t x', b=bs)
+
+
+        batch['lcd'] = batch['lcd']
+        flat_batch = {key: flatten(key, val) for key, val in batch.items()}
+        embed = unflatten('z', self.encoder(flat_batch))
         action = batch['action'][:, :-1]
         embed = embed[:, 1:]
         post, prior = self.observe(embed, action)
         feat = self.get_feat(post)
         # reconstruction loss
         decoded = self.decoder(feat.flatten(0, 1))
+        batch_with_first_time_gone = {key: flatten(key, val, trim=1) for key, val in batch.items()}
         recon_losses = {}
-        chop_flat = tree_map(lambda x: x[:, 1:].flatten(0, 1), batch)
         recon_losses['loss/recon_proprio'] = (
-            -decoded['proprio'].log_prob(chop_flat['proprio']).mean()
+            -decoded['proprio'].log_prob(batch_with_first_time_gone['proprio']).mean()
         )
         recon_losses['loss/recon_lcd'] = (
-            -decoded['lcd'].log_prob(chop_flat['lcd']).mean()
+            -decoded['lcd'].log_prob(batch_with_first_time_gone['lcd']).mean()
         )
         recon_loss = sum(recon_losses.values())
 
@@ -136,6 +151,27 @@ class RSSM(VideoModel):
         return priors
 
     def sample(self, n, action=None, prompts=None, prompt_n=10):
+        bs = n
+
+        def trim_dim(key, val, trim_start=None, trim_end=None):
+            if key == 'lcd':
+                return val[:, :, trim_start:trim_end]
+            else:
+                return val[:, trim_start:trim_end]
+
+        def flatten(key, val, trim=None, trim_end=None):
+            if key == 'lcd':
+                return rearrange(val[:,:,trim:trim_end], 'b c t h w -> (b t) c h w')
+            else:
+                return rearrange(val[:,trim:trim_end], 'b t x -> (b t) x')
+
+        def unflatten(key, val):
+            if key == 'lcd':
+                return rearrange(val, '(b t) c h w -> b c t h w', b=bs)
+            else:
+                return rearrange(val, '(b t) x -> b t x', b=bs)
+
+
         with torch.no_grad():
             if action is not None:
                 n = action.shape[0]
@@ -143,12 +179,13 @@ class RSSM(VideoModel):
                 action = (torch.rand(n, self.G.window, self.act_n) * 2 - 1).to(
                     self.G.device
                 )
+
             if prompts is None:
                 prior = self.imagine(action)
                 feat = self.get_feat(prior)
                 decoded = self.decoder(feat.flatten(0, 1))
                 gen = {
-                    'lcd': (1.0 * (decoded['lcd'].probs > 0.5)),
+                    'lcd': decoded['lcd'].probs,
                     'proprio': decoded['proprio'].mean,
                 }
                 gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
@@ -156,11 +193,9 @@ class RSSM(VideoModel):
                     n, -1, self.env.observation_space['proprio'].shape[0]
                 )
             else:
-                batch = tree_map(lambda x: x[:, :prompt_n], prompts)
-                flat_batch = tree_map(lambda x: x.flatten(0, 1), batch)
-                embed = self.encoder(flat_batch).unflatten(
-                    0, (*batch['lcd'].shape[:2],)
-                )
+                batch = {key: trim_dim(key, val, None, prompt_n) for key, val in prompts.items()}
+                flat_batch = {key: flatten(key, val) for key, val in batch.items()}
+                embed = unflatten('z', self.encoder(flat_batch))
                 action = torch.cat([torch.zeros_like(action)[:, :1], action[:, :-1]], 1)
                 post, prior = self.observe(embed, action[:, :prompt_n])
                 prior = self.imagine(
@@ -169,20 +204,15 @@ class RSSM(VideoModel):
                 feat = self.get_feat(prior)
                 decoded = self.decoder(feat.flatten(0, 1))
                 gen = {
-                    'lcd': (1.0 * (decoded['lcd'].probs > 0.5)),
+                    'lcd': decoded['lcd'].probs,
                     'proprio': decoded['proprio'].mean,
                 }
-                gen['lcd'] = gen['lcd'].reshape(n, -1, 1, self.G.lcd_h, self.G.lcd_w)
-                gen['proprio'] = gen['proprio'].reshape(
-                    n, -1, self.env.observation_space['proprio'].shape[0]
-                )
-                prompts['lcd'] = prompts['lcd'][:, :, None]
+                gen = {key: unflatten(key, val) for key, val in gen.items()}
                 gen = tree_multimap(
-                    lambda x, y: torch.cat([x[:, :prompt_n], y], 1),
-                    utils.subdict(prompts, ['lcd', 'proprio']),
-                    gen,
+                    lambda x, y: torch.cat([x, y], dim=2 if x.ndim == 5 else 1),
+                    utils.subdict(batch, ['lcd', 'proprio']),
+                    utils.subdict(gen, ['lcd', 'proprio']),
                 )
-                prompts['lcd'] = prompts['lcd'][:, :, 0]
         return gen
 
     def get_feat(self, state):
@@ -228,7 +258,7 @@ class Encoder(nn.Module):
         state = batch['proprio']
         lcd = batch['lcd']
         emb = self.state_embed(state)
-        x = lcd[:, None]
+        x = lcd
         for layer in self.seq:
             if isinstance(layer, ResBlock):
                 x = layer(x, emb)
@@ -263,6 +293,6 @@ class Decoder(nn.Module):
         nf = G.nfilter
 
     def forward(self, x):
-        lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]))
+        lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]), validate_args=False)
         state_dist = thd.Normal(self.state_net(x), 1)
         return {'lcd': lcd_dist, 'proprio': state_dist}

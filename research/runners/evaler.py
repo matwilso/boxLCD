@@ -8,12 +8,8 @@ import yaml
 from jax.tree_util import tree_map
 from torch import nn
 
-from boxLCD.utils import A
 from research import data, utils
-from research.define_config import env_fn
 from research.nets import net_map
-from research.utils import Timer
-from research.wrappers import AsyncVectorEnv
 
 
 class Evaler:

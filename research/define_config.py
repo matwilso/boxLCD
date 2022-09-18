@@ -5,7 +5,7 @@ import sys
 import gym
 
 import boxLCD.utils
-from boxLCD import ENV_DG, env_map, envs
+from boxLCD import ENV_DG, env_map
 from boxLCD.utils import args_type
 from research import wrappers
 
