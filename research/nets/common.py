@@ -32,15 +32,11 @@ class SelfAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(n_embed, n_embed)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.register_buffer(
-            "mask",
-            torch.tril(torch.ones(self.block_size, self.block_size)).view(
-                1, 1, self.block_size, self.block_size
-            ),
-        )
+        mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(1, 1, self.block_size, self.block_size)
         self.n_head = n_head
         if not causal:
-            self.mask = torch.ones_like(self.mask)
+            mask = torch.ones_like(mask)
+        self.register_buffer("mask", mask)
 
     def forward(self, x, layer_past=None):
         B, T, G = x.size()
@@ -239,7 +235,7 @@ class MultiHead(nn.Module):
 
 class ResBlock3d(nn.Module):
     def __init__(
-        self, channels, emb_channels, out_channels=None, dropout=0.0, group_size=16
+        self, channels, emb_channels, out_channels=None, dropout=0.0, group_size=16, kernel_size=3, padding=1
     ):
         super().__init__()
         self.out_channels = out_channels or channels
@@ -247,7 +243,7 @@ class ResBlock3d(nn.Module):
         self.in_layers = nn.Sequential(
             nn.GroupNorm(group_size, channels),
             nn.SiLU(),
-            nn.Conv3d(channels, self.out_channels, 3, padding=1),
+            nn.Conv3d(channels, self.out_channels, kernel_size, padding=padding),
         )
         self.emb_layers = nn.Sequential(
             nn.SiLU(), nn.Linear(emb_channels, self.out_channels)
@@ -256,7 +252,7 @@ class ResBlock3d(nn.Module):
             nn.GroupNorm(group_size, self.out_channels),
             nn.SiLU(),
             nn.Dropout(p=dropout),
-            zero_module(nn.Conv3d(self.out_channels, self.out_channels, 3, padding=1)),
+            zero_module(nn.Conv3d(self.out_channels, self.out_channels, kernel_size, padding=padding)),
         )
         if self.out_channels == channels:
             self.skip_connection = nn.Identity()

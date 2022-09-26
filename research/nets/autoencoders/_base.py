@@ -198,14 +198,14 @@ class MultiStepAE(Autoencoder):
             pred_proprio = decoded['proprio']
             true_proprio = batch['proprio']
             metrics['eval/proprio_log_mse'] = (
-                ((true_proprio - pred_proprio) ** 2).mean().log().cpu()
+                ((true_proprio - pred_proprio) ** 2).mean().log().detach().cpu().numpy()
             )
 
         if 'action' in decoded:
             pred_action = decoded['action']
             true_action = batch['action'][:, :-1]
             metrics['eval/action_log_mse'] = (
-                ((true_action - pred_action) ** 2).mean().log().cpu()
+                ((true_action - pred_action) ** 2).mean().log().detach().cpu().numpy()
             )
 
         if arbiter is not None:

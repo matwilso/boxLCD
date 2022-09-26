@@ -93,6 +93,7 @@ class VideoModel(Net):
                 taz = arbiter.forward(utils.flat_batch(t_post_prompt)).cpu().numpy()
                 fid = utils.compute_fid(paz, taz)
                 metrics['eval/fid'] = fid
+        return sample
 
     def _duplicate_eval(self, epoch, writer, metrics, batch, arbiter=None):
         n = self.G.video_n

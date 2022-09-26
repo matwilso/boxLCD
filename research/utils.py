@@ -109,6 +109,11 @@ def count_vars(module):
 def dump_logger(logger, writer, i, G, verbose=True):
     print('=' * 30)
     print(i)
+    def convert(x):
+        if isinstance(x, np.ndarray):
+            return x
+        else:
+            return x.detach().cpu().numpy()
     for key in logger:
         check = logger[key][0] if isinstance(logger[key], list) else logger[key]
         if torch.is_tensor(check):
@@ -119,6 +124,8 @@ def dump_logger(logger, writer, i, G, verbose=True):
         val = np.mean(logger[key])
         if writer is not None:
             writer.add_scalar(key, val, i)
+            if 'ssim' in key:
+                writer.add_scalar(key + '_log', np.log(val), i)
             if key == 'loss' and i > 0:
                 writer.add_scalar('logx/' + key, val, int(np.log(1e5 * i)))
             # if 'loss' in key:

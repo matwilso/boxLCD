@@ -13,9 +13,9 @@ from research.nets.common import (
     timestep_embedding,
     zero_module,
 )
-from research.nets.video_models.gaussian_diffusion import GaussianDiffusion
+from research.nets.video_models.diffusion.gaussian_diffusion import GaussianDiffusion
 
-from ._base import VideoModel
+from .._base import VideoModel
 
 
 class DiffusionVideo(VideoModel):

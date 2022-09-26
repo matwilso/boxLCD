@@ -223,8 +223,8 @@ def load_ds(G):
     test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False, max_barrels=1)
     test_loader = DataLoader(
         test_dset,
-        #batch_size=G.bs,
-        batch_size=8,
+        batch_size=G.bs,
+        #batch_size=8,
         pin_memory=G.device == 'cuda',
         num_workers=G.data_workers,
         drop_last=True,

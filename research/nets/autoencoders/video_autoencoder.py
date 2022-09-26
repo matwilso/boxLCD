@@ -73,14 +73,13 @@ class VideoAutoencoder(MultiStepAE):
         )
         recon_loss = sum(recon_losses.values())
         metrics = {'loss/recon_total': recon_loss, **recon_losses}
-
-        metrics['kl/std'] = z.std()
-        if self.G.entropy_bonus != 0.0:
-            z_post = thd.Normal(z, 1)
-            z_prior = thd.Normal(0, 1)
-            kl_reg_loss = thd.kl_divergence(z_post, z_prior).mean()
-            metrics['kl/loss'] = kl_reg_loss
-            recon_loss += self.G.entropy_bonus * kl_reg_loss
+        #metrics['kl/std'] = z.std()
+        #if self.G.entropy_bonus != 0.0:
+        #    z_post = thd.Normal(z, 1)
+        #    z_prior = thd.Normal(0, 1)
+        #    kl_reg_loss = thd.kl_divergence(z_post, z_prior).mean()
+        #    metrics['kl/loss'] = kl_reg_loss
+        #    recon_loss += self.G.entropy_bonus * kl_reg_loss
 
         return recon_loss, metrics
 
@@ -139,6 +138,7 @@ class Encoder(nn.Module):
                 x = layer(x, emb)
             else:
                 x = layer(x)
+        x = torch.tanh(x)
         return x
 
 

@@ -13,3 +13,8 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
         attribute = getattr(module, attribute_name)
         if isclass(attribute) and issubclass(attribute, VideoModel):
             video_model_map[attribute_name] = attribute
+
+#from diffusion.latent_diffusion_video import LatentDiffusionVideo
+#from research.nets.video_models.latent_diffusion_video_v2 import LatentDiffusionVideo_v2
+#
+#import ipdb; ipdb.set_trace()

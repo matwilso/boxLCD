@@ -6,12 +6,12 @@ import yaml
 from einops import parse_shape, rearrange, repeat
 from jax.tree_util import tree_map
 from torch import nn
+import numpy as np
 
 from research import utils
 from research.nets.autoencoders.video_autoencoder import Decoder
 from research.nets.common import (
     ResBlock3d,
-    SelfAttention,
     TimestepEmbedSequential,
     TransformerBlock,
     timestep_embedding,
@@ -26,16 +26,17 @@ AE_H = 4  # TODO: replace with the value from loading it
 AE_W = 4  # TODO: replace with the value from loading it
 AE_Z = 32  # TODO: replace with the value from loading it
 
+# TODO: see if we can reuse some code and try different arches
 
-class LatentDiffusionVideo(VideoModel):
+class LatentDiffusionVideo_v3(VideoModel):
     def __init__(self, env, G):
         super().__init__(env, G)
         G.dropout = 0.0
-        G.timesteps = 500  # seems to work pretty well for MNIST
+        G.timesteps = 250  # seems to work pretty well for MNIST
         G.timestep_embed = 64
         state_n = env.observation_space.spaces['proprio'].shape[0]
         self.embed_size = G.n_embed
-        self.net = SimpleUnet3d(G)
+        self.net = v3Net(G)
         self.diffusion = GaussianDiffusion(G.timesteps)
 
         # TODO: maybe consider caching features for a dataset
@@ -77,7 +78,7 @@ class LatentDiffusionVideo(VideoModel):
             key: partial(
                 rearrange,
                 pattern=self.ein_unpacked[key] + '->' + self.ein_packed[key],
-                d1=AE_STRIDE,
+                d1=G.window//AE_STRIDE,
             )
             for key in self.ein_packed
         }
@@ -85,17 +86,20 @@ class LatentDiffusionVideo(VideoModel):
             key: partial(
                 rearrange,
                 pattern=self.ein_packed[key] + '->' + self.ein_unpacked[key],
-                d1=AE_STRIDE,
+                d1=G.window//AE_STRIDE,
             )
             for key in self.ein_packed
         }
 
     def evaluate(self, epoch, writer, batch, arbiter=None):
         metrics = {}
-        sample = self._prompted_eval(
-            epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
+        #sample = self._prompted_eval(
+        #    epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
+        #)
+        sample = self._unprompted_eval(
+            epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video,
         )
-        if show_sampling := False:
+        if show_sampling := True:
             #n = batch['lcd'].shape[0]
             #out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
             # self._diffusion_video(epoch, writer, out['diffusion_sampling'], name='diffusion_sampling', prompt_n=None)
@@ -148,8 +152,6 @@ class LatentDiffusionVideo(VideoModel):
         # t = torch.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
         # flops = FlopCountAnalysis(self.model.net, (z, t))
         # flops.total()
-        # import ipdb; ipdb.set_trace()
-
         z = self.preproc(batch)
         t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
         z = self.net(z, t).split(z.shape[1], dim=1)
@@ -164,6 +166,7 @@ class LatentDiffusionVideo(VideoModel):
             batch = self.proc_batch(batch)
             z = self.pre_encoder(batch)
             z = self.unpack['lcd'](z)
+        assert z.min() > -1 and z.max() < 1
         return z
 
     def postproc(self, z):
@@ -181,7 +184,7 @@ class LatentDiffusionVideo(VideoModel):
         #zeros = torch.zeros_like(t).float()
         #diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
         #if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
-        #    import ipdb; ipdb.set_trace()
+        #print(z.min(), z.max())
 
         metrics = self.diffusion.training_losses(self.net, z, t)
         metrics = {key: val.mean() for key, val in metrics.items()}
@@ -195,12 +198,13 @@ class LatentDiffusionVideo(VideoModel):
         if prompts is not None:
             prompts = self.preproc(prompts)
             prompts = prompts[:, :, : prompt_n // AE_STRIDE]
+            prompt_n = prompt_n // AE_STRIDE
         all_samples = self.diffusion.p_sample(
             self.net,
             vid_shape,
             noise=noise,
             prompts=prompts,
-            prompt_n=prompt_n // AE_STRIDE,
+            prompt_n=prompt_n,
         )
         samps = [al['sample'] for al in all_samples]
         preds = [al['pred_xstart'] for al in all_samples]
@@ -211,7 +215,7 @@ class LatentDiffusionVideo(VideoModel):
         diffusion_sampling = None
         diffusion_pred = None
 
-        if do_diffusion := True:
+        if True:
             samps = [self.postproc(ds) for ds in samps]
             preds = [self.postproc(dp) for dp in preds]
             diffusion_sampling = torch.stack(samps)
@@ -224,7 +228,7 @@ class LatentDiffusionVideo(VideoModel):
         }
 
 
-class SimpleUnet3d(nn.Module):
+class v3Net(nn.Module):
     def __init__(self, G):
         super().__init__()
         channels = G.hidden_size
@@ -235,11 +239,10 @@ class SimpleUnet3d(nn.Module):
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
-        self.down = Down(
-            G.window // AE_STRIDE, channels, time_embed_dim, dropout=dropout
+        dim_shape = (G.window // AE_STRIDE, AE_H, AE_W)
+        self.through = Through(
+            dim_shape, channels, time_embed_dim, dropout=dropout
         )
-        self.turn = ResBlock3d(channels, time_embed_dim, dropout=dropout)
-        self.up = Up(G.window // AE_STRIDE, channels, time_embed_dim, dropout=dropout)
         self.out = nn.Sequential(
             nn.GroupNorm(16, channels),
             nn.SiLU(),
@@ -247,29 +250,24 @@ class SimpleUnet3d(nn.Module):
         )
         self.G = G
 
-    def forward(self, x, timesteps):
+    def forward(self, inp, timesteps):
+        x = inp
         emb = self.time_embed(timestep_embedding(timesteps=timesteps.float(), dim=self.G.timestep_embed, max_period=self.G.timesteps))
-        # <UNET> downsample, then upsample with skip connections between the down and up.
-        x, pass_through = self.down(x, emb)
-        x = self.turn(x, emb)
-        x = self.up(x, emb, pass_through)
+        x = self.through(x, emb)
         x = self.out(x)
-        # </UNET>
+        #x[:, :32] += inp
         return x
 
-
-class Downsample(nn.Module):
-    """halve the size of the input"""
-
+class Conv3d(nn.Module):
     def __init__(self, channels, out_channels=None, stride=2):
         super().__init__()
         out_channels = out_channels or channels
-        # TODO: change to no mixing across time
+        # TODO: try no mixing across time
         self.conv = nn.Conv3d(
             channels,
             out_channels,
             kernel_size=(3, 3, 3),
-            stride=(1, stride, stride),
+            stride=(stride, stride, stride),
             padding=(1, 1, 1),
         )
         # self.conv = nn.Conv3d(channels, out_channels, kernel_size=(1, 3, 3), stride=stride, padding=(0, 1, 1))
@@ -277,120 +275,82 @@ class Downsample(nn.Module):
     def forward(self, x, emb=None):
         return self.conv(x)
 
-
-class Down(nn.Module):
-    def __init__(self, window, channels, emb_channels, dropout=0.0):
-        super().__init__()
-        self.seq = nn.ModuleList(
-            [
-                Downsample(
-                    32, channels, stride=1
-                ),  # not really a downsample, just makes the code simpler to reuse
-                # ResBlock3d(channels, emb_channels, dropout=dropout),
-                ResBlock3d(channels, emb_channels, dropout=dropout),
-                TimestepEmbedSequential(
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                ),
-                Downsample(channels),
-                # ResBlock3d(channels, emb_channels, dropout=dropout),
-                TimestepEmbedSequential(
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                ),
-                ResBlock3d(channels, emb_channels, dropout=dropout),
-                Downsample(channels),
-            ]
-        )
-
-    def forward(self, x, emb):
-        pass_through = []
-        for layer in self.seq:
-            x = layer(x, emb)
-            pass_through += [x]
-        return x, pass_through
-
-
 class Upsample(nn.Module):
-    """double the size of the input"""
-
     def __init__(self, channels):
         super().__init__()
         self.conv = nn.Conv3d(channels, channels, (3, 3, 3), padding=(1, 1, 1))
 
     def forward(self, x, emb=None):
-        x = F.interpolate(x, scale_factor=(1, 2, 2), mode="nearest")
+        x = F.interpolate(x, scale_factor=(2, 2, 2), mode="nearest")
         x = self.conv(x)
         return x
 
 
-class Up(nn.Module):
-    def __init__(self, window, channels, emb_channels, dropout=0.0):
+class Through(nn.Module):
+    def __init__(self, dim_shape, channels, emb_channels, dropout=0.0):
         super().__init__()
-        # on the up, bundle resnets with upsampling so upsampling can be simpler
+        group_size = 32
+        kernel_size = 3
+        padding = 1
         self.seq = nn.ModuleList(
             [
-                TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    Upsample(channels),
-                    AttentionBlock(window, channels),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                    ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                ),
-                # ResBlock3d(2*channels, emb_channels, channels, dropout=dropout),
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                ),
-                TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels), Upsample(channels)
-                ),
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                # ResBlock3d(2*channels, emb_channels, channels, dropout=dropout),
-                TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                    AttentionBlock(window, channels),
-                ),
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
+                Conv3d(32, channels, stride=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
+                #AllAttentionBlock(dim_shape, channels),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
+                #AllAttentionBlock(dim_shape, channels),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
+                #AllAttentionBlock(dim_shape, channels),
+                #AllAttentionBlock(dim_shape, channels),
+                #AllAttentionBlock(dim_shape, channels),
+                #Upsample(channels),
             ]
         )
 
-    def forward(self, x, emb, pass_through):
-        pass_through = pass_through[::-1]
-        for i in range(len(self.seq)):
-            layer, hoz_skip = self.seq[i], pass_through[i]
-            x = torch.cat([x, hoz_skip], 1)
+    def forward(self, x, emb):
+        for layer in self.seq:
             x = layer(x, emb)
         return x
 
 
-class AttentionBlock(nn.Module):
-    def __init__(self, n, n_embed):
+class _AttentionBlock(nn.Module):
+    def __init__(self, dim_shape, n_embed):
         super().__init__()
+
+        if self.MODE == 'all':
+            self.tf_shape = 'bs (h w t) c'
+            self.n = np.prod(dim_shape)
+        elif self.MODE == 'time':
+            self.tf_shape = '(bs h w) t c'
+            self.n = dim_shape[0]
+        elif self.MODE == 'space':
+            self.tf_shape = '(bs t) (h w) c'
+            self.n = np.prod(dim_shape[-2:])
+
         n_head = n_embed // 8
-        self.attn = TransformerBlock(n, n_embed, n_head, causal=False)
-        #self.attn = SelfAttention(n, n_embed, n_head, causal=False)
-        self.register_buffer(
-            "time_embed",
-            # probably can be period 1 and wouldn't matter
-            timestep_embedding(timesteps=torch.linspace(0, 1, n), dim=n_embed, max_period=2).T,
-        )
+        self.attn = TransformerBlock(self.n, n_embed, n_head, causal=False)
+        # TODO: try out better embedding, like going spatial for spatial, etc.
+        self.register_buffer("tf_embed", timestep_embedding(timesteps=torch.linspace(0, 1, n_embed), dim=self.n, max_period=1).T)
 
     def forward(self, x, emb=None):
-        x = x + self.time_embed[None, :, :, None, None]
         x_shape = parse_shape(x, 'bs c t h w')
-        x = rearrange(x, 'bs c t h w -> (bs h w) t c')
+        x = rearrange(x, f'bs c t h w -> {self.tf_shape}')
+        x = x + self.tf_embed[None]
         x = self.attn(x)
-        x = rearrange(x, '(bs h w) t c -> bs c t h w', **x_shape)
+        x = rearrange(x, f'{self.tf_shape} -> bs c t h w', **x_shape)
         return x
+
+class AllAttentionBlock(_AttentionBlock):
+    MODE = 'all'
+
+class TimeAttentionBlock(_AttentionBlock):
+    MODE = 'time'
+
+class SpaceAttentionBlock(_AttentionBlock):
+    MODE = 'space'

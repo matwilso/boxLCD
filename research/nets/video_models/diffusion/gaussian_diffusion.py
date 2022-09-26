@@ -9,7 +9,7 @@ Then matwilso cut everything but base features and a single choice of settings, 
 import numpy as np
 import torch
 
-from .losses import discretized_gaussian_log_likelihood, mean_flat, normal_kl
+from ..losses import discretized_gaussian_log_likelihood, mean_flat, normal_kl
 
 
 class GaussianDiffusion:
