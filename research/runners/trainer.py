@@ -82,8 +82,8 @@ class Trainer:
                             break
                 with Timer(self.logger, 'evaluate'):
                     # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-                    testb = {key: val for key, val in proc_test_batch.items()}
-                    #testb = {key: val[:8] for key, val in proc_test_batch.items()}
+                    #testb = {key: val for key, val in proc_test_batch.items()}
+                    testb = {key: val[:64] for key, val in proc_test_batch.items()}
                     eval_metrics = self.model.evaluate(
                         itr, self.writer, testb, arbiter=self.arbiter
                     )

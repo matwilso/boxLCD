@@ -15,7 +15,7 @@ from research.nets.common import (
 )
 from research.nets.video_models.diffusion.gaussian_diffusion import GaussianDiffusion
 
-from .._base import VideoModel
+from ._base import VideoModel
 
 
 class DiffusionVideo(VideoModel):
@@ -247,7 +247,7 @@ class AttentionBlock(nn.Module):
         )
 
     def forward(self, x, emb=None):
-        x = x + self.time_embed[None, :, :, None, None]
+        #x = x + self.time_embed[None, :, :, None, None]
         x_shape = parse_shape(x, 'bs c t h w')
         x = rearrange(x, 'bs c t h w -> (bs h w) t c')
         x = self.attn(x)

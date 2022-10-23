@@ -16,7 +16,8 @@ from gym.vector.utils import (
     read_from_shared_memory,
     write_to_shared_memory,
 )
-from gym.vector.vector_env import VectorEnv
+from gym.vector.async_vector_env import AsyncVectorEnv as GymAsyncVectorEnv
+#from gym.vector.vector_env import VectorEnv
 
 __all__ = ['AsyncVectorEnv']
 
@@ -33,7 +34,7 @@ class AsyncState(Enum):
 # TODO: make add compute reward function
 
 
-class AsyncVectorEnv(VectorEnv):
+class AsyncVectorEnv(GymAsyncVectorEnv):
     """Vectorized environment that runs multiple environments in parallel. It
     uses `multiprocessing` processes, and pipes for communication.
     Parameters
@@ -82,73 +83,8 @@ class AsyncVectorEnv(VectorEnv):
         worker=None,
         G={},
     ):
-        try:
-            ctx = mp.get_context(context)
-        except AttributeError:
-            logger.warn(
-                'Context switching for `multiprocessing` is not '
-                'available in Python 2. Using the default context.'
-            )
-            ctx = mp
-        self.env_fns = env_fns
-        self.shared_memory = shared_memory
-        self.copy = copy
+        super().__init__(env_fns, observation_space, action_space, shared_memory, copy, context, daemon, worker)
         self.G = G
-
-        if (observation_space is None) or (action_space is None):
-            dummy_env = env_fns[0]()
-            observation_space = observation_space or dummy_env.observation_space
-            action_space = action_space or dummy_env.action_space
-            dummy_env.close()
-            del dummy_env
-        super(AsyncVectorEnv, self).__init__(
-            num_envs=len(env_fns),
-            observation_space=observation_space,
-            action_space=action_space,
-        )
-
-        if self.shared_memory:
-            _obs_buffer = create_shared_memory(
-                self.single_observation_space, n=self.num_envs, ctx=ctx
-            )
-            self.observations = read_from_shared_memory(
-                _obs_buffer, self.single_observation_space, n=self.num_envs
-            )
-        else:
-            _obs_buffer = None
-            self.observations = create_empty_array(
-                self.single_observation_space, n=self.num_envs, fn=np.zeros
-            )
-
-        self.parent_pipes, self.processes = [], []
-        self.error_queue = ctx.Queue()
-        target = _worker_shared_memory if self.shared_memory else _worker
-        target = worker or target
-        with clear_mpi_env_vars():
-            for idx, env_fn in enumerate(self.env_fns):
-                parent_pipe, child_pipe = ctx.Pipe()
-                process = ctx.Process(
-                    target=target,
-                    name='Worker<{0}>-{1}'.format(type(self).__name__, idx),
-                    args=(
-                        idx,
-                        CloudpickleWrapper(env_fn),
-                        child_pipe,
-                        parent_pipe,
-                        _obs_buffer,
-                        self.error_queue,
-                    ),
-                )
-
-                self.parent_pipes.append(parent_pipe)
-                self.processes.append(process)
-
-                process.daemon = daemon
-                process.start()
-                child_pipe.close()
-
-        self._state = AsyncState.DEFAULT
-        self._check_observation_spaces()
 
     def seed(self, seeds=None):
         self._assert_is_running()

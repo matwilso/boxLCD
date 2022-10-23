@@ -15,7 +15,7 @@ from research.wrappers import AsyncVectorEnv
 BARREL_SIZE = int(1e3)
 from einops import rearrange
 
-# from jax.tree_util import tree_map, tree_multimap
+# from jax.tree_util import tree_map, tree_map
 
 """
 Crack yourself open a fresh barrel of data

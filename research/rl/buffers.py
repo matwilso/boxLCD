@@ -2,7 +2,7 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 
 from research import utils
 
@@ -43,9 +43,9 @@ class OGRB:
     # def get_last(self, n):
     #  assert self.G.ep_len*n <= self.ptr
     #  batch = tree_map(lambda x: x[self.ptrs[-2]:self.ptrs[-1]], self.bufs)
-    #  batch = tree_multimap(lambda x, y: np.concatenate([x, y[self.ptrs[-3]:self.ptrs[-2]]]), batch, self.bufs)
-    #  batch = tree_multimap(lambda x, y: np.concatenate([x, y[self.ptrs[-4]:self.ptrs[-3]]]), batch, self.bufs)
-    #  batch = tree_multimap(lambda x, y: np.concatenate([x, y[self.ptrs[-5]:self.ptrs[-4]]]), batch, self.bufs)
+    #  batch = tree_map(lambda x, y: np.concatenate([x, y[self.ptrs[-3]:self.ptrs[-2]]]), batch, self.bufs)
+    #  batch = tree_map(lambda x, y: np.concatenate([x, y[self.ptrs[-4]:self.ptrs[-3]]]), batch, self.bufs)
+    #  batch = tree_map(lambda x, y: np.concatenate([x, y[self.ptrs[-5]:self.ptrs[-4]]]), batch, self.bufs)
     #  o = utils.filtdict(batch, 'o:', fkey=lambda x: x[2:])
     #  o2 = utils.filtdict(batch, 'o2:', fkey=lambda x: x[3:])
     #  batch = utils.nfiltdict(batch, '(o:|o2:)')

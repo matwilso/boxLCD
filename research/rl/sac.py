@@ -9,7 +9,7 @@ import torch
 import yaml
 
 # from research.nets.flat_everything import FlatEverything
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 from torch.optim import Adam
 
 import boxLCD
@@ -376,7 +376,7 @@ class SAC(RLAlgo):
                         assert (
                             self.env.shared_memory
                         ), "i am not sure if this works when you don't do shared memory. it would need to be tested. something like the comment below"
-                    # o = tree_multimap(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
+                    # o = tree_map(lambda x,y: ~done[:,None]*x + done[:,None]*y, o, reset_o)
 
             # Updte handling
             if itr >= self.G.update_after and itr % self.G.update_every == 0:

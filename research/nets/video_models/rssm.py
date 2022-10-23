@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 from torch import distributions as thd
 from torch import nn
 
@@ -108,10 +108,10 @@ class RSSM(VideoModel):
             posts += [post]
             priors += [prior]
             state = post
-        posts = tree_multimap(
+        posts = tree_map(
             lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:]
         )
-        priors = tree_multimap(
+        priors = tree_map(
             lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
         )
         return posts, priors
@@ -145,7 +145,7 @@ class RSSM(VideoModel):
             prior = self.img_step(state, action[:, i])
             priors += [prior]
             state = prior
-        priors = tree_multimap(
+        priors = tree_map(
             lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
         )
         return priors
@@ -208,7 +208,7 @@ class RSSM(VideoModel):
                     'proprio': decoded['proprio'].mean,
                 }
                 gen = {key: unflatten(key, val) for key, val in gen.items()}
-                gen = tree_multimap(
+                gen = tree_map(
                     lambda x, y: torch.cat([x, y], dim=2 if x.ndim == 5 else 1),
                     utils.subdict(batch, ['lcd', 'proprio']),
                     utils.subdict(gen, ['lcd', 'proprio']),

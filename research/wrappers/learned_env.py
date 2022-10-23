@@ -5,7 +5,7 @@ from collections import defaultdict
 import gym
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 
 import research.utils
 from boxLCD import env_map
@@ -60,7 +60,7 @@ class LearnedEnv:
     def reset(self, *args, update_window_batch=True, **kwargs):
         with torch.no_grad():
             prompts = [self.real_env.reset() for _ in range(self.num_envs)]
-            prompts = tree_multimap(
+            prompts = tree_map(
                 lambda x, *y: torch.as_tensor(np.stack([x, *y])).to(self.G.device),
                 prompts[0],
                 *prompts[1:],
@@ -231,7 +231,7 @@ class RewardLenv:
                         )
                         for _ in np.arange(self.lenv.num_envs)
                     ]
-                    new_goal = tree_multimap(
+                    new_goal = tree_map(
                         lambda x, *y: torch.as_tensor(np.stack([x, *y]))
                         .to(self.G.device)
                         .float(),
@@ -246,7 +246,7 @@ class RewardLenv:
                         y = y[..., None]
                     return y
 
-                self.goal = tree_multimap(
+                self.goal = tree_map(
                     lambda x, y: (x * tileup(x, mask) + y * ~tileup(y, mask)).detach(),
                     new_goal,
                     self.goal,

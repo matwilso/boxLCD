@@ -62,6 +62,8 @@ class VideoAutoencoder(MultiStepAE):
 
     def loss(self, batch):
         z = self.encoder(batch)
+        # a little noise for extra robustness
+        z = z + 1e-3 * (torch.rand(z.shape, device=z.device) - 0.5)
         decoded = self.decoder.forward_dist(z)
         recon_losses = {}
         recon_losses['loss/recon_proprio'] = (
@@ -73,13 +75,14 @@ class VideoAutoencoder(MultiStepAE):
         )
         recon_loss = sum(recon_losses.values())
         metrics = {'loss/recon_total': recon_loss, **recon_losses}
-        #metrics['kl/std'] = z.std()
-        #if self.G.entropy_bonus != 0.0:
-        #    z_post = thd.Normal(z, 1)
-        #    z_prior = thd.Normal(0, 1)
-        #    kl_reg_loss = thd.kl_divergence(z_post, z_prior).mean()
-        #    metrics['kl/loss'] = kl_reg_loss
-        #    recon_loss += self.G.entropy_bonus * kl_reg_loss
+        metrics['kl/std'] = z.std()
+        metrics['kl/mean'] = z.mean()
+        if self.G.entropy_bonus != 0.0:
+            z_post = thd.Normal(z, 0.5)
+            z_prior = thd.Normal(0, 0.5)
+            kl_reg_loss = thd.kl_divergence(z_post, z_prior).mean()
+            metrics['kl/loss'] = kl_reg_loss
+            recon_loss += self.G.entropy_bonus * kl_reg_loss
 
         return recon_loss, metrics
 
@@ -111,17 +114,11 @@ class Encoder(nn.Module):
 
         self.seq = nn.ModuleList(
             [
-                nn.Conv3d(
-                    in_channels,
-                    nf,
-                    kernel_size=(3, 3, 3),
-                    stride=(stride, 2, 2),
-                    padding=1,
-                ),
+                nn.Conv3d(in_channels, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
-                nn.Conv3d(
-                    nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1
-                ),
+                #nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
+                #ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
+                nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
                 nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=1),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
@@ -146,12 +143,13 @@ class Decoder(nn.Module):
     def __init__(self, act_n, state_n, G):
         super().__init__()
         # assert G.lcd_h == 16 and G.lcd_w == 32
-        if G.lcd_w == 32:
-            W = 4
-        elif G.lcd_w == 24:
-            W = 3
-        elif G.lcd_w == 16:
-            W = 2
+        ratio = 2 * (G.lcd_w // G.lcd_h)
+        #if G.lcd_w == 32:
+        #    W = 4
+        #elif G.lcd_w == 24:
+        #    W = 3
+        #elif G.lcd_w == 16:
+        #    W = 2
 
         if G.window == 4:
             stride = 2
@@ -160,14 +158,12 @@ class Decoder(nn.Module):
 
         nf = G.nfilter
         self.net = nn.Sequential(
-            nn.ConvTranspose3d(
-                nf, nf, kernel_size=(stride, 2, W), stride=(stride, 2, 2)
-            ),
+            nn.ConvTranspose3d(nf, nf, kernel_size=(stride, 2, ratio), stride=(stride, 2, 2)),
             nn.ReLU(),
-            nn.ConvTranspose3d(
-                nf, nf, kernel_size=(stride, 2, 2), stride=(stride, 2, 2)
-            ),
+            nn.ConvTranspose3d(nf, nf, kernel_size=(stride, 2, 2), stride=(stride, 2, 2)),
             nn.ReLU(),
+            #nn.ConvTranspose3d(nf, nf, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            #nn.ReLU(),
             nn.Conv3d(nf, nf, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv3d(nf, 3, kernel_size=1, stride=1, padding=0),

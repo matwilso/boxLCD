@@ -5,7 +5,7 @@ import scipy.signal
 import torch
 
 # from research.nets.flat_everything import FlatEverything
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 from torch.optim import Adam
 
 import boxLCD

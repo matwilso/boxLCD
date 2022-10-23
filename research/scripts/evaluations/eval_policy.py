@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 
 from boxLCD import env_map
 from research import data, runners, utils

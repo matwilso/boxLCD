@@ -9,7 +9,7 @@ Then matwilso cut everything but base features and a single choice of settings, 
 import numpy as np
 import torch
 
-from ..losses import discretized_gaussian_log_likelihood, mean_flat, normal_kl
+from .losses import discretized_gaussian_log_likelihood, mean_flat, normal_kl
 
 
 class GaussianDiffusion:
@@ -192,7 +192,7 @@ class GaussianDiffusion:
         terms["vb"] *= (
             self.num_timesteps / 1000.0
         )  # Divide by 1000 for equivalence with initial implementation. else VB term hurts the MSE term.
-        terms['vb'] *= 0.0
+        #terms['vb'] *= 0.0
         terms["loss"] = terms["mse"] + terms["vb"]
         return terms
 

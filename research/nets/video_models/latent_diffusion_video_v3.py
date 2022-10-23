@@ -93,13 +93,13 @@ class LatentDiffusionVideo_v3(VideoModel):
 
     def evaluate(self, epoch, writer, batch, arbiter=None):
         metrics = {}
-        #sample = self._prompted_eval(
-        #    epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
-        #)
+        sample = self._prompted_eval(
+            epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
+        )
         sample = self._unprompted_eval(
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video,
         )
-        if show_sampling := True:
+        if show_sampling := False:
             #n = batch['lcd'].shape[0]
             #out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
             # self._diffusion_video(epoch, writer, out['diffusion_sampling'], name='diffusion_sampling', prompt_n=None)
@@ -167,7 +167,7 @@ class LatentDiffusionVideo_v3(VideoModel):
             z = self.pre_encoder(batch)
             z = self.unpack['lcd'](z)
         assert z.min() > -1 and z.max() < 1
-        return z
+        return z.detach()
 
     def postproc(self, z):
         with torch.no_grad():
@@ -185,7 +185,16 @@ class LatentDiffusionVideo_v3(VideoModel):
         #diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
         #if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
         #print(z.min(), z.max())
+        #import matplotlib.pyplot as plt
+        #imgs = []
+        #for i in range(16):
+        #    imgs += [batch['lcd'].permute(0, 2,3,4, 1)[0,i].detach().cpu().numpy()]
+        #    plt.imsave(f'itest{i+1}.png', imgs[-1])
+        #plt.imsave(f'itest{0}.png', np.zeros_like(imgs[-1]))
 
+        #imgs = np.stack(imgs).__mul__(255).astype(np.uint8)
+        #utils.write_gif('test.gif', imgs, fps=4)
+        #utils.write_video('test.mp4', imgs, fps=4)
         metrics = self.diffusion.training_losses(self.net, z, t)
         metrics = {key: val.mean() for key, val in metrics.items()}
         loss = metrics['loss']
@@ -193,7 +202,7 @@ class LatentDiffusionVideo_v3(VideoModel):
 
     def sample(self, n, action=None, prompts=None, prompt_n=None):
         vid_shape = (n, AE_Z, self.G.window // AE_STRIDE, AE_W, AE_H)
-        torch.manual_seed(0)
+        #torch.manual_seed(0)
         noise = torch.randn(vid_shape, device=self.G.device)
         if prompts is not None:
             prompts = self.preproc(prompts)
@@ -206,16 +215,15 @@ class LatentDiffusionVideo_v3(VideoModel):
             prompts=prompts,
             prompt_n=prompt_n,
         )
-        samps = [al['sample'] for al in all_samples]
-        preds = [al['pred_xstart'] for al in all_samples]
         raw_samples = all_samples[-1]['sample']
-
         raw_samples = self.postproc(raw_samples)
 
         diffusion_sampling = None
         diffusion_pred = None
 
-        if True:
+        if False:
+            samps = [al['sample'] for al in all_samples]
+            preds = [al['pred_xstart'] for al in all_samples]
             samps = [self.postproc(ds) for ds in samps]
             preds = [self.postproc(dp) for dp in preds]
             diffusion_sampling = torch.stack(samps)
@@ -294,18 +302,18 @@ class Through(nn.Module):
         padding = 1
         self.seq = nn.ModuleList(
             [
-                Conv3d(32, channels, stride=1),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
+                #Conv3d(32, channels, stride=1),
+                ResBlock3d(32, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
                 ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
-                #AllAttentionBlock(dim_shape, channels),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
+                AllAttentionBlock(dim_shape, channels),
                 ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
-                #AllAttentionBlock(dim_shape, channels),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=5, padding=2),
                 ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=1, padding=0),
+                AllAttentionBlock(dim_shape, channels),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                AllAttentionBlock(dim_shape, channels),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, group_size=group_size, kernel_size=3, padding=1),
                 #AllAttentionBlock(dim_shape, channels),
                 #AllAttentionBlock(dim_shape, channels),
                 #AllAttentionBlock(dim_shape, channels),
@@ -323,25 +331,34 @@ class _AttentionBlock(nn.Module):
     def __init__(self, dim_shape, n_embed):
         super().__init__()
 
+
         if self.MODE == 'all':
             self.tf_shape = 'bs (h w t) c'
             self.n = np.prod(dim_shape)
+            x, y, z = torch.meshgrid(torch.linspace(-1,1,dim_shape[0]), torch.linspace(-1,1,dim_shape[1]), torch.linspace(-1,1,dim_shape[2]))
+            tf_embed = torch.stack([x, y, z], axis=0)
         elif self.MODE == 'time':
             self.tf_shape = '(bs h w) t c'
             self.n = dim_shape[0]
+            import ipdb; ipdb.set_trace()
         elif self.MODE == 'space':
             self.tf_shape = '(bs t) (h w) c'
             self.n = np.prod(dim_shape[-2:])
+            import ipdb; ipdb.set_trace()
+            time_embed = timestep_embedding(timesteps=torch.linspace(0, 1, n_embed), dim=self.n, max_period=2).T - 0.5
 
+        self.linear = nn.Linear(3, n_embed)
         n_head = n_embed // 8
         self.attn = TransformerBlock(self.n, n_embed, n_head, causal=False)
         # TODO: try out better embedding, like going spatial for spatial, etc.
-        self.register_buffer("tf_embed", timestep_embedding(timesteps=torch.linspace(0, 1, n_embed), dim=self.n, max_period=1).T)
+        self.register_buffer("tf_embed", tf_embed)
 
     def forward(self, x, emb=None):
         x_shape = parse_shape(x, 'bs c t h w')
         x = rearrange(x, f'bs c t h w -> {self.tf_shape}')
-        x = x + self.tf_embed[None]
+        tf_embed = rearrange(self.tf_embed[None], f'bs c t h w -> {self.tf_shape}')
+        tf_embed = repeat(tf_embed, 'bs d c -> (repeat bs) d c', repeat=x_shape['bs'])
+        x = x + self.linear(tf_embed)
         x = self.attn(x)
         x = rearrange(x, f'{self.tf_shape} -> bs c t h w', **x_shape)
         return x

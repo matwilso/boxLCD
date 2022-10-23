@@ -4,7 +4,7 @@ import gym
 import numpy as np
 import torch
 from gym.vector.async_vector_env import AsyncVectorEnv
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 

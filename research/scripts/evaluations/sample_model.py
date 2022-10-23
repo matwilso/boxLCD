@@ -3,7 +3,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 
 from boxLCD import env_map
 from research import data, runners, utils
@@ -47,7 +47,7 @@ if __name__ == '__main__':
         action = np_random.uniform(-1, 1, env.action_space.shape[0])
         actions += [action]
         obs = env.step(action)[0]
-        obses = tree_multimap(
+        obses = tree_map(
             lambda x, y: torch.cat([x, torch.as_tensor(y).float()[None, None]], 1),
             obses,
             obs,

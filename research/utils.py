@@ -140,7 +140,7 @@ def dump_logger(logger, writer, i, G, verbose=True):
     return defaultdict(lambda: [])
 
 
-def write_gif(name, frames, fps=30):
+def write_gif(name, frames, fps=20):
     start = time.time()
     from moviepy.editor import ImageSequenceClip
 
@@ -152,6 +152,9 @@ def write_gif(name, frames, fps=30):
 
 
 def write_video(name, frames, fps=20):
+    if frames.dtype == np.float:
+        frames = (255 * frames).astype(np.uint8)
+
     start = time.time()
     import cv2
 

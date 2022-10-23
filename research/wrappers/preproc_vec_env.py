@@ -3,7 +3,7 @@ import copy
 import gym
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_multimap
+from jax.tree_util import tree_map, tree_map
 from scipy.spatial.distance import cosine
 
 from research import utils
