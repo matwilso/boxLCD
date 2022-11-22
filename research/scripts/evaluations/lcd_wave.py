@@ -37,9 +37,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     for key, value in G.items():
-        parser.add_argument(
-            f'--{key}', type=boxLCD.utils.args_type(value), default=value
-        )
+        parser.add_argument(f'--{key}', type=boxLCD.utils.args_type(value), default=value)
     G = parser.parse_args()
     env = envs.UrchinBall(G)
     env.seed(7)

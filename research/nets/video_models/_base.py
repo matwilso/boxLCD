@@ -142,11 +142,11 @@ class VideoModel(Net):
             flat = lambda x: rearrange(x, 'bs c d h w -> (bs d) c h w')
             # run basic metrics
             self.ssim.update((flat(cpred), flat(ctrue)))
-            ssim = self.ssim.compute().cpu().detach()
+            ssim = self.ssim.compute()
             metrics['eval/ssim'] = ssim
             # TODO: try not flat
             self.psnr.update((flat(cpred), flat(ctrue)))
-            psnr = self.psnr.compute().cpu().detach()
+            psnr = self.psnr.compute()
             metrics['eval/psnr'] = psnr
             if make_video:
                 # visualize reconstruction
@@ -194,9 +194,7 @@ class VideoModel(Net):
                 tact = chop(tact)[:, :-1]
 
                 paz, paa = arbiter.forward(s_window)
-                metrics['eval/prompted_action_log_mse'] = (
-                    ((tact - paa) ** 2).mean().log()
-                )
+                metrics['eval/prompted_action_log_mse'] = ((tact - paa) ** 2).mean().log()
                 taz, taa = arbiter.forward(t_window)
                 metrics['eval/true_action_log_mse'] = ((tact - taa) ** 2).mean().log()
                 fvd = utils.compute_fid(paz.cpu().numpy(), taz.cpu().numpy())
@@ -229,9 +227,7 @@ class VideoModel(Net):
             gt = gt[: self.G.video_n]
             error = (pred - gt + 1.0) / 2.0
             hoz_div = torch.zeros_like(gt)[..., :1, :]
-            hoz_div[:, :, :prompt_n] = torch.as_tensor(YELLOW)[
-                None, :, None, None, None
-            ]
+            hoz_div[:, :, :prompt_n] = torch.as_tensor(YELLOW)[None, :, None, None, None]
             hoz_div[:, :, prompt_n:] = torch.as_tensor(GREEN)[None, :, None, None, None]
             # stack vertically
             out = torch.cat([gt, hoz_div, pred, hoz_div, error], dim=-2)
@@ -254,9 +250,9 @@ class VideoModel(Net):
         pred_proprio = pred[: self.G.video_n].cpu().detach().numpy()
         pred_lcds = []
         for i in range(pred_proprio.shape[1]):
-            lcd = self.venv.reset(
-                np.arange(self.G.video_n), proprio=pred_proprio[:, i]
-            )['lcd']
+            lcd = self.venv.reset(np.arange(self.G.video_n), proprio=pred_proprio[:, i])[
+                'lcd'
+            ]
             pred_lcds += [lcd]
         pred_lcds = 1.0 * np.stack(pred_lcds, 1)
 
@@ -264,7 +260,9 @@ class VideoModel(Net):
             true_proprio = truth[: self.G.video_n].cpu().detach().numpy()
             true_lcds = []
             for i in range(true_proprio.shape[1]):
-                lcd = self.venv.reset(np.arange(self.G.video_n), proprio=true_proprio[:, i])['lcd']
+                lcd = self.venv.reset(
+                    np.arange(self.G.video_n), proprio=true_proprio[:, i]
+                )['lcd']
                 true_lcds += [lcd]
             true_lcds = 1.0 * np.stack(true_lcds, 1)
             error = (pred_lcds - true_lcds + 1.0) / 2.0

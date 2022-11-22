@@ -63,9 +63,7 @@ class MultiStepArbiter(MultiStepAE):
         if self.G.entropy_bonus != 0.0:
             z_post = thd.Normal(z, 1)
             z_prior = thd.Normal(0, 1)
-            kl_reg_loss = (
-                self.G.entropy_bonus * thd.kl_divergence(z_post, z_prior).mean()
-            )
+            kl_reg_loss = self.G.entropy_bonus * thd.kl_divergence(z_post, z_prior).mean()
             # full loss and metrics
             recon_loss += kl_reg_loss
             metrics['kl_loss'] = kl_reg_loss

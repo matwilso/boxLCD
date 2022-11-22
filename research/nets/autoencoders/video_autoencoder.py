@@ -114,11 +114,19 @@ class Encoder(nn.Module):
 
         self.seq = nn.ModuleList(
             [
-                nn.Conv3d(in_channels, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
+                nn.Conv3d(
+                    in_channels,
+                    nf,
+                    kernel_size=(3, 3, 3),
+                    stride=(stride, 2, 2),
+                    padding=1,
+                ),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
-                #nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
-                #ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
-                nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
+                # nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1),
+                # ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
+                nn.Conv3d(
+                    nf, nf, kernel_size=(3, 3, 3), stride=(stride, 2, 2), padding=1
+                ),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
                 nn.Conv3d(nf, nf, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=1),
                 ResBlock3d(nf, emb_channels=G.hidden_size, group_size=4),
@@ -144,11 +152,11 @@ class Decoder(nn.Module):
         super().__init__()
         # assert G.lcd_h == 16 and G.lcd_w == 32
         ratio = 2 * (G.lcd_w // G.lcd_h)
-        #if G.lcd_w == 32:
+        # if G.lcd_w == 32:
         #    W = 4
-        #elif G.lcd_w == 24:
+        # elif G.lcd_w == 24:
         #    W = 3
-        #elif G.lcd_w == 16:
+        # elif G.lcd_w == 16:
         #    W = 2
 
         if G.window == 4:
@@ -158,12 +166,14 @@ class Decoder(nn.Module):
 
         nf = G.nfilter
         self.net = nn.Sequential(
-            nn.ConvTranspose3d(nf, nf, kernel_size=(stride, 2, ratio), stride=(stride, 2, 2)),
+            nn.ConvTranspose3d(
+                nf, nf, kernel_size=(stride, 2, ratio), stride=(stride, 2, 2)
+            ),
             nn.ReLU(),
             nn.ConvTranspose3d(nf, nf, kernel_size=(stride, 2, 2), stride=(stride, 2, 2)),
             nn.ReLU(),
-            #nn.ConvTranspose3d(nf, nf, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
-            #nn.ReLU(),
+            # nn.ConvTranspose3d(nf, nf, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            # nn.ReLU(),
             nn.Conv3d(nf, nf, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv3d(nf, 3, kernel_size=1, stride=1, padding=0),

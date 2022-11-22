@@ -76,7 +76,7 @@ class WorldDef(NamedTuple):
     gravity: List[float] = [0, -9.81]
     forcetorque: int = 0
     background_color: str = 'white'
-    render_mode: str = 'rgb'
+    lcd_mode: str = 'rgb'
 
 
 # THESE TAKE A PARTIAL ROBOT DESCRIPTION AND BUILD ALL THE JOINTS AND STUFF.
@@ -139,9 +139,7 @@ def make_luxo(robot, G):
     LL_H = 20 / SCALE
     LUXO_POLY = A[(-15, +15), (+20, +25), (+20, -25), (-15, -15)] * 0.8
     SHAPES = {}
-    SHAPES['root'] = polygonShape(
-        vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY]
-    )
+    SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in LUXO_POLY])
     SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
     SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LL_H / 2))
     SHAPES['foot'] = polygonShape(box=(LEG_H, LEG_W / 2))
@@ -244,9 +242,7 @@ def make_crab(robot, G):
         0.9 * A[(-25, +0), (-20, +16), (+20, +16), (+25, +0), (+20, -16), (-20, -16)]
     )
     SHAPES = {}
-    SHAPES['root'] = polygonShape(
-        vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY]
-    )
+    SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in CRAB_POLY])
     # SHAPES['root'] = circleShape(radius=20/SCALE)
     SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))
     SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
@@ -367,9 +363,7 @@ def make_walker(robot, G):
     HULL_POLY = 0.8 * A[(-30, +9), (+6, +9), (+34, +1), (+34, -8), (-30, -8)]
 
     SHAPES = {}
-    SHAPES['root'] = polygonShape(
-        vertices=[(x / SCALE, y / SCALE) for x, y in HULL_POLY]
-    )
+    SHAPES['root'] = polygonShape(vertices=[(x / SCALE, y / SCALE) for x, y in HULL_POLY])
     SHAPES['hip'] = polygonShape(box=(LEG_W / 2, LEG_H / 2))
     SHAPES['knee'] = polygonShape(box=(0.8 * LEG_W / 2, LEG_H / 2))
     SHAPES['arm'] = polygonShape(box=(ARM_W / 2, ARM_H / 2))

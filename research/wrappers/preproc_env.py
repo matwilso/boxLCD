@@ -44,9 +44,7 @@ class PreprocEnv:
         base_space = self._env.observation_space
         base_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
         if 'goal:proprio' in base_space.spaces:
-            base_space.spaces['goal:zstate'] = gym.spaces.Box(
-                -1, 1, (self.model.z_size,)
-            )
+            base_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
         return base_space
 
     def _preproc_obs(self, obs):

@@ -129,9 +129,7 @@ class Vizer:
         def on_key_release(symbol, modifiers):
             self.held_down[symbol] = 0
 
-        self.window.set_handlers(
-            on_key_press=on_key_press, on_key_release=on_key_release
-        )
+        self.window.set_handlers(on_key_press=on_key_press, on_key_release=on_key_release)
 
     def check_message(self, str):
         if self.messages[str]:
@@ -329,9 +327,7 @@ class Vizer:
         xys = []
         for xy_img in imgs:
             xy, img = xy_img
-            xy = (
-                np.array(xy) * A[self.G.lcd_base * self.G.wh_ratio, self.G.lcd_base] * 8
-            )
+            xy = np.array(xy) * A[self.G.lcd_base * self.G.wh_ratio, self.G.lcd_base] * 8
             xys += [xy]
             images += [
                 pyglet.image.ImageData(
@@ -350,9 +346,7 @@ class Vizer:
             images[i].blit(*xys[i])
         for xy_text in texts:
             xy, text = xy_text
-            xy = (
-                np.array(xy) * A[self.G.lcd_base * self.G.wh_ratio, self.G.lcd_base] * 8
-            )
+            xy = np.array(xy) * A[self.G.lcd_base * self.G.wh_ratio, self.G.lcd_base] * 8
             label = pyglet.text.HTMLLabel(
                 f'<font face="Times New Roman" size="{size}">{text}</font>',
                 x=xy[0],

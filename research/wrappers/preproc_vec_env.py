@@ -3,7 +3,7 @@ import copy
 import gym
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 from scipy.spatial.distance import cosine
 
 from research import utils
@@ -44,9 +44,7 @@ class PreprocVecEnv:
         base_space = copy.deepcopy(self._env.observation_space)
         base_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
         if 'goal:full_state' in base_space.spaces:
-            base_space.spaces['goal:zstate'] = gym.spaces.Box(
-                -1, 1, (self.model.z_size,)
-            )
+            base_space.spaces['goal:zstate'] = gym.spaces.Box(-1, 1, (self.model.z_size,))
         return base_space
 
     def _preproc_obs(self, obs):
@@ -83,9 +81,7 @@ class PreprocVecEnv:
     def learned_rew(self, obs, info={}):
         assert 'Cube' in self.G.env, 'ya gotta'
         done = torch.zeros(obs['lcd'].shape[0]).to(self.G.device)
-        obs = tree_map(
-            lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), obs
-        )
+        obs = tree_map(lambda x: torch.as_tensor(1.0 * x).float().to(self.G.device), obs)
         obj = self.obj_loc(obs).detach()
         goal = self.obj_loc(utils.filtdict(obs, 'goal:', fkey=lambda x: x[5:])).detach()
         delta = (obj - goal).abs().mean(-1)
@@ -120,9 +116,7 @@ class PreprocVecEnv:
             # info['preproc_rew'] = preproc_rew
             if 'RewardLenv' in self._env.__class__.__name__:
                 info['og_rew'] = info['og_rew'].cpu().detach()
-                success = (
-                    torch.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
-                )
+                success = torch.logical_and(done, ~_info['timeout'].bool()).cpu().numpy()
 
                 def fx(x):
                     if isinstance(x, np.ndarray):

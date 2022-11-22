@@ -1,6 +1,5 @@
-from abc import abstractmethod
-
 import math
+from abc import abstractmethod
 
 import numpy as np
 import torch as torch
@@ -9,13 +8,13 @@ import torch.nn.functional as F
 
 from .fp16_util import convert_module_to_f16, convert_module_to_f32
 from .nn import (
+    avg_pool_nd,
     checkpoint,
     conv_nd,
     linear,
-    avg_pool_nd,
-    zero_module,
     normalization,
     timestep_embedding,
+    zero_module,
 )
 
 
@@ -33,7 +32,7 @@ class AttentionPool2d(nn.Module):
     ):
         super().__init__()
         self.positional_embedding = nn.Parameter(
-            torch.randn(embed_dim, spacial_dim ** 2 + 1) / embed_dim ** 0.5
+            torch.randn(embed_dim, spacial_dim**2 + 1) / embed_dim**0.5
         )
         self.qkv_proj = conv_nd(1, embed_dim, 3 * embed_dim, 1)
         self.c_proj = conv_nd(1, embed_dim, output_dim or embed_dim, 1)
@@ -225,9 +224,7 @@ class ResBlock(TimestepBlock):
         :param emb: an [N x emb_channels] Tensor of timestep embeddings.
         :return: an [N x C x ...] Tensor of outputs.
         """
-        return checkpoint(
-            self._forward, (x, emb), self.parameters(), self.use_checkpoint
-        )
+        return checkpoint(self._forward, (x, emb), self.parameters(), self.use_checkpoint)
 
     def _forward(self, x, emb):
         if self.updown:
@@ -316,7 +313,7 @@ def count_flops_attn(model, _x, y):
     # We perform two matmuls with the same number of ops.
     # The first computes the weight matrix, the second computes
     # the combination of the value vectors.
-    matmul_ops = 2 * b * (num_spatial ** 2) * c
+    matmul_ops = 2 * b * (num_spatial**2) * c
     model.total_ops += torch.DoubleTensor([matmul_ops])
 
 
@@ -423,7 +420,7 @@ class UNetModel(nn.Module):
         model_channels,
         out_channels,
         num_res_blocks,
-        attention_resolutions=(16,8),
+        attention_resolutions=(16, 8),
         dropout=0,
         channel_mult=(1, 2, 4, 8),
         conv_resample=True,
@@ -518,9 +515,7 @@ class UNetModel(nn.Module):
                             down=True,
                         )
                         if resblock_updown
-                        else Downsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch
-                        )
+                        else Downsample(ch, conv_resample, dims=dims, out_channels=out_ch)
                     )
                 )
                 ch = out_ch
@@ -637,9 +632,11 @@ class UNetModel(nn.Module):
 
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
-        import ipdb; ipdb.set_trace()
+        import ipdb
 
-        #if self.num_classes is not None:
+        ipdb.set_trace()
+
+        # if self.num_classes is not None:
         #    assert y.shape == (x.shape[0],)
         #    emb = emb + self.label_emb(y)
 
@@ -774,9 +771,7 @@ class EncoderUNetModel(nn.Module):
                             down=True,
                         )
                         if resblock_updown
-                        else Downsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch
-                        )
+                        else Downsample(ch, conv_resample, dims=dims, out_channels=out_ch)
                     )
                 )
                 ch = out_ch
@@ -824,9 +819,7 @@ class EncoderUNetModel(nn.Module):
             self.out = nn.Sequential(
                 normalization(ch),
                 nn.SiLU(),
-                AttentionPool2d(
-                    (image_size // ds), ch, num_head_channels, out_channels
-                ),
+                AttentionPool2d((image_size // ds), ch, num_head_channels, out_channels),
             )
         elif pool == "spatial":
             self.out = nn.Sequential(

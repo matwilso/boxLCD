@@ -103,9 +103,9 @@ class FBT(VideoModel):
             else:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(
-                n, self.block_size, self.G.lcd_h, self.G.lcd_w
-            ).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(
+                self.G.device
+            )
             batch['proprio'] = torch.zeros(n, self.block_size, self.proprio_n).to(
                 self.G.device
             )
@@ -115,9 +115,9 @@ class FBT(VideoModel):
                 batch['proprio'][:, :prompt_n] = prompts['proprio'][:, :prompt_n]
                 start = prompt_n
             z = self.bvae.encode(batch, noise=False).detach()
-            z_sample = torch.zeros(
-                n, self.block_size, self.bvae.G.vqD * 4 * self.zW
-            ).to(self.G.device)
+            z_sample = torch.zeros(n, self.block_size, self.bvae.G.vqD * 4 * self.zW).to(
+                self.G.device
+            )
             z_sample[:, :prompt_n] = z[:, :prompt_n]
             # SAMPLE FORWARD IN LATENT SPACE, ACTION CONDITIONED
             z_sample = self.latent_sample(z_sample, action, start, temp)

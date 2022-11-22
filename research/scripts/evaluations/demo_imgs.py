@@ -59,9 +59,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     for key, value in G.items():
-        parser.add_argument(
-            f'--{key}', type=boxLCD.utils.args_type(value), default=value
-        )
+        parser.add_argument(f'--{key}', type=boxLCD.utils.args_type(value), default=value)
     parser.add_argument(f'--env', type=str, default='urchin_ball')
     G = parser.parse_args()
     env = env_fn(G)()

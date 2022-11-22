@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 
 from boxLCD import env_map
 from research import data, runners, utils
@@ -36,9 +36,7 @@ if __name__ == '__main__':
         goal_key = 'goal:object'
     mG = torch.load(G.weightdir / 'ppo_ac.pt')['G']
     mG.lenv = 0
-    ac = ActorCritic(env.observation_space, env.action_space, goal_key, G=mG).to(
-        G.device
-    )
+    ac = ActorCritic(env.observation_space, env.action_space, goal_key, G=mG).to(G.device)
     ac.load(G.weightdir)
     print('LOADED PPO', G.weightdir)
 

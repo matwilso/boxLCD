@@ -1,5 +1,5 @@
-from functools import partial
 import math
+from functools import partial
 
 import torch
 import torch.nn.functional as F
@@ -10,15 +10,16 @@ from torch import nn
 
 from research import utils
 from research.nets.autoencoders.video_autoencoder import Decoder
-from .diffusion.unet import UNetModel
 from research.nets.video_models.diffusion.gaussian_diffusion import GaussianDiffusion
 
 from ._base import VideoModel
+from .diffusion.unet import UNetModel
 
 AE_STRIDE = 4  # TODO: replace with the value from loading it
 AE_H = 4  # TODO: replace with the value from loading it
 AE_W = 4  # TODO: replace with the value from loading it
 AE_Z = 32  # TODO: replace with the value from loading it
+
 
 class LatentDiffusionVideo_v2(VideoModel):
     def __init__(self, env, G):
@@ -89,8 +90,8 @@ class LatentDiffusionVideo_v2(VideoModel):
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         )
         if show_sampling := False:
-            #n = batch['lcd'].shape[0]
-            #out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
+            # n = batch['lcd'].shape[0]
+            # out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
             # self._diffusion_video(epoch, writer, out['diffusion_sampling'], name='diffusion_sampling', prompt_n=None)
             self._diffusion_video(
                 epoch,
@@ -113,9 +114,7 @@ class LatentDiffusionVideo_v2(VideoModel):
         metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
-    def _diffusion_video(
-        self, epoch, writer, pred, truth=None, name=None, prompt_n=None
-    ):
+    def _diffusion_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
         out = pred[:, :4]  # video_n
         out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :1])], axis=4)
         out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :, :1])], axis=5)
@@ -126,7 +125,9 @@ class LatentDiffusionVideo_v2(VideoModel):
         print('FLUSH')
 
     def forward(self, batch):
-        import ipdb; ipdb.set_trace()
+        import ipdb
+
+        ipdb.set_trace()
 
         z = self.preproc(batch)
         t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
@@ -154,9 +155,9 @@ class LatentDiffusionVideo_v2(VideoModel):
     def loss(self, batch):
         z = self.preproc(batch)
         t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
-        #zeros = torch.zeros_like(t).float()
-        #diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
-        #if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
+        # zeros = torch.zeros_like(t).float()
+        # diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
+        # if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
         #    import ipdb; ipdb.set_trace()
 
         metrics = self.diffusion.training_losses(self.net, z, t)

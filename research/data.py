@@ -1,8 +1,8 @@
 import itertools
 import time
 from datetime import datetime
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, IterableDataset
@@ -144,7 +144,14 @@ def fill_barrels_slow(env, num_barrels, prefix, G):
 
 
 class RolloutDataset(IterableDataset):
-    def __init__(self, barrel_path, window=int(1e9), infinite=True, refresh_data=False, max_barrels=None):
+    def __init__(
+        self,
+        barrel_path,
+        window=int(1e9),
+        infinite=True,
+        refresh_data=False,
+        max_barrels=None,
+    ):
         super().__init__()
         self.window = window
         self.infinite = infinite
@@ -155,7 +162,9 @@ class RolloutDataset(IterableDataset):
 
     def _refresh(self):
         """recheck the directory for new barrels"""
-        self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))[:self.max_barrels]
+        self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))[
+            : self.max_barrels
+        ]
         self.nbarrels = len(self.barrel_files)
         assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
@@ -220,11 +229,13 @@ class RolloutDataset(IterableDataset):
 
 
 def load_ds(G):
-    test_dset = RolloutDataset(G.datadir / 'test', G.window, infinite=False, max_barrels=1)
+    test_dset = RolloutDataset(
+        G.datadir / 'test', G.window, infinite=False, max_barrels=1
+    )
     test_loader = DataLoader(
         test_dset,
         batch_size=G.bs,
-        #batch_size=8,
+        # batch_size=8,
         pin_memory=G.device == 'cuda',
         num_workers=G.data_workers,
         drop_last=True,

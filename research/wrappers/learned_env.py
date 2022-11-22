@@ -5,7 +5,7 @@ from collections import defaultdict
 import gym
 import numpy as np
 import torch
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 
 import research.utils
 from boxLCD import env_map
@@ -16,9 +16,7 @@ from research.wrappers.cube_goal import CubeGoalEnv
 
 
 def outproc(img):
-    return (
-        (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
-    )
+    return (255 * img[..., None].repeat(3, -1)).astype(np.uint8).repeat(8, 1).repeat(8, 2)
 
 
 # TODO: add back this wrapper probably, since it makes things a bit cleaner.
@@ -49,9 +47,7 @@ class LearnedEnv:
         self.keys = ['lcd', 'proprio']
         for key in self.keys:
             val = self.real_env.observation_space.spaces[key]
-            spaces[key] = gym.spaces.Box(
-                -1, +1, (num_envs,) + val.shape, dtype=val.dtype
-            )
+            spaces[key] = gym.spaces.Box(-1, +1, (num_envs,) + val.shape, dtype=val.dtype)
         spaces['zstate'] = gym.spaces.Box(
             -1, +1, (num_envs, self.model.z_size), dtype=val.dtype
         )
@@ -74,9 +70,7 @@ class LearnedEnv:
             window_batch['action'] = torch.zeros(
                 [self.model.G.window, *self.action_space.shape]
             ).to(self.G.device)
-            window_batch = {
-                key: val.transpose(0, 1) for key, val in window_batch.items()
-            }
+            window_batch = {key: val.transpose(0, 1) for key, val in window_batch.items()}
             for key in self.keys:
                 window_batch[key][:, 0] = prompts[key]
 
@@ -87,8 +81,7 @@ class LearnedEnv:
                 self.ptr = 1
             else:
                 window_batch['action'] += (
-                    2.0 * torch.rand(window_batch['action'].shape).to(self.G.device)
-                    - 1.0
+                    2.0 * torch.rand(window_batch['action'].shape).to(self.G.device) - 1.0
                 )
                 with torch.no_grad():
                     for self.ptr in range(10):
@@ -175,9 +168,7 @@ class RewardLenv:
         base_space.spaces['goal:lcd'] = copy.deepcopy(base_space.spaces['lcd'])
         base_space.spaces['goal:proprio'] = copy.deepcopy(base_space.spaces['proprio'])
         if 'Cube' in self.real_env.__class__.__name__:
-            base_space.spaces['goal:object'] = copy.deepcopy(
-                base_space.spaces['proprio']
-            )
+            base_space.spaces['goal:object'] = copy.deepcopy(base_space.spaces['proprio'])
             base_space.spaces['goal:object'].shape = (self.lenv.num_envs, 2)
         return base_space
 
@@ -226,9 +217,7 @@ class RewardLenv:
             else:
                 with utils.Timer(logger, 'set_goal'):
                     new_goal = [
-                        utils.filtdict(
-                            self.real_env.reset(), 'goal:(lcd|proprio|object)'
-                        )
+                        utils.filtdict(self.real_env.reset(), 'goal:(lcd|proprio|object)')
                         for _ in np.arange(self.lenv.num_envs)
                     ]
                     new_goal = tree_map(

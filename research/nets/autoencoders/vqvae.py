@@ -79,9 +79,7 @@ class VQVAE(nn.Module):
         recon_losses['recon_proprio'] = (
             -decoded['proprio'].log_prob(batch['proprio']).mean()
         )
-        recon_losses['recon_lcd'] = (
-            -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
-        )
+        recon_losses['recon_lcd'] = -decoded['lcd'].log_prob(batch['lcd'][:, None]).mean()
         recon_loss = sum(recon_losses.values())
         loss = recon_loss + embed_loss
         metrics = {

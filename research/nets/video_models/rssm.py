@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
-from einops import rearrange
-from jax.tree_util import tree_map, tree_map
+from einops import parse_shape, rearrange
+from jax.tree_util import tree_map
 from torch import distributions as thd
 from torch import nn
 
@@ -9,8 +9,6 @@ from research import utils
 from research.nets.common import ResBlock
 
 from ._base import VideoModel
-
-from einops import parse_shape, rearrange
 
 
 class RSSM(VideoModel):
@@ -44,16 +42,15 @@ class RSSM(VideoModel):
         # TODO: write utility to pack and unpack different dims
         def flatten(key, val, trim=None):
             if key == 'lcd':
-                return rearrange(val[:,:,trim:], 'b c t h w -> (b t) c h w')
+                return rearrange(val[:, :, trim:], 'b c t h w -> (b t) c h w')
             else:
-                return rearrange(val[:,trim:], 'b t x -> (b t) x')
+                return rearrange(val[:, trim:], 'b t x -> (b t) x')
 
         def unflatten(key, val):
             if key == 'lcd':
                 return rearrange(val, '(b t) c h w -> b c t h w', b=bs)
             else:
                 return rearrange(val, '(b t) x -> b t x', b=bs)
-
 
         batch['lcd'] = batch['lcd']
         flat_batch = {key: flatten(key, val) for key, val in batch.items()}
@@ -64,7 +61,9 @@ class RSSM(VideoModel):
         feat = self.get_feat(post)
         # reconstruction loss
         decoded = self.decoder(feat.flatten(0, 1))
-        batch_with_first_time_gone = {key: flatten(key, val, trim=1) for key, val in batch.items()}
+        batch_with_first_time_gone = {
+            key: flatten(key, val, trim=1) for key, val in batch.items()
+        }
         recon_losses = {}
         recon_losses['loss/recon_proprio'] = (
             -decoded['proprio'].log_prob(batch_with_first_time_gone['proprio']).mean()
@@ -108,12 +107,8 @@ class RSSM(VideoModel):
             posts += [post]
             priors += [prior]
             state = post
-        posts = tree_map(
-            lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:]
-        )
-        priors = tree_map(
-            lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
-        )
+        posts = tree_map(lambda x, *y: torch.stack([x, *y], 1), posts[0], *posts[1:])
+        priors = tree_map(lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:])
         return posts, priors
 
     def obs_step(self, prev_state, prev_action, embed):
@@ -145,9 +140,7 @@ class RSSM(VideoModel):
             prior = self.img_step(state, action[:, i])
             priors += [prior]
             state = prior
-        priors = tree_map(
-            lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:]
-        )
+        priors = tree_map(lambda x, *y: torch.stack([x, *y], 1), priors[0], *priors[1:])
         return priors
 
     def sample(self, n, action=None, prompts=None, prompt_n=10):
@@ -161,16 +154,15 @@ class RSSM(VideoModel):
 
         def flatten(key, val, trim=None, trim_end=None):
             if key == 'lcd':
-                return rearrange(val[:,:,trim:trim_end], 'b c t h w -> (b t) c h w')
+                return rearrange(val[:, :, trim:trim_end], 'b c t h w -> (b t) c h w')
             else:
-                return rearrange(val[:,trim:trim_end], 'b t x -> (b t) x')
+                return rearrange(val[:, trim:trim_end], 'b t x -> (b t) x')
 
         def unflatten(key, val):
             if key == 'lcd':
                 return rearrange(val, '(b t) c h w -> b c t h w', b=bs)
             else:
                 return rearrange(val, '(b t) x -> b t x', b=bs)
-
 
         with torch.no_grad():
             if action is not None:
@@ -193,7 +185,10 @@ class RSSM(VideoModel):
                     n, -1, self.env.observation_space['proprio'].shape[0]
                 )
             else:
-                batch = {key: trim_dim(key, val, None, prompt_n) for key, val in prompts.items()}
+                batch = {
+                    key: trim_dim(key, val, None, prompt_n)
+                    for key, val in prompts.items()
+                }
                 flat_batch = {key: flatten(key, val) for key, val in batch.items()}
                 embed = unflatten('z', self.encoder(flat_batch))
                 action = torch.cat([torch.zeros_like(action)[:, :1], action[:, :-1]], 1)

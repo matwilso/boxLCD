@@ -3,15 +3,7 @@ import gym
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
-from Box2D.b2 import (
-    circleShape,
-    contactListener,
-    edgeShape,
-    fixtureDef,
-    frictionJointDef,
-    polygonShape,
-    revoluteJointDef,
-)
+from Box2D.b2 import circleShape, edgeShape, fixtureDef, polygonShape, revoluteJointDef
 from gym.utils import EzPickle, seeding
 from matplotlib import colors
 
@@ -37,7 +29,6 @@ class WorldEnv(gym.Env, EzPickle):
     enables flexible specification of a box2d environment
     You pass in a world def and a configuration.
     Then this behaves like a regular env given that configuration.
-    But it additionally has _lcd_render.
     """
 
     metadata = {
@@ -52,7 +43,9 @@ class WorldEnv(gym.Env, EzPickle):
     # settings for different obs and action spaces
     ENV_DG.angular_offset = 0  # compute joint angular offsets from robot roots
     ENV_DG.root_offset = 0  # compute position offsets from root
-    ENV_DG.compact_obs = 0  # use compact joint angle space instead of joint positions and sin+cos of theta
+    ENV_DG.compact_obs = (
+        0  # use compact joint angle space instead of joint positions and sin+cos of theta
+    )
     ENV_DG.use_speed = 1  # use velocity control vs. torque control
     ENV_DG.walls = 1  # bound the environment with walls on both sides
     ENV_DG.debug = 0
@@ -73,6 +66,17 @@ class WorldEnv(gym.Env, EzPickle):
             G = G.__dict__
         for key in G:
             self.G[key] = G[key]  # update with what gets passed in
+
+        # rendering
+        if 'lcd_mode' in self.G['full_cmd']:
+            self.lcd_mode = self.G['lcd_mode'].upper()
+        else:
+            self.lcd_mode = self.world_def.lcd_mode.upper()
+        assert self.lcd_mode in [
+            '1',
+            'RGB',
+        ], 'lcd_mode must be in one of these PIL supported modes'
+
         # box2D stuff
         self.scroll = 0.0
         self.viewer = None
@@ -130,9 +134,7 @@ class WorldEnv(gym.Env, EzPickle):
         self.pobs_idxs = [self.obs_keys.index(x) for x in self.pobs_keys]
         # observation is a dict space
         spaces = {}
-        spaces['full_state'] = gym.spaces.Box(
-            -1, +1, (self.obs_size,), dtype=np.float32
-        )
+        spaces['full_state'] = gym.spaces.Box(-1, +1, (self.obs_size,), dtype=np.float32)
         # proprio = partial state
         if self.pobs_size == 0:
             spaces['proprio'] = gym.spaces.Box(-1, +1, (1,), dtype=np.float32)
@@ -563,28 +565,22 @@ class WorldEnv(gym.Env, EzPickle):
         """render the env using PIL at potentially very low resolution
         # TODO: deal with scrolling
         """
-        lcd_mode = self.world_def.render_mode.upper()
-        assert lcd_mode in [
-            '1',
-            'RGB',
-        ], 'lcd_mode must be in one of these PIL supported modes'
-
         if width is None and height is None:
             width = int(self.G.lcd_base * self.G.wh_ratio)
             height = self.G.lcd_base
-        if lcd_mode == '1':
+        if self.lcd_mode == '1':
             background = 1
-        elif lcd_mode == 'RGB':
+        elif self.lcd_mode == 'RGB':
             background = self.current_background_color
 
-        image = Image.new(lcd_mode, (width, height))
+        image = Image.new(self.lcd_mode, (width, height))
         draw = ImageDraw.Draw(image)
         draw.rectangle([0, 0, width, height], fill=background)
         for name, body in self.dynbodies.items():
             pos = A[body.position]
             shape = body.fixtures[0].shape
 
-            if lcd_mode == 'RGB':
+            if self.lcd_mode == 'RGB':
                 color = body.color
                 outline = (0, 0, 0)
             else:
@@ -610,13 +606,11 @@ class WorldEnv(gym.Env, EzPickle):
         image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
         lcd = np.asarray(image)
         if lcd.dtype == np.bool:
-            lcd = lcd.astype(np.float).astype(
-                np.bool
-            )  # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
+            # fix bug where PIL produces a bool(xFF) instead of a bool(0x01)
+            lcd = lcd.astype(np.float).astype(np.bool)
         return lcd
 
-    def render(self, mode='rgb_array', lcd_mode='1', return_pyglet_view=False):
-        lcd_mode = lcd_mode.upper()
+    def render(self, mode='rgb_array', return_pyglet_view=False):
         width = int(self.G.lcd_base * self.G.wh_ratio)
         height = self.G.lcd_base
         lcd = self._lcd_render(width, height)
@@ -625,22 +619,14 @@ class WorldEnv(gym.Env, EzPickle):
         elif mode == 'human':
             # use a pyglet viewer to show the images to the user in realtime.
             if self.viewer is None:
-                self.viewer = Viewer(width * 8, height * 8, self.G)
-            high_res = self._lcd_render(width * 8, height * 8).astype(np.uint8)
-            # high_res = 255 * high_res[..., None].astype(np.uint8).repeat(3, -1)
-            if self.world_def.render_mode != 'rgb':
-                import ipdb
+                self.viewer = Viewer(8 * width, 8 * height, self.G)
 
-                ipdb.set_trace()
-            if lcd_mode == 'RGB':
-                low_res = lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
+            rep = lambda x: x.repeat(8, axis=0).repeat(8, axis=1)
+            if self.lcd_mode == '1':
+                low_res = rep(255 * lcd[..., None].repeat(3, 2).astype(np.uint8))
             else:
-                # low_res = 255 * lcd.astype(np.uint8)[..., None].repeat(8, 0).repeat(8, 1).repeat(3, 2)
-                low_res = 255 * lcd.astype(np.uint8).repeat(8, 0).repeat(8, 1)
-            img = np.concatenate(
-                [high_res, np.zeros_like(low_res)[:, :1], low_res], axis=1
-            )
-            out = self.viewer.render(img, return_rgb_array=return_pyglet_view)
+                low_res = rep(lcd)
+            out = self.viewer.render(low_res, return_rgb_array=return_pyglet_view)
             if not return_pyglet_view:
                 out = lcd
             return out

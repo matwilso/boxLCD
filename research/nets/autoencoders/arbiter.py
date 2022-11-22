@@ -111,8 +111,6 @@ class Decoder(nn.Module):
         nf = G.nfilter
 
     def forward(self, x):
-        lcd_dist = thd.Bernoulli(
-            logits=self.net(x[..., None, None]), validate_args=False
-        )
+        lcd_dist = thd.Bernoulli(logits=self.net(x[..., None, None]), validate_args=False)
         state_dist = thd.Normal(self.state_net(x), 1)
         return {'lcd': lcd_dist, 'proprio': state_dist}

@@ -96,8 +96,8 @@ class LatentDiffusionVideo(VideoModel):
             epoch, writer, metrics, batch, arbiter, make_video=self.G.make_video
         )
         if show_sampling := False:
-            #n = batch['lcd'].shape[0]
-            #out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
+            # n = batch['lcd'].shape[0]
+            # out = self.sample(n, prompts=batch, prompt_n=self.G.prompt_n)
             # self._diffusion_video(epoch, writer, out['diffusion_sampling'], name='diffusion_sampling', prompt_n=None)
             self._diffusion_video(
                 epoch,
@@ -120,9 +120,7 @@ class LatentDiffusionVideo(VideoModel):
         metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
-    def _diffusion_video(
-        self, epoch, writer, pred, truth=None, name=None, prompt_n=None
-    ):
+    def _diffusion_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
         out = pred[:, :4]  # video_n
         out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :1])], axis=4)
         out = torch.cat([out, torch.zeros_like(out[:, :, :, :, :, :1])], axis=5)
@@ -134,7 +132,7 @@ class LatentDiffusionVideo(VideoModel):
 
     def forward(self, batch):
         # TODO: make a flop counter thing
-        #from fvcore.nn import (
+        # from fvcore.nn import (
         #    ActivationCountAnalysis,
         #    FlopCountAnalysis,
         #    activation_count,
@@ -142,8 +140,8 @@ class LatentDiffusionVideo(VideoModel):
         #    flop_count_table,
         #    parameter_count,
         #    parameter_count_table,
-        #)
-        #train_batch = self.b(next(train_iter))
+        # )
+        # train_batch = self.b(next(train_iter))
         # z = torch.zeros(32, 32, 4, 4, 4).cuda()
         # t = torch.randint(0, self.G.timesteps, (z.shape[0],)).cuda()
         # flops = FlopCountAnalysis(self.model.net, (z, t))
@@ -178,9 +176,9 @@ class LatentDiffusionVideo(VideoModel):
     def loss(self, batch):
         z = self.preproc(batch)
         t = torch.randint(0, self.G.timesteps, (z.shape[0],)).to(z.device)
-        #zeros = torch.zeros_like(t).float()
-        #diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
-        #if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
+        # zeros = torch.zeros_like(t).float()
+        # diff = self.net(z, t)[0,0,0,0] - self.net(z[:32], t[:32])[0,0,0,0]
+        # if not torch.isclose(diff, zeros[:4], atol=1e-5).all():
         #    import ipdb; ipdb.set_trace()
 
         metrics = self.diffusion.training_losses(self.net, z, t)
@@ -235,9 +233,7 @@ class SimpleUnet3d(nn.Module):
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
-        self.down = Down(
-            G.window // AE_STRIDE, channels, time_embed_dim, dropout=dropout
-        )
+        self.down = Down(G.window // AE_STRIDE, channels, time_embed_dim, dropout=dropout)
         self.turn = ResBlock3d(channels, time_embed_dim, dropout=dropout)
         self.up = Up(G.window // AE_STRIDE, channels, time_embed_dim, dropout=dropout)
         self.out = nn.Sequential(
@@ -248,7 +244,13 @@ class SimpleUnet3d(nn.Module):
         self.G = G
 
     def forward(self, x, timesteps):
-        emb = self.time_embed(timestep_embedding(timesteps=timesteps.float(), dim=self.G.timestep_embed, max_period=self.G.timesteps))
+        emb = self.time_embed(
+            timestep_embedding(
+                timesteps=timesteps.float(),
+                dim=self.G.timestep_embed,
+                max_period=self.G.timesteps,
+            )
+        )
         # <UNET> downsample, then upsample with skip connections between the down and up.
         x, pass_through = self.down(x, emb)
         x = self.turn(x, emb)
@@ -380,11 +382,13 @@ class AttentionBlock(nn.Module):
         super().__init__()
         n_head = n_embed // 8
         self.attn = TransformerBlock(n, n_embed, n_head, causal=False)
-        #self.attn = SelfAttention(n, n_embed, n_head, causal=False)
+        # self.attn = SelfAttention(n, n_embed, n_head, causal=False)
         self.register_buffer(
             "time_embed",
             # probably can be period 1 and wouldn't matter
-            timestep_embedding(timesteps=torch.linspace(0, 1, n), dim=n_embed, max_period=2).T,
+            timestep_embedding(
+                timesteps=torch.linspace(0, 1, n), dim=n_embed, max_period=2
+            ).T,
         )
 
     def forward(self, x, emb=None):

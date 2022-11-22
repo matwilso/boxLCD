@@ -20,9 +20,7 @@ class GaussianDiffusion:
     """
 
     def __init__(self, num_timesteps):
-        self.num_timesteps = (
-            num_timesteps  # steps of diffusion (e.g., 1000 in Ho paper)
-        )
+        self.num_timesteps = num_timesteps  # steps of diffusion (e.g., 1000 in Ho paper)
         # initialize betas and calculate alphas for each timestep
         self.betas = np.linspace(
             0.0001, 0.02, self.num_timesteps, dtype=np.float64
@@ -108,14 +106,14 @@ class GaussianDiffusion:
         )
 
         if prompt_n is not None:
-        #if False:
+            # if False:
             prompt = x[:, :, :prompt_n].detach()
             pred_prompt = pred_xstart[:, :, :prompt_n]
             conditional_loss = (prompt - pred_prompt).pow(2).mean()
             conditional_loss.backward()
             conditional_grad = x.grad
-            conditional_dir = -conditional_grad / (2*self.alphas[t])
-            #print('condir', conditional_dir.abs().mean())
+            conditional_dir = -conditional_grad / (2 * self.alphas[t])
+            # print('condir', conditional_dir.abs().mean())
             pred_xstart = pred_xstart + conditional_dir
             # TODO: use gradients within a no_grad or lessen the scope of no grad
 
@@ -140,9 +138,7 @@ class GaussianDiffusion:
         nonzero_mask = (
             (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
         )  # no noise when t == 0
-        sample = (
-            out["mean"] + nonzero_mask * torch.exp(0.5 * out["log_variance"]) * noise
-        )
+        sample = out["mean"] + nonzero_mask * torch.exp(0.5 * out["log_variance"]) * noise
         return {"sample": sample, "pred_xstart": out["pred_xstart"]}
 
     def p_sample(
@@ -162,10 +158,14 @@ class GaussianDiffusion:
                 ), "This would overwrite the whole sample with the prompt. Probably not what you want."
                 img[:, :, :prompt_n] = prompts[:, :, :prompt_n]
 
-                out = self._p_sample_step(model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs)
+                out = self._p_sample_step(
+                    model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs
+                )
             else:
                 with torch.no_grad():
-                    out = self._p_sample_step(model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs)
+                    out = self._p_sample_step(
+                        model, img, t, prompt_n=prompt_n, model_kwargs=model_kwargs
+                    )
 
             out = {key: val.detach() for key, val in out.items()}
             outs += [out]
@@ -192,7 +192,7 @@ class GaussianDiffusion:
         terms["vb"] *= (
             self.num_timesteps / 1000.0
         )  # Divide by 1000 for equivalence with initial implementation. else VB term hurts the MSE term.
-        #terms['vb'] *= 0.0
+        # terms['vb'] *= 0.0
         terms["loss"] = terms["mse"] + terms["vb"]
         return terms
 

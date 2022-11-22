@@ -9,7 +9,7 @@ import torch
 import yaml
 
 # from research.nets.flat_everything import FlatEverything
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 from torch.optim import Adam
 
 import boxLCD
@@ -28,9 +28,9 @@ class SAC(RLAlgo):
     def __init__(self, G):
         super().__init__(G)
         # Create actor-critic module and target networks
-        self.ac = ActorCritic(
-            self.obs_space, self.act_space, self.goal_key, G=self.G
-        ).to(self.G.device)
+        self.ac = ActorCritic(self.obs_space, self.act_space, self.goal_key, G=self.G).to(
+            self.G.device
+        )
         self.ac_targ = deepcopy(self.ac)
         var_counts = tuple(
             utils.count_vars(module) for module in [self.ac.pi, self.ac.q1, self.ac.q2]
@@ -44,9 +44,7 @@ class SAC(RLAlgo):
             p.requires_grad = False
 
         # List of parameters for both Q-networks (save this for convenience)
-        self.q_params = itertools.chain(
-            self.ac.q1.parameters(), self.ac.q2.parameters()
-        )
+        self.q_params = itertools.chain(self.ac.q1.parameters(), self.ac.q2.parameters())
 
         # Experience buffer
         self.buf = ReplayBuffer(
@@ -54,9 +52,7 @@ class SAC(RLAlgo):
         )
 
         # Set up optimizers for policy and q-function
-        self.q_optimizer = Adam(
-            self.q_params, lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8
-        )
+        self.q_optimizer = Adam(self.q_params, lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8)
         self.pi_optimizer = Adam(
             self.ac.pi.parameters(), lr=self.G.lr, betas=(0.9, 0.999), eps=1e-8
         )
@@ -413,8 +409,6 @@ class SAC(RLAlgo):
                 # Log info about epoch
                 self.logger['var_count'] = [self.sum_count]
                 self.logger['dt'] = dt = time.time() - epoch_time
-                self.logger['env_interactions'] = env_interactions = (
-                    itr * self.G.num_envs
-                )
+                self.logger['env_interactions'] = env_interactions = itr * self.G.num_envs
                 self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
                 epoch_time = time.time()

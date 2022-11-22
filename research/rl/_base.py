@@ -4,7 +4,7 @@ import gym
 import numpy as np
 import torch
 from gym.vector.async_vector_env import AsyncVectorEnv
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 
@@ -57,9 +57,7 @@ class RLAlgo:
                     preproc, self.learned_tvenv, G
                 )
                 self.real_tvenv = wrappers.PreprocVecEnv(preproc, self.real_tvenv, G)
-                self.obs_space.spaces['zstate'] = gym.spaces.Box(
-                    -1, 1, (preproc.z_size,)
-                )
+                self.obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
                 if 'goal:proprio' in self.obs_space.spaces:
                     self.obs_space.spaces['goal:zstate'] = gym.spaces.Box(
                         -1, 1, (preproc.z_size,)
@@ -81,9 +79,7 @@ class RLAlgo:
                 self.real_tvenv = self.tvenv = wrappers.PreprocVecEnv(
                     preproc, self.tvenv, G
                 )
-                self.obs_space.spaces['zstate'] = gym.spaces.Box(
-                    -1, 1, (preproc.z_size,)
-                )
+                self.obs_space.spaces['zstate'] = gym.spaces.Box(-1, 1, (preproc.z_size,))
                 if 'goal:proprio' in self.obs_space.spaces:
                     self.obs_space.spaces['goal:zstate'] = gym.spaces.Box(
                         -1, 1, (preproc.z_size,)

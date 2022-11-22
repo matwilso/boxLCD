@@ -49,9 +49,7 @@ class Trainer:
         sample, sample_loss = self.model.sample(N, action=action)
         self.logger['sample_loss'] += [sample_loss]
         lcd = sample['lcd']
-        lcd = (
-            lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
-        )
+        lcd = lcd.cpu().detach().repeat_interleave(4, -1).repeat_interleave(4, -2)[:, 1:]
         self.writer.add_video(
             'unprompted_samples', utils.force_shape(lcd), i, fps=self.G.fps
         )

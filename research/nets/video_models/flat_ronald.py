@@ -98,9 +98,9 @@ class FRNLD(VideoModel):
             else:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(
-                n, self.block_size, self.G.lcd_h, self.G.lcd_w
-            ).to(self.G.device)
+            batch['lcd'] = torch.zeros(n, self.block_size, self.G.lcd_h, self.G.lcd_w).to(
+                self.G.device
+            )
             batch['proprio'] = torch.zeros(n, self.block_size, self.proprio_n).to(
                 self.G.device
             )

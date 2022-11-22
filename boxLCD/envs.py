@@ -34,9 +34,7 @@ class Bounce(WorldEnv):
         w = WorldDef(
             robots=[],
             objects=[
-                Object(
-                    'object0', shape='circle', size=0.5, density=0.1, restitution=0.8
-                )
+                Object('object0', shape='circle', size=0.5, density=0.1, restitution=0.8)
             ],
         )
         super().__init__(w, G)

@@ -6,7 +6,7 @@ class Viewer:
     """use pyglet to render images that have already been generated, to show to user live"""
 
     def __init__(self, width, height, G):
-        self.window = pyglet.window.Window(2 * width, height)
+        self.window = pyglet.window.Window(width, height)
         self.width = width
         self.height = height
         self.G = G
@@ -38,14 +38,6 @@ class Viewer:
                 anchor_y='center',
             )
             label1.draw()
-            label2 = pyglet.text.HTMLLabel(
-                f'<font face="Helvetica Bold" size=10">{self.lcd_h}x{self.lcd_w}</font>',
-                x=3 * self.width / 2,
-                y=7 * self.height / 8,
-                anchor_x='center',
-                anchor_y='center',
-            )
-            label2.draw()
         arr = None
         if return_rgb_array:
             buffer = pyglet.image.get_buffer_manager().get_color_buffer()

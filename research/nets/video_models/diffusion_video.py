@@ -51,9 +51,7 @@ class DiffusionVideo(VideoModel):
         metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
         return metrics
 
-    def _diffusion_video(
-        self, epoch, writer, pred, truth=None, name=None, prompt_n=None
-    ):
+    def _diffusion_video(self, epoch, writer, pred, truth=None, name=None, prompt_n=None):
         pred = pred[:, :4]
         pred = torch.cat([pred, torch.zeros_like(pred[:, :, :, :, :1])], axis=4)
         pred = torch.cat([pred, torch.zeros_like(pred[:, :, :, :, :, :1])], axis=5)
@@ -112,14 +110,16 @@ class SimpleUnet3d(nn.Module):
         self.out = nn.Sequential(
             nn.GroupNorm(16, channels),
             nn.SiLU(),
-            nn.Conv3d(channels, 2*3, (3, 3, 3), padding=(1, 1, 1)),
+            nn.Conv3d(channels, 2 * 3, (3, 3, 3), padding=(1, 1, 1)),
         )
         self.G = G
 
     def forward(self, x, timesteps):
         emb = self.time_embed(
             timestep_embedding(
-                timesteps=timesteps.float(), dim=self.G.timestep_embed, max_period=self.G.timesteps,
+                timesteps=timesteps.float(),
+                dim=self.G.timestep_embed,
+                max_period=self.G.timesteps,
             )
         )
         # <UNET> downsample, then upsample with skip connections between the down and up.
@@ -243,11 +243,13 @@ class AttentionBlock(nn.Module):
         # self.attn = SelfAttention(n, n_embed, n_head, causal=False)
         self.register_buffer(
             "time_embed",
-            timestep_embedding(timesteps=torch.linspace(0, 1, n), dim=n_embed, max_period=1).T,
+            timestep_embedding(
+                timesteps=torch.linspace(0, 1, n), dim=n_embed, max_period=1
+            ).T,
         )
 
     def forward(self, x, emb=None):
-        #x = x + self.time_embed[None, :, :, None, None]
+        # x = x + self.time_embed[None, :, :, None, None]
         x_shape = parse_shape(x, 'bs c t h w')
         x = rearrange(x, 'bs c t h w -> (bs h w) t c')
         x = self.attn(x)

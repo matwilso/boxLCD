@@ -5,7 +5,7 @@ import scipy.signal
 import torch
 
 # from research.nets.flat_everything import FlatEverything
-from jax.tree_util import tree_map, tree_map
+from jax.tree_util import tree_map
 from torch.optim import Adam
 
 import boxLCD
@@ -34,9 +34,7 @@ class PPO(RLAlgo):
         )
 
         # Count variables (protip: try to get a feel for how different size networks behave!)
-        var_counts = tuple(
-            utils.count_vars(module) for module in [self.ac.pi, self.ac.v]
-        )
+        var_counts = tuple(utils.count_vars(module) for module in [self.ac.pi, self.ac.v])
         print('\nNumber of parameters: \t pi: %d, \t v: %d\n' % var_counts)
         self.sum_count = sum(var_counts)
 
@@ -60,9 +58,7 @@ class PPO(RLAlgo):
         # Policy loss
         pi, logp = self.ac.pi(obs, act)
         ratio = torch.exp(logp - logp_old)
-        clip_adv = (
-            torch.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
-        )
+        clip_adv = torch.clamp(ratio, 1 - self.G.clip_ratio, 1 + self.G.clip_ratio) * adv
         loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
         # Useful extra info
         approx_kl = (logp_old - logp).mean().cpu()
@@ -215,8 +211,6 @@ class PPO(RLAlgo):
                 self.ac.save(self.G.logdir)
                 self.logger['var_count'] = [self.sum_count]
                 self.logger['dt'] = dt = time.time() - epoch_time
-                self.logger['env_interactions'] = env_interactions = (
-                    itr * self.G.num_envs
-                )
+                self.logger['env_interactions'] = env_interactions = itr * self.G.num_envs
                 self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
                 epoch_time = time.time()

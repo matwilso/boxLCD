@@ -105,9 +105,7 @@ class FIT(VideoModel):
             if action is not None:
                 n = action.shape[0]
             batch = {}
-            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(
-                self.G.device
-            )
+            batch['lcd'] = torch.zeros(n, self.block_size, self.imsize).to(self.G.device)
             batch['action'] = (
                 action
                 if action is not None

@@ -2,21 +2,11 @@ import itertools
 import time
 from collections import defaultdict
 
-import Box2D
 import matplotlib.pyplot as plt
 import pyglet
-from Box2D.b2 import (
-    circleShape,
-    contactListener,
-    edgeShape,
-    fixtureDef,
-    frictionJointDef,
-    polygonShape,
-)
-from pyglet.gl import glClearColor
 from utils import parse_args
 
-from boxLCD import ENV_DG, env_map, envs, utils
+from boxLCD import env_map, utils
 
 KEY = pyglet.window.key
 A = utils.A
@@ -79,7 +69,6 @@ if __name__ == '__main__':
 
         if not paused or check(KEY.RIGHT):
             action = env.action_space.sample()
-            # action = np.zeros_like(action)
             obs, rew, done, info = env.step(action)
             print(obs.keys())
             print(obs['full_state'])
@@ -90,9 +79,7 @@ if __name__ == '__main__':
             if done and reset_on_done:
                 print('episode return', ret)
                 ret = 0
-                # env.seed(0)
                 start = obs = env.reset()
-        # img = env.render(mode='human', lcd_mode=G.lcd_mode)
         img = env.render(mode='human')
         time.sleep(delay)
 

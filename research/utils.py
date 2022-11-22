@@ -109,11 +109,13 @@ def count_vars(module):
 def dump_logger(logger, writer, i, G, verbose=True):
     print('=' * 30)
     print(i)
+
     def convert(x):
         if isinstance(x, np.ndarray):
             return x
         else:
             return x.detach().cpu().numpy()
+
     for key in logger:
         check = logger[key][0] if isinstance(logger[key], list) else logger[key]
         if torch.is_tensor(check):
