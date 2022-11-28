@@ -2,18 +2,19 @@ import itertools
 import time
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn.functional as F
+
+from einops import rearrange
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm
 
-from boxLCD.utils import A
 from research import utils
 from research.wrappers import AsyncVectorEnv
 
+
 BARREL_SIZE = int(1e3)
-from einops import rearrange
 
 # from jax.tree_util import tree_map, tree_map
 
@@ -151,6 +152,7 @@ class RolloutDataset(IterableDataset):
         infinite=True,
         refresh_data=False,
         max_barrels=None,
+        downsample=-1,
     ):
         super().__init__()
         self.window = window
@@ -158,13 +160,13 @@ class RolloutDataset(IterableDataset):
         self.barrel_path = barrel_path
         self.refresh_data = refresh_data
         self.max_barrels = max_barrels
+        self.downsample = downsample
         self._refresh()
 
     def _refresh(self):
         """recheck the directory for new barrels"""
-        self.barrel_files = list(self.barrel_path.glob('*.barrel.npz'))[
-            : self.max_barrels
-        ]
+        barrel_files = list(self.barrel_path.glob('*.barrel.npz'))
+        self.barrel_files = barrel_files[:self.max_barrels]
         self.nbarrels = len(self.barrel_files)
         assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
@@ -222,6 +224,15 @@ class RolloutDataset(IterableDataset):
                 # if (elem['lcd'] == 0.0).all(dim=0).all(dim=-1).all(dim=-1).any():
                 #  import ipdb; ipdb.set_trace()
                 assert elem['lcd'].max() <= 1.0 and elem['lcd'].min() >= 0.0
+                if self.downsample != -1:
+                    lcd_t, lcd_c, lcd_w, lcd_h = elem['lcd'].shape
+                    assert lcd_w % self.downsample == 0 and lcd_h % self.downsample == 0
+                    if lcd_h != lcd_w:
+                        # which is the smaller dimension?
+                        breakpoint()
+                    elem[f'lcd_{self.downsample}'] = F.interpolate(
+                        elem['lcd'], size=(self.downsample, self.downsample), mode='bilinear'
+                    )
                 yield elem
             curr_barrel.close()
             if ct >= self.nbarrels - 1 and not self.infinite:
@@ -230,7 +241,7 @@ class RolloutDataset(IterableDataset):
 
 def load_ds(G):
     test_dset = RolloutDataset(
-        G.datadir / 'test', G.window, infinite=False, max_barrels=1
+        G.datadir / 'test', G.window, infinite=False, max_barrels=1, downsample=G.downsample,
     )
     test_loader = DataLoader(
         test_dset,
@@ -242,7 +253,7 @@ def load_ds(G):
     )
 
     train_dset = RolloutDataset(
-        G.datadir / 'train', G.window, refresh_data=G.refresh_data
+        G.datadir / 'train', G.window, refresh_data=G.refresh_data, downsample=G.downsample,
     )
     train_loader = DataLoader(
         train_dset,

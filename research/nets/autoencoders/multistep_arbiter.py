@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from jax.tree_util import tree_map
 from torch import distributions as thd
 from torch import nn
@@ -121,12 +122,7 @@ class Decoder(nn.Module):
     def __init__(self, act_n, state_n, in_size, G):
         super().__init__()
         # assert G.lcd_h == 16 and G.lcd_w == 32
-        if G.lcd_w == 32:
-            W = 4
-        elif G.lcd_w == 24:
-            W = 3
-        elif G.lcd_w == 16:
-            W = 2
+        W = G.lcd_w // 8
         nf = G.nfilter
         self.net = nn.Sequential(
             nn.ConvTranspose2d(in_size, nf, (2, W), 2),

@@ -617,11 +617,12 @@ class WorldEnv(gym.Env, EzPickle):
         if mode == 'rgb_array':
             return lcd
         elif mode == 'human':
+            K = 8
             # use a pyglet viewer to show the images to the user in realtime.
             if self.viewer is None:
-                self.viewer = Viewer(8 * width, 8 * height, self.G)
+                self.viewer = Viewer(K * width, K * height, self.G)
 
-            rep = lambda x: x.repeat(8, axis=0).repeat(8, axis=1)
+            rep = lambda x: x.repeat(K, axis=0).repeat(K, axis=1)
             if self.lcd_mode == '1':
                 low_res = rep(255 * lcd[..., None].repeat(3, 2).astype(np.uint8))
             else:

@@ -101,6 +101,8 @@ def config():
     G.make_video = 0
     G.data_workers = 12
 
+    G.downsample = -1
+
     # extra info that we set here for convenience and don't modify
     G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
     G.commit = (

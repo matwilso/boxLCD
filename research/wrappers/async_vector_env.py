@@ -23,6 +23,7 @@ __all__ = ['AsyncVectorEnv']
 
 # stolen from: https://github.com/openai/gym/blob/master/gym/vector/async_vector_env.py
 # and then modified to support my custom APIs
+# TODO: remove the depenendency on gym, since we have to use an old version otherwise it breaks
 
 
 class AsyncState(Enum):
