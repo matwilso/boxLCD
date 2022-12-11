@@ -71,6 +71,14 @@ def config():
     G.beta = 0.25
     G.entropy_bonus = 0.0
 
+    # DIFFUSION
+
+
+
+
+
+
+
     G.min_std = 1e-4
     G.data_frac = 1.0
     G.vanished = 1
