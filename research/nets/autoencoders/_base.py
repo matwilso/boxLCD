@@ -51,7 +51,7 @@ class Autoencoder(Net):
 
     def _plot_lcds(self, epoch, writer, pred, truth=None):
         """visualize lcd reconstructions"""
-        viz_idxs = np.linspace(0, pred.shape[0]-1, self.G.video_n, dtype=np.int)
+        viz_idxs = np.linspace(0, pred.shape[0] - 1, self.G.video_n, dtype=np.int)
         pred = pred[viz_idxs].cpu()
         if truth is not None:
             truth = self.unproc(truth[viz_idxs]).cpu()
@@ -67,7 +67,7 @@ class Autoencoder(Net):
 
     def _plot_proprios(self, epoch, writer, pred, truth=None):
         """visualize proprio reconstructions"""
-        viz_idxs = np.linspace(0, pred.shape[0]-1, self.G.video_n, dtype=np.int)
+        viz_idxs = np.linspace(0, pred.shape[0] - 1, self.G.video_n, dtype=np.int)
         pred_proprio = pred[viz_idxs].cpu()
         preds = []
         for s in pred_proprio:

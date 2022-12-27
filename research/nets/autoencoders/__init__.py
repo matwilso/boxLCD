@@ -15,4 +15,5 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
             autoencoder_map[attribute_name] = attribute
 
 from .diffusion_v2.diffusion_model import DiffusionModel
+
 autoencoder_map['diffusion_model'] = DiffusionModel

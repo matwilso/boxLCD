@@ -5,14 +5,12 @@ from datetime import datetime
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 from einops import rearrange
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm
 
 from research import utils
 from research.wrappers import AsyncVectorEnv
-
 
 BARREL_SIZE = int(1e3)
 
@@ -152,7 +150,7 @@ class RolloutDataset(IterableDataset):
         infinite=True,
         refresh_data=False,
         max_barrels=None,
-        downsample=-1,
+        resolutions=[],
     ):
         super().__init__()
         self.window = window
@@ -160,13 +158,13 @@ class RolloutDataset(IterableDataset):
         self.barrel_path = barrel_path
         self.refresh_data = refresh_data
         self.max_barrels = max_barrels
-        self.downsample = downsample
+        self.resolutions = resolutions
         self._refresh()
 
     def _refresh(self):
         """recheck the directory for new barrels"""
         barrel_files = list(self.barrel_path.glob('*.barrel.npz'))
-        self.barrel_files = barrel_files[:self.max_barrels]
+        self.barrel_files = barrel_files[: self.max_barrels]
         self.nbarrels = len(self.barrel_files)
         assert self.nbarrels > 0, 'didnt find any barrels at datadir'
 
@@ -226,15 +224,16 @@ class RolloutDataset(IterableDataset):
                 if True:
                     elem['lcd'] = elem['lcd'] * 2 - 1
 
-                if self.downsample != -1:
-                    lcd_t, lcd_c, lcd_w, lcd_h = elem['lcd'].shape
-                    assert lcd_w % self.downsample == 0 and lcd_h % self.downsample == 0
-                    if lcd_h != lcd_w:
-                        # which is the smaller dimension?
-                        breakpoint()
-                    elem[f'lcd_{self.downsample}'] = F.interpolate(
-                        elem['lcd'], size=(self.downsample, self.downsample), mode='bilinear'
-                    )
+                for resolution in self.resolutions:
+                    if resolution != -1:
+                        lcd_t, lcd_c, lcd_w, lcd_h = elem['lcd'].shape
+                        assert lcd_w % resolution == 0 and lcd_h % resolution == 0
+                        if lcd_h != lcd_w:
+                            # which is the smaller dimension?
+                            breakpoint()
+                        elem[f'lcd_{resolution}'] = F.interpolate(
+                            elem['lcd'], size=(resolution, resolution), mode='bilinear'
+                        )
                 yield elem
             curr_barrel.close()
             if ct >= self.nbarrels - 1 and not self.infinite:
@@ -242,8 +241,13 @@ class RolloutDataset(IterableDataset):
 
 
 def load_ds(G):
+    resolutions = [G.src_resolution, G.dst_resolution]
     test_dset = RolloutDataset(
-        G.datadir / 'test', G.window, infinite=False, max_barrels=1, downsample=G.downsample,
+        G.datadir / 'test',
+        G.window,
+        infinite=False,
+        max_barrels=1,
+        resolutions=resolutions,
     )
     test_loader = DataLoader(
         test_dset,
@@ -255,7 +259,10 @@ def load_ds(G):
     )
 
     train_dset = RolloutDataset(
-        G.datadir / 'train', G.window, refresh_data=G.refresh_data, downsample=G.downsample,
+        G.datadir / 'train',
+        G.window,
+        refresh_data=G.refresh_data,
+        resolutions=resolutions,
     )
     train_loader = DataLoader(
         train_dset,

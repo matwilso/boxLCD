@@ -1,6 +1,6 @@
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import gym
 
@@ -27,6 +27,10 @@ def env_fn(G, seed=None):
         return env
 
     return _make
+
+
+# TODO: conver this to arg parse so we can have defaults and choices and it's better and less automagic
+# Then we can fix the resolutions to not be -1, but None
 
 
 def config():
@@ -82,6 +86,9 @@ def config():
     G.cf_drop_prob = 0.1
     G.teacher_path = Path('.')
     G.teacher_mode = 'step1'
+    G.diffusion_mode = 'base'
+    G.src_resolution = -1
+    G.dst_resolution = -1
 
     G.min_std = 1e-4
     G.data_frac = 1.0
@@ -112,8 +119,6 @@ def config():
 
     G.make_video = 0
     G.data_workers = 12
-
-    G.downsample = -1
 
     # extra info that we set here for convenience and don't modify
     G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

@@ -14,13 +14,13 @@ MAX_TIMESTEPS = 256
 
 
 class SimpleUnet(nn.Module):
-    def __init__(self, G):
+    def __init__(self, resolution, channels, dropout, superres=False):
         super().__init__()
-        self.G = G
-        channels = G.hidden_size
-        dropout = G.dropout
-        time_embed_dim = 2 * channels
         out_channels = 3
+        time_embed_dim = 2 * channels
+        # if super-res, condition on low-res image
+        in_channels = 6 if superres else 3
+
         self.time_embed = nn.Sequential(
             nn.Linear(64, time_embed_dim),
             nn.SiLU(),
@@ -36,16 +36,19 @@ class SimpleUnet(nn.Module):
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
-        self.down = Down(channels, time_embed_dim, dropout=dropout)
+        self.down = Down(
+            resolution, in_channels, channels, time_embed_dim, dropout=dropout
+        )
         self.turn = ResBlock(channels, time_embed_dim, dropout=dropout)
-        self.up = Up(channels, time_embed_dim, dropout=dropout)
+        self.up = Up(resolution, channels, time_embed_dim, dropout=dropout)
         self.out = nn.Sequential(
             nn.GroupNorm(32, channels),
             nn.SiLU(),
             nn.Conv2d(channels, out_channels, 3, padding=1),
         )
 
-    def forward(self, x, timesteps, guide=None, cond_w=None):
+    def forward(self, x, timesteps, guide=None, cond_w=None, low_res=None):
+        assert timesteps.max() < MAX_TIMESTEPS
         emb = self.time_embed(
             timestep_embedding(
                 timesteps=timesteps.float(), dim=64, max_period=MAX_TIMESTEPS
@@ -61,6 +64,9 @@ class SimpleUnet(nn.Module):
                 timestep_embedding(timesteps=cond_w, dim=64, max_period=4)
             )
             emb += cond_w_embed
+
+        if low_res is not None:
+            x = torch.cat([x, low_res], dim=1)
 
         # <UNET> downsample, then upsample with skip connections between the down and up.
         x, cache = self.down(x, emb)
@@ -84,12 +90,11 @@ class Downsample(nn.Module):
 
 
 class Down(nn.Module):
-    def __init__(self, channels, emb_channels, dropout=0.0):
+    def __init__(self, resolution, in_channels, channels, emb_channels, dropout=0.0):
         super().__init__()
-        self.seq = nn.ModuleList(
-            [
+        seq = [
                 # not really a downsample, just makes the code simpler to reuse
-                Downsample(3, channels, 1),
+                Downsample(in_channels, channels, 1),
                 ResBlock(channels, emb_channels, dropout=dropout),
                 ResBlock(channels, emb_channels, dropout=dropout),
                 Downsample(channels),
@@ -97,7 +102,17 @@ class Down(nn.Module):
                 ResBlock(channels, emb_channels, dropout=dropout),
                 Downsample(channels),
             ]
-        )
+        extra_res = (resolution // 16) // 2
+        for _ in range(extra_res):
+            extra = [
+                TimestepEmbedSequential(
+                    ResBlock(channels, emb_channels, dropout=dropout),
+                    Downsample(channels),
+                )
+            ]
+            seq += extra
+
+        self.seq = nn.ModuleList(seq)
 
     def forward(self, x, emb):
         cache = []
@@ -121,11 +136,10 @@ class Upsample(nn.Module):
 
 
 class Up(nn.Module):
-    def __init__(self, channels, emb_channels, dropout=0.0):
+    def __init__(self, resolution, channels, emb_channels, dropout=0.0):
         super().__init__()
         # on the up, bundle resnets with upsampling so upsamplnig can be simpler
-        self.seq = nn.ModuleList(
-            [
+        seq = [
                 TimestepEmbedSequential(
                     ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
                     Upsample(channels),
@@ -139,7 +153,16 @@ class Up(nn.Module):
                 ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
                 ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
             ]
-        )
+        extra_res = (resolution // 16) // 2
+        for _ in range(extra_res):
+            extra = [
+                TimestepEmbedSequential(
+                    ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+                    Upsample(channels),
+                ),
+            ]
+            seq = extra + seq
+        self.seq = nn.ModuleList(seq)
 
     def forward(self, x, emb, cache):
         cache = cache[::-1]
