@@ -20,6 +20,7 @@ class SimpleUnet(nn.Module):
         channels = G.hidden_size
         dropout = G.dropout
         time_embed_dim = 2 * channels
+        out_channels = 3
         self.time_embed = nn.Sequential(
             nn.Linear(64, time_embed_dim),
             nn.SiLU(),
@@ -31,7 +32,7 @@ class SimpleUnet(nn.Module):
             nn.Linear(time_embed_dim, time_embed_dim),
         )
         self.guide_embed = nn.Sequential(
-            nn.Linear(10, time_embed_dim),
+            nn.Linear(128, time_embed_dim),
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
@@ -41,7 +42,7 @@ class SimpleUnet(nn.Module):
         self.out = nn.Sequential(
             nn.GroupNorm(32, channels),
             nn.SiLU(),
-            nn.Conv2d(channels, 1, 3, padding=1),
+            nn.Conv2d(channels, out_channels, 3, padding=1),
         )
 
     def forward(self, x, timesteps, guide=None, cond_w=None):
@@ -52,11 +53,7 @@ class SimpleUnet(nn.Module):
         )
 
         if guide is not None:
-            guide = guide.clone()
-            mask = guide == -1
-            guide[mask] = 0  # zero out so one-hot works
-            guide_emb = self.guide_embed(F.one_hot(guide, num_classes=10).float())
-            guide_emb[mask] = 0  # actually zero out the values
+            guide_emb = self.guide_embed(guide)
             emb += guide_emb
 
         if cond_w is not None:
@@ -92,7 +89,7 @@ class Down(nn.Module):
         self.seq = nn.ModuleList(
             [
                 # not really a downsample, just makes the code simpler to reuse
-                Downsample(1, channels, 1),
+                Downsample(3, channels, 1),
                 ResBlock(channels, emb_channels, dropout=dropout),
                 ResBlock(channels, emb_channels, dropout=dropout),
                 Downsample(channels),

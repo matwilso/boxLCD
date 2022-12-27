@@ -221,9 +221,11 @@ class RolloutDataset(IterableDataset):
                 # elem = {key: torch.as_tensor(val[idx, start:start+self.window], dtype=torch.float32) for key, val in elems.items()}
                 elem['lcd'] = rearrange(elem['lcd'], 't h w c -> c t h w', c=3)
                 elem['lcd'] /= 255.0
-                # if (elem['lcd'] == 0.0).all(dim=0).all(dim=-1).all(dim=-1).any():
-                #  import ipdb; ipdb.set_trace()
                 assert elem['lcd'].max() <= 1.0 and elem['lcd'].min() >= 0.0
+                # TODO: add an arg to check for diffusion model or something like that.
+                if True:
+                    elem['lcd'] = elem['lcd'] * 2 - 1
+
                 if self.downsample != -1:
                     lcd_t, lcd_c, lcd_w, lcd_h = elem['lcd'].shape
                     assert lcd_w % self.downsample == 0 and lcd_h % self.downsample == 0

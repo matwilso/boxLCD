@@ -3,7 +3,7 @@ from functools import partial
 import torch
 import torch.nn.functional as F
 
-from gms.diffusion.diffusion_utils import (
+from .diffusion_utils import (
     broadcast_from_left,
     diffusion_forward,
     diffusion_reverse,

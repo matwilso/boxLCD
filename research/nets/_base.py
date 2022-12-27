@@ -13,6 +13,7 @@ class Net(nn.Module):
         self.psnr = ignite.metrics.PSNR(1.0, device=self.G.device)
         self.cossim = nn.CosineSimilarity(dim=-1)
         self.arbiter = None
+        self.lcd_key = 'lcd'
 
     def _init(self):
         self.optimizer = Adam(self.parameters(), lr=self.G.lr)

@@ -1,4 +1,4 @@
-import pathlib
+from pathlib import Path
 import subprocess
 import sys
 
@@ -32,11 +32,11 @@ def env_fn(G, seed=None):
 def config():
     G = boxLCD.utils.AttrDict()
     # BASICS
-    G.logdir = pathlib.Path('./logs/trash')
-    G.weightdir = pathlib.Path('.')
-    G.buffdir = pathlib.Path('.')
-    G.datadir = pathlib.Path('.')
-    G.arbiterdir = pathlib.Path('.')
+    G.logdir = Path('./logs/trash')
+    G.weightdir = Path('.')
+    G.buffdir = Path('.')
+    G.datadir = Path('.')
+    G.arbiterdir = Path('.')
     G.device = 'cuda'  # 'cuda', 'cpu'
     G.mode = 'train'
     G.model = 'BVAE'
@@ -72,12 +72,16 @@ def config():
     G.entropy_bonus = 0.0
 
     # DIFFUSION
-
-
-
-
-
-
+    G.binarize = 0
+    G.timesteps = 250
+    G.dropout = 0.0
+    G.sampler = 'ddim'
+    G.mean_type = 'v'
+    G.class_cond = 1
+    G.sample_cond_w = -1.0
+    G.cf_drop_prob = 0.1
+    G.teacher_path = Path('.')
+    G.teacher_mode = 'step1'
 
     G.min_std = 1e-4
     G.data_frac = 1.0

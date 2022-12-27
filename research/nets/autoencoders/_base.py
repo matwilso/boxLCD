@@ -23,8 +23,8 @@ class Autoencoder(Net):
     def decode_mode(self, z):
         mode = {}
         dists = self._decode(z)
-        if 'lcd' in dists:
-            mode['lcd'] = dists['lcd'].probs
+        if self.lcd_key in dists:
+            mode[self.lcd_key] = dists[self.lcd_key].probs
             # mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
         if 'proprio' in dists:
             mode['proprio'] = dists['proprio'].mean
@@ -51,7 +51,7 @@ class Autoencoder(Net):
 
     def _plot_lcds(self, epoch, writer, pred, truth=None):
         """visualize lcd reconstructions"""
-        viz_idxs = np.arange(0, pred.shape[0], pred.shape[0] // self.G.video_n)
+        viz_idxs = np.linspace(0, pred.shape[0]-1, self.G.video_n, dtype=np.int)
         pred = pred[viz_idxs].cpu()
         if truth is not None:
             truth = self.unproc(truth[viz_idxs]).cpu()
@@ -67,18 +67,18 @@ class Autoencoder(Net):
 
     def _plot_proprios(self, epoch, writer, pred, truth=None):
         """visualize proprio reconstructions"""
-        viz_idxs = np.arange(0, pred.shape[0], pred.shape[0] // self.G.video_n)
+        viz_idxs = np.linspace(0, pred.shape[0]-1, self.G.video_n, dtype=np.int)
         pred_proprio = pred[viz_idxs].cpu()
         preds = []
         for s in pred_proprio:
-            preds += [self.env.reset(proprio=s)['lcd']]
+            preds += [self.env.reset(proprio=s)[self.lcd_key]]
         preds = 1.0 * np.stack(preds)
 
         if truth is not None:
             true_proprio = truth[viz_idxs].cpu()
             truths = []
             for s in true_proprio:
-                truths += [self.env.reset(proprio=s)['lcd']]
+                truths += [self.env.reset(proprio=s)[self.lcd_key]]
             truths = 1.0 * np.stack(truths)
             error = (preds - truths + 1.0) / 2.0
             stack = np.concatenate([truths, preds, error], -2)[:, None]
@@ -93,11 +93,11 @@ class Autoencoder(Net):
             )
 
     def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
-        n = batch['lcd'].shape[0]
+        n = batch[self.lcd_key].shape[0]
         decoded = self.sample(n)
 
-        if 'lcd' in decoded:
-            sample_lcd = decoded['lcd']
+        if self.lcd_key in decoded:
+            sample_lcd = decoded[self.lcd_key]
             self._plot_lcds(epoch, writer, sample_lcd)
 
         if 'proprio' in decoded:
@@ -105,7 +105,7 @@ class Autoencoder(Net):
             self._plot_proprios(epoch, writer, sample_proprio)
 
         if arbiter is not None:
-            decoded['lcd'] = self.proc(decoded['lcd'])
+            decoded[self.lcd_key] = self.proc(decoded[self.lcd_key])
             paz = arbiter.forward(decoded).cpu().numpy()
             taz = arbiter.forward(batch).cpu().numpy()
             metrics['eval/fid'] = utils.compute_fid(paz, taz)
@@ -114,9 +114,9 @@ class Autoencoder(Net):
         # run the examples through encoder and decoder
         z = self.encode(batch, flatten=False, noise=False)
         decoded = self.decode_mode(z)
-        if 'lcd' in decoded:
-            pred_lcd = decoded['lcd']
-            true_lcd = batch['lcd']
+        if self.lcd_key in decoded:
+            pred_lcd = decoded[self.lcd_key]
+            true_lcd = batch[self.lcd_key]
             # run basic metrics
             self.ssim.update((pred_lcd, self.unproc(true_lcd)))
             ssim = self.ssim.compute().cpu().detach()
@@ -137,7 +137,7 @@ class Autoencoder(Net):
             self._plot_proprios(epoch, writer, pred_proprio, true_proprio)
 
         if arbiter is not None:
-            decoded['lcd'] = decoded['lcd'][:, 0]
+            decoded[self.lcd_key] = decoded[self.lcd_key][:, 0]
             paz = arbiter.forward(decoded)
             taz = arbiter.forward(batch)
             cosdist = 1 - self.cossim(paz, taz).mean().cpu()
@@ -161,15 +161,15 @@ class MultiStepAE(Autoencoder):
         self.unproc = lambda x: x
 
     def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
-        n = batch['lcd'].shape[0]
+        n = batch[self.lcd_key].shape[0]
         decoded = self.sample(n)
 
-        if 'lcd' in decoded:
-            sample_lcd = decoded['lcd']
+        if self.lcd_key in decoded:
+            sample_lcd = decoded[self.lcd_key]
             self._plot_lcds(epoch, writer, sample_lcd)
 
         if arbiter is not None:
-            decoded['lcd'] = decoded['lcd'][:, 0]
+            decoded[self.lcd_key] = decoded[self.lcd_key][:, 0]
             paz = arbiter.forward(decoded).cpu().numpy()
             taz = arbiter.forward(batch).cpu().numpy()
             metrics['eval/fid'] = utils.compute_fid(paz, taz)
@@ -178,9 +178,9 @@ class MultiStepAE(Autoencoder):
         # run the examples through encoder and decoder
         z = self.encode(batch, flatten=False)
         decoded = self.decode_mode(z)
-        if 'lcd' in decoded:
-            pred_lcd = decoded['lcd']
-            true_lcd = batch['lcd']
+        if self.lcd_key in decoded:
+            pred_lcd = decoded[self.lcd_key]
+            true_lcd = batch[self.lcd_key]
             swap = lambda x: rearrange(x, 'b c d h w -> (c d) b h w')
             # run basic metrics
             self.ssim.update((swap(pred_lcd), swap(true_lcd)))
@@ -212,7 +212,7 @@ class MultiStepAE(Autoencoder):
             import ipdb
 
             ipdb.set_trace()
-            decoded['lcd'] = decoded['lcd'][:, 0]
+            decoded[self.lcd_key] = decoded[self.lcd_key][:, 0]
             paz = arbiter.forward(decoded)
             taz = arbiter.forward(batch)
             cosdist = 1 - self.cossim(paz, taz).mean().cpu()

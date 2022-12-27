@@ -128,10 +128,6 @@ def dump_logger(logger, writer, i, G, verbose=True):
             writer.add_scalar(key, val, i)
             if 'ssim' in key:
                 writer.add_scalar(key + '_log', np.log(val), i)
-            if key == 'loss' and i > 0:
-                writer.add_scalar('logx/' + key, val, int(np.log(1e5 * i)))
-            # if 'loss' in key:
-            #  writer.add_scalar('neg/'+key, -val, i)
         print(val)
     print(G.full_cmd)
     print(G.num_vars)
@@ -388,7 +384,13 @@ def compute_fid(x, y):
 
 
 def flat_batch(batch):
-    return {key: val.flatten(0, 0).flatten(1, 2) for key, val in batch.items()}
+    new_batch = {}
+    for key, val in batch.items():
+        if 'lcd' in key:
+            new_batch[key] = rearrange(batch[key], 'b c t h w -> (b t) c h w')
+        else:
+            new_batch[key] = val.flatten(0, 1)
+    return new_batch
 
 
 def flatten_first(arr):

@@ -13,3 +13,6 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
         attribute = getattr(module, attribute_name)
         if isclass(attribute) and issubclass(attribute, Autoencoder):
             autoencoder_map[attribute_name] = attribute
+
+from .diffusion_v2.diffusion_model import DiffusionModel
+autoencoder_map['diffusion_model'] = DiffusionModel
