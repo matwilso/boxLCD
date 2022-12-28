@@ -24,7 +24,9 @@ class Autoencoder(Net):
         mode = {}
         dists = self._decode(z)
         if self.lcd_key in dists:
-            mode[self.lcd_key] = dists[self.lcd_key].probs
+            dist = dists[self.lcd_key]
+            mode[self.lcd_key] = dist.mean if isinstance(dist, torch.distributions.Normal) else dist.probs
+            #mode[self.lcd_key] = dists[self.lcd_key].probs
             # mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
         if 'proprio' in dists:
             mode['proprio'] = dists['proprio'].mean
@@ -51,6 +53,8 @@ class Autoencoder(Net):
 
     def _plot_lcds(self, epoch, writer, pred, truth=None):
         """visualize lcd reconstructions"""
+        truth = (truth.clone() + 1.0) / 2.0
+        pred = (pred.clone() + 1.0) / 2.0
         viz_idxs = np.linspace(0, pred.shape[0] - 1, self.G.video_n, dtype=np.int)
         pred = pred[viz_idxs].cpu()
         if truth is not None:
@@ -68,23 +72,22 @@ class Autoencoder(Net):
     def _plot_proprios(self, epoch, writer, pred, truth=None):
         """visualize proprio reconstructions"""
         viz_idxs = np.linspace(0, pred.shape[0] - 1, self.G.video_n, dtype=np.int)
-        pred_proprio = pred[viz_idxs].cpu()
+        pred_proprio = pred[viz_idxs].detach().cpu()
         preds = []
         for s in pred_proprio:
             preds += [self.env.reset(proprio=s)[self.lcd_key]]
         preds = 1.0 * np.stack(preds)
 
         if truth is not None:
-            true_proprio = truth[viz_idxs].cpu()
+            true_proprio = truth[viz_idxs].detach().cpu()
             truths = []
             for s in true_proprio:
                 truths += [self.env.reset(proprio=s)[self.lcd_key]]
             truths = 1.0 * np.stack(truths)
             error = (preds - truths + 1.0) / 2.0
-            stack = np.concatenate([truths, preds, error], -2)[:, None]
-            writer.add_image(
-                'recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch
-            )
+            stack = np.concatenate([truths, preds, error], -3)
+            stack = rearrange(stack, 'b h w c -> b c h w')
+            writer.add_image('recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
         else:
             writer.add_image(
                 'sample_proprio',
@@ -106,8 +109,8 @@ class Autoencoder(Net):
 
         if arbiter is not None:
             decoded[self.lcd_key] = self.proc(decoded[self.lcd_key])
-            paz = arbiter.forward(decoded).cpu().numpy()
-            taz = arbiter.forward(batch).cpu().numpy()
+            paz = arbiter.forward(decoded).detach().cpu().numpy()
+            taz = arbiter.forward(batch).detach().cpu().numpy()
             metrics['eval/fid'] = utils.compute_fid(paz, taz)
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
@@ -119,10 +122,10 @@ class Autoencoder(Net):
             true_lcd = batch[self.lcd_key]
             # run basic metrics
             self.ssim.update((pred_lcd, self.unproc(true_lcd)))
-            ssim = self.ssim.compute().cpu().detach()
+            ssim = self.ssim.compute()
             metrics['eval/ssim'] = ssim
             self.psnr.update((pred_lcd, self.unproc(true_lcd)))
-            psnr = self.psnr.compute().cpu().detach()
+            psnr = self.psnr.compute().cpu()
             metrics['eval/psnr'] = psnr
             # visualize reconstruction
             self._plot_lcds(epoch, writer, pred_lcd, true_lcd)
@@ -170,8 +173,8 @@ class MultiStepAE(Autoencoder):
 
         if arbiter is not None:
             decoded[self.lcd_key] = decoded[self.lcd_key][:, 0]
-            paz = arbiter.forward(decoded).cpu().numpy()
-            taz = arbiter.forward(batch).cpu().numpy()
+            paz = arbiter.forward(decoded).detach().cpu().numpy()
+            taz = arbiter.forward(batch).detach().cpu().numpy()
             metrics['eval/fid'] = utils.compute_fid(paz, taz)
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
@@ -184,10 +187,10 @@ class MultiStepAE(Autoencoder):
             swap = lambda x: rearrange(x, 'b c d h w -> (c d) b h w')
             # run basic metrics
             self.ssim.update((swap(pred_lcd), swap(true_lcd)))
-            ssim = self.ssim.compute().cpu().detach()
+            ssim = self.ssim.compute()
             metrics['eval/ssim'] = ssim
             self.psnr.update((swap(pred_lcd), swap(true_lcd)))
-            psnr = self.psnr.compute().cpu().detach()
+            psnr = self.psnr.compute().cpu()
             metrics['eval/psnr'] = psnr
             # visualize reconstruction
             # TODO: maybe plot all

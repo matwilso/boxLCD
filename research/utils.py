@@ -111,10 +111,10 @@ def dump_logger(logger, writer, i, G, verbose=True):
     print(i)
 
     def convert(x):
-        if isinstance(x, np.ndarray):
-            return x
-        else:
+        if isinstance(x, torch.Tensor):
             return x.detach().cpu().numpy()
+        else:
+            return x
 
     for key in logger:
         check = logger[key][0] if isinstance(logger[key], list) else logger[key]
@@ -123,11 +123,16 @@ def dump_logger(logger, writer, i, G, verbose=True):
                 check.device.type == 'cpu'
             ), f'all metrics should be on the cpu before logging. {key} is on {check.device}'
         print(key, end=' ')
-        val = np.mean(logger[key])
+        if isinstance(logger[key], list):
+            y = [convert(x) for x in logger[key]]
+        else:
+            y = logger[key]
+        if key in ['dt/sample_batch', 'dt/train_step']:
+            val = np.sum(y)
+        else:
+            val = np.mean(y)
         if writer is not None:
             writer.add_scalar(key, val, i)
-            if 'ssim' in key:
-                writer.add_scalar(key + '_log', np.log(val), i)
         print(val)
     print(G.full_cmd)
     print(G.num_vars)

@@ -4,49 +4,12 @@ import yaml
 
 from boxLCD import env_map
 from research import data, runners, utils
-from research.define_config import args_type, config, env_fn
+from research.define_config import env_fn, load_G
 from research.nets import net_map
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    for key, value in config().items():
-        parser.add_argument(f'--{key}', type=args_type(value), default=value)
-    temp_cfg = parser.parse_args()
-    # grab defaults from the env
-    Env = env_map[temp_cfg.env]
-    parser.set_defaults(**Env.ENV_DG)
-    data_yaml = temp_cfg.datadir / 'hps.yaml'
-    weight_yaml = temp_cfg.weightdir / 'hps.yaml'
-    defaults = {
-        'vidstack': temp_cfg.ep_len,
-    }
-    ignore = [
-        'logdir',
-        'full_cmd',
-        'dark_mode',
-        'ipython_mode',
-        'weightdir',
-        'arbiterdir',
-    ]
-    if data_yaml.exists():
-        with data_yaml.open('r') as f:
-            data_cfg = yaml.load(f, Loader=yaml.Loader)
-        for key in data_cfg.__dict__.keys():
-            if key in ignore:
-                continue
-            defaults[key] = data_cfg.__dict__[key]
-    if weight_yaml.exists():
-        with weight_yaml.open('r') as f:
-            weight_cfg = yaml.load(f, Loader=yaml.Loader)
-        for key in weight_cfg.__dict__.keys():
-            if key in ignore:
-                continue
-            defaults[key] = weight_cfg.__dict__[key]
-    parser.set_defaults(**defaults)
-    G = parser.parse_args()
-    G.lcd_w = int(G.wh_ratio * G.lcd_base)
-    G.lcd_h = G.lcd_base
-    G.imsize = G.lcd_w * G.lcd_h
+    G = load_G()
+
     # assert G.lcd_w == data_cfg.lcd_w and G.lcd_h == data_cfg.lcd_w, "mismatch of env dims"
     env = env_fn(G)()
     if G.mode not in ['collect', 'eval']:
@@ -66,6 +29,28 @@ if __name__ == '__main__':
     elif G.mode == 'collect':
         data.collect(env_fn, G)
         exit()
+    elif G.mode == 'eval_diffusion':
+        Net = net_map['diffusion_model']
+        MODEL_BASE = '/home/matwilso/code/boxLCD/logs/dec28/base_16_1e-3/net.pt'
+        #MODEL_32 = ''
+        #MODEL_64 = ''
+        base = Net.from_disk(MODEL_BASE, device='cuda')
+        b = lambda x: {key: val.to(G.device) for key, val in x.items()}
+        #to32 = Net.from_disk(MODEL_32)
+        #to64 = Net.from_disk(MODEL_64)
+        train_ds, test_ds = data.load_ds(G, resolutions=[16, 32, 64])
+        for batch in test_ds:
+            batch = b(batch)
+            n = batch['lcd'].shape[0]
+            sample16 = base.sample(n)
+            #sample32 = to32.sample(n, low_res=sample16['lcd_16'])
+            #sample64 = to64.sample(n, low_res=sample32['lcd_32'])
+            # cheats
+            #cheat_sample32 = to32.sample(n, low_res=batch['lcd_16'])
+            #cheat_sample64 = to64.sample(n, low_res=batch['lcd_32'])
+
+
+
     if G.ipython_mode:
         import IPython
         from traitlets.config import Config

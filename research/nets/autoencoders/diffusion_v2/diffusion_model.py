@@ -19,7 +19,6 @@ class DiffusionModel(SingleStepAE):
         super().__init__(env, G)
         self.res = G.dst_resolution
         self.src_res = G.src_resolution
-        self.lcd_key = f'lcd_{self.res}'
 
         if self.G.diffusion_mode == 'superres':
             assert (
@@ -61,21 +60,23 @@ class DiffusionModel(SingleStepAE):
         self._init()
 
     def upres_coarse(self, x, low_res):
-        return F.interpolate(low_res, x.shape[-2:], mode='bilinear')
+        low_res = F.interpolate(low_res, x.shape[-2:], mode='bilinear')
+        low_res = low_res + torch.randn_like(low_res) * 0.01
+        return low_res
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
         pass
 
     def _unprompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
-        n = batch[self.lcd_key].shape[0]
+        n = batch[self.G.lcd_key].shape[0]
 
         low_res = (
-            self.upres_coarse(batch[self.lcd_key], batch[self.low_res_key])
+            self.upres_coarse(batch[self.G.lcd_key], batch[self.low_res_key])
             if self.superres
             else None
         )
         decoded = self.sample(n, low_res=low_res)
-        decoded[self.lcd_key] = (decoded[self.lcd_key] + 1.0) / 2.0
+        decoded[self.G.lcd_key] = (decoded[self.G.lcd_key] + 1.0) / 2.0
 
         def grid(name, x):
             x = (x + 1.0) / 2.0
@@ -93,7 +94,7 @@ class DiffusionModel(SingleStepAE):
 
         genz = decoded['zs'][:, :25]
         genx = decoded['xs'][:, :25]
-        batchx = batch[self.lcd_key][:25]
+        batchx = batch[self.G.lcd_key][:25]
         gridvid('genz', genz)
         gridvid('genx', genx)
         grid('batchx', batchx)
@@ -102,16 +103,16 @@ class DiffusionModel(SingleStepAE):
             grid('low_res', low_res[:25])
 
         if arbiter is not None:
-            decoded[self.lcd_key] = self.proc(decoded[self.lcd_key])
+            decoded[self.G.lcd_key] = self.proc(decoded[self.G.lcd_key])
             paz = arbiter.forward(decoded).cpu().numpy()
             taz = arbiter.forward(batch).cpu().numpy()
             metrics['eval/fid'] = utils.compute_fid(paz, taz)
 
     def loss(self, batch):
-        lcd = batch[self.lcd_key]
+        lcd = batch[self.G.lcd_key]
         y = torch.ones((lcd.shape[0], 128), device=lcd.device)
         low_res = (
-            self.upres_coarse(batch[self.lcd_key], batch[self.low_res_key])
+            self.upres_coarse(batch[self.G.lcd_key], batch[self.low_res_key])
             if self.superres
             else None
         )
@@ -128,4 +129,4 @@ class DiffusionModel(SingleStepAE):
             noise = torch.randn((n, 3, self.res, self.res), device=self.G.device)
             net = partial(self.net, guide=y, low_res=low_res)
             zs, xs, eps = self.diffusion.sample(net=net, init_x=noise, cond_w=0.5)
-            return {self.lcd_key: zs[-1], 'zs': zs, 'xs': xs}
+            return {self.G.lcd_key: zs[-1], 'zs': zs, 'xs': xs}

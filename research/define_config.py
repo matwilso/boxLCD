@@ -1,6 +1,8 @@
 import subprocess
+import yaml
 import sys
 from pathlib import Path
+import argparse
 
 import gym
 
@@ -8,7 +10,6 @@ import boxLCD.utils
 from boxLCD import ENV_DG, env_map
 from boxLCD.utils import args_type
 from research import wrappers
-
 
 def env_fn(G, seed=None):
     def _make():
@@ -31,7 +32,6 @@ def env_fn(G, seed=None):
 
 # TODO: conver this to arg parse so we can have defaults and choices and it's better and less automagic
 # Then we can fix the resolutions to not be -1, but None
-
 
 def config():
     G = boxLCD.utils.AttrDict()
@@ -136,4 +136,52 @@ def config():
         assert key not in pastKeys, f'make sure you are not duplicating keys {key}'
         G[key] = val
 
+    return G
+
+def postprocess_G(G):
+    G.lcd_w = int(G.wh_ratio * G.lcd_base)
+    G.lcd_h = G.lcd_base
+    G.imsize = G.lcd_w * G.lcd_h
+    G.resolution = G.dst_resolution if G.dst_resolution != -1 else G.lcd_h
+    G.lcd_key = f'lcd_{G.dst_resolution}' if G.dst_resolution != -1 else 'lcd'
+    return G
+
+def load_G():
+    parser = argparse.ArgumentParser()
+    for key, value in config().items():
+        parser.add_argument(f'--{key}', type=args_type(value), default=value)
+    temp_cfg = parser.parse_args()
+    # grab defaults from the env
+    Env = env_map[temp_cfg.env]
+    parser.set_defaults(**Env.ENV_DG)
+    data_yaml = temp_cfg.datadir / 'hps.yaml'
+    weight_yaml = temp_cfg.weightdir / 'hps.yaml'
+    defaults = {
+        'vidstack': temp_cfg.ep_len,
+    }
+    ignore = [
+        'logdir',
+        'full_cmd',
+        'dark_mode',
+        'ipython_mode',
+        'weightdir',
+        'arbiterdir',
+    ]
+    if data_yaml.exists():
+        with data_yaml.open('r') as f:
+            data_cfg = yaml.load(f, Loader=yaml.Loader)
+        for key in data_cfg.__dict__.keys():
+            if key in ignore:
+                continue
+            defaults[key] = data_cfg.__dict__[key]
+    if weight_yaml.exists():
+        with weight_yaml.open('r') as f:
+            weight_cfg = yaml.load(f, Loader=yaml.Loader)
+        for key in weight_cfg.__dict__.keys():
+            if key in ignore:
+                continue
+            defaults[key] = weight_cfg.__dict__[key]
+    parser.set_defaults(**defaults)
+    G = parser.parse_args()
+    G = postprocess_G(G)
     return G

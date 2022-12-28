@@ -240,8 +240,9 @@ class RolloutDataset(IterableDataset):
                 break
 
 
-def load_ds(G):
-    resolutions = [G.src_resolution, G.dst_resolution]
+def load_ds(G, resolutions=None):
+    if resolutions is None:
+        resolutions = [G.src_resolution, G.dst_resolution]
     test_dset = RolloutDataset(
         G.datadir / 'test',
         G.window,

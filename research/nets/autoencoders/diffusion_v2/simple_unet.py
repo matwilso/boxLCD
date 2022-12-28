@@ -93,15 +93,15 @@ class Down(nn.Module):
     def __init__(self, resolution, in_channels, channels, emb_channels, dropout=0.0):
         super().__init__()
         seq = [
-                # not really a downsample, just makes the code simpler to reuse
-                Downsample(in_channels, channels, 1),
-                ResBlock(channels, emb_channels, dropout=dropout),
-                ResBlock(channels, emb_channels, dropout=dropout),
-                Downsample(channels),
-                ResBlock(channels, emb_channels, dropout=dropout),
-                ResBlock(channels, emb_channels, dropout=dropout),
-                Downsample(channels),
-            ]
+            # not really a downsample, just makes the code simpler to reuse
+            Downsample(in_channels, channels, 1),
+            ResBlock(channels, emb_channels, dropout=dropout),
+            ResBlock(channels, emb_channels, dropout=dropout),
+            Downsample(channels),
+            ResBlock(channels, emb_channels, dropout=dropout),
+            ResBlock(channels, emb_channels, dropout=dropout),
+            Downsample(channels),
+        ]
         extra_res = (resolution // 16) // 2
         for _ in range(extra_res):
             extra = [
@@ -140,19 +140,19 @@ class Up(nn.Module):
         super().__init__()
         # on the up, bundle resnets with upsampling so upsamplnig can be simpler
         seq = [
-                TimestepEmbedSequential(
-                    ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-                    Upsample(channels),
-                ),
+            TimestepEmbedSequential(
                 ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-                ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-                TimestepEmbedSequential(
-                    ResBlock(2 * channels, emb_channels, channels), Upsample(channels)
-                ),
-                ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-                ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-                ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
-            ]
+                Upsample(channels),
+            ),
+            ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+            ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+            TimestepEmbedSequential(
+                ResBlock(2 * channels, emb_channels, channels), Upsample(channels)
+            ),
+            ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+            ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+            ResBlock(2 * channels, emb_channels, channels, dropout=dropout),
+        ]
         extra_res = (resolution // 16) // 2
         for _ in range(extra_res):
             extra = [

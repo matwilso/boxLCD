@@ -53,9 +53,9 @@ class Trainer:
 
         for itr in itertools.count(1):
             # TRAIN
-            with Timer(self.logger, 'sample_batch'):
+            with Timer(self.logger, 'sampling_batches'):
                 train_batch = self.b(next(train_iter))
-            with Timer(self.logger, 'train_step'):
+            with Timer(self.logger, 'training_steps'):
                 metrics = self.model.train_step(train_batch)
                 for key in metrics:
                     self.logger[key] += [metrics[key].detach().cpu()]
