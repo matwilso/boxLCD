@@ -37,7 +37,9 @@ class ArbiterAE(SingleStepAE):
         recon_losses['loss/recon_proprio'] = (
             -decoded['proprio'].log_prob(batch['proprio']).mean()
         )
-        recon_losses['loss/recon_lcd'] = -decoded[self.G.lcd_key].log_prob(batch[self.G.lcd_key]).mean()
+        recon_losses['loss/recon_lcd'] = (
+            -decoded[self.G.lcd_key].log_prob(batch[self.G.lcd_key]).mean()
+        )
         recon_loss = sum(recon_losses.values())
         metrics = {'loss/recon_total': recon_loss, **recon_losses}
         return recon_loss, metrics

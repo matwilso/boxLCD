@@ -59,9 +59,11 @@ class DiffusionModel(SingleStepAE):
         )
         self._init()
 
-    def upres_coarse(self, x, low_res):
+    @staticmethod
+    def upres_coarse(x, low_res, noise=False):
         low_res = F.interpolate(low_res, x.shape[-2:], mode='bilinear')
-        low_res = low_res + torch.randn_like(low_res) * 0.01
+        if noise:
+            low_res = low_res + torch.randn_like(low_res) * 0.01
         return low_res
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
@@ -71,7 +73,9 @@ class DiffusionModel(SingleStepAE):
         n = batch[self.G.lcd_key].shape[0]
 
         low_res = (
-            self.upres_coarse(batch[self.G.lcd_key], batch[self.low_res_key])
+            DiffusionModel.upres_coarse(
+                batch[self.G.lcd_key], batch[self.low_res_key], noise=True
+            )
             if self.superres
             else None
         )
@@ -81,14 +85,18 @@ class DiffusionModel(SingleStepAE):
         def grid(name, x):
             x = (x + 1.0) / 2.0
             assert tuple(x.shape) == (25, 3, self.res, self.res)
-            x = rearrange(x, '(n1 n2) c h w -> c (n1 h) (n2 w)', n1=5, n2=5)
+            x = rearrange(
+                F.pad(x, (0, 1, 0, 1)), '(n1 n2) c h w -> c (n1 h) (n2 w)', n1=5, n2=5
+            )
             writer.add_image(name, x, epoch)
 
         def gridvid(name, x):
             x = (x + 1.0) / 2.0
             T = x.shape[0]
             assert tuple(x.shape[1:]) == (25, 3, self.res, self.res)
-            vid = rearrange(x, 't (n1 n2) c h w -> t c (n1 h) (n2 w)', n1=5, n2=5)[None]
+            vid = rearrange(
+                F.pad(x, (0, 1, 0, 1)), 't (n1 n2) c h w -> t c (n1 h) (n2 w)', n1=5, n2=5
+            )[None]
             vid = repeat(vid, 'b t c h w -> b t (repeat c) h w', repeat=3)
             writer.add_video(name, vid, epoch, fps=min(T // 3, 60))
 
@@ -112,7 +120,9 @@ class DiffusionModel(SingleStepAE):
         lcd = batch[self.G.lcd_key]
         y = torch.ones((lcd.shape[0], 128), device=lcd.device)
         low_res = (
-            self.upres_coarse(batch[self.G.lcd_key], batch[self.low_res_key])
+            DiffusionModel.upres_coarse(
+                batch[self.G.lcd_key], batch[self.low_res_key], noise=True
+            )
             if self.superres
             else None
         )

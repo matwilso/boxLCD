@@ -2,6 +2,7 @@ import ignite
 import torch
 from torch import nn
 from torch.optim import Adam
+
 from research.define_config import env_fn
 
 
@@ -21,7 +22,7 @@ class Net(nn.Module):
         cls.name = cls.__class__.__name__
 
     @classmethod
-    def from_disk(cls, dir, device=None):
+    def from_disk(cls, dir, device='cuda'):
         sd = torch.load(dir, map_location=device)
         G = sd.pop('G')
         env = env_fn(G)

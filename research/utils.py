@@ -385,6 +385,7 @@ def compute_fid(x, y):
         # TODO: this is somewhat concerning i got an imaginary number before.
         return fid.real
     except:
+        breakpoint()
         return np.nan
 
 

@@ -25,8 +25,10 @@ class Autoencoder(Net):
         dists = self._decode(z)
         if self.lcd_key in dists:
             dist = dists[self.lcd_key]
-            mode[self.lcd_key] = dist.mean if isinstance(dist, torch.distributions.Normal) else dist.probs
-            #mode[self.lcd_key] = dists[self.lcd_key].probs
+            mode[self.lcd_key] = (
+                dist.mean if isinstance(dist, torch.distributions.Normal) else dist.probs
+            )
+            # mode[self.lcd_key] = dists[self.lcd_key].probs
             # mode['lcd'] = 1.0 * (dists['lcd'].probs > 0.5)
         if 'proprio' in dists:
             mode['proprio'] = dists['proprio'].mean
@@ -87,7 +89,9 @@ class Autoencoder(Net):
             error = (preds - truths + 1.0) / 2.0
             stack = np.concatenate([truths, preds, error], -3)
             stack = rearrange(stack, 'b h w c -> b c h w')
-            writer.add_image('recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch)
+            writer.add_image(
+                'recon_proprio', utils.combine_rgbs(stack, 1, self.G.video_n), epoch
+            )
         else:
             writer.add_image(
                 'sample_proprio',
