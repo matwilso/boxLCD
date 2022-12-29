@@ -51,8 +51,18 @@ class GaussianDiffusion:
         # we can predict the noise, the x itself, the v (direction to more noise in spherical interpolation),
         # or both x and eps and we weight between them based on the logsnr.
 
+        #y = z.clone()
+        #y[:,:,1:] = 0
+        #net.func.eval()
+        #x1 = net(z, logsnr)[0,0,0,:3,:3]
+        #x2 = net(y, logsnr)[0,0,0,:3,:3]
+        #print(x1)
+        #print(x2)
+        #breakpoint()
+
         # if we are not predicting x, we need to get it
         model_output = net(z, logsnr)
+
         if self.mean_type == 'eps':
             model_eps = model_output
             model_x = predict_x_from_eps(z=z, eps=model_eps, logsnr=logsnr)

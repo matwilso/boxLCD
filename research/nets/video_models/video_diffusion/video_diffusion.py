@@ -1,14 +1,14 @@
 from functools import partial
 from pathlib import Path
+import numpy as np
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange, reduce, repeat
 
 from research.nets.autoencoders.diffusion_v2.gaussian_diffusion import GaussianDiffusion
-from research.nets.autoencoders.diffusion_v2.simple_unet import SimpleUnet as SimpleUnet3D
-#from .iso_net3d import IsoNet3D as SimpleUnet3D
 #from .simple_unet3d import SimpleUnet3D
+from .iso_net3d import IsoNet3D as SimpleUnet3D
 from research.nets.video_models._base import VideoModel
 
 class VideoDiffusion(VideoModel):
@@ -16,7 +16,7 @@ class VideoDiffusion(VideoModel):
         super().__init__(env, G)
         self.res = G.dst_resolution
         self.src_res = G.src_resolution
-        self.temporal_res = 1
+        self.temporal_res = 4
 
         if self.G.diffusion_mode == 'superres':
             assert (
@@ -28,9 +28,8 @@ class VideoDiffusion(VideoModel):
             self.superres = False
 
         self.net = SimpleUnet3D(
-            #temporal_res=self.temporal_res,
-            resolution=self.res,
-            #spatial_res=self.res,
+            temporal_res=self.temporal_res,
+            spatial_res=self.res,
             channels=G.hidden_size,
             dropout=G.dropout,
             superres=self.superres,
@@ -59,9 +58,8 @@ class VideoDiffusion(VideoModel):
         )
         self._init()
         #self.proc = lambda x: x[:, :, :4]
-        #self.proc = lambda x: x[:, :, ::8]
-        self.proc = lambda x: x[:, :, 0]
-        #self.proc = lambda x: x[:, :, :1]
+        self.proc = lambda x: x[:, :, ::8]
+        assert self.G.window == 32
         #self.net.set_attn_masks(iso_image=True)
 
     @staticmethod
@@ -73,6 +71,11 @@ class VideoDiffusion(VideoModel):
 
 
     def loss(self, batch):
+        if np.random.binomial(1, 0.5):
+            self.net.set_attn_masks(iso_image=True)
+        else:
+            self.net.set_attn_masks(iso_image=False)
+
         lcd = batch[self.G.lcd_key]
         base_lcd = self.proc(lcd)
         y = torch.ones((lcd.shape[0], 128), device=lcd.device)
@@ -91,13 +94,15 @@ class VideoDiffusion(VideoModel):
         return loss, metrics
 
     def sample(self, n, y=None, low_res=None):
+        self.net.eval()
+        self.net.set_attn_masks(iso_image=False)
         with torch.no_grad():
             y = torch.ones((n, 128), device=self.G.device)
-            noise = torch.randn((n, 3, self.res, self.res), device=self.G.device)
-            #noise = torch.randn((n, 3, self.temporal_res, self.res, self.res), device=self.G.device)
+            noise = torch.randn((n, 3, self.temporal_res, self.res, self.res), device=self.G.device)
             net = partial(self.net, guide=y, low_res=low_res)
             zs, xs, eps = self.diffusion.sample(net=net, init_x=noise, cond_w=0.5)
             return {self.G.lcd_key: zs[-1], 'zs': zs, 'xs': xs}
+        self.net.train()
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
         pass
@@ -130,12 +135,12 @@ class VideoDiffusion(VideoModel):
         # i guess each row should be a video. so just the first 4 and make a 4x4
         finalx = decoded[self.G.lcd_key][:4]
         batchx = self.proc(batch[self.G.lcd_key][:4])
-        grid('finalx', finalx[:, :, None])
-        grid('batchx', batchx[:, :, None])
+        grid('finalx', finalx)
+        grid('batchx', batchx)
         if low_res is not None:
-            grid('low_res', low_res[:4, :, None])
-        genz = decoded['zs'][:, :4, :, None]
-        genx = decoded['xs'][:, :4, :, None]
+            grid('low_res', low_res[:4])
+        genz = decoded['zs'][:, :4]
+        genx = decoded['xs'][:, :4]
         gridvid('genz', genz)
         gridvid('genx', genx)
 

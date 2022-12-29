@@ -199,10 +199,7 @@ class AttentionBlock(nn.Module):
         )
 
     def forward(self, x, emb=None):
-        try:
-            x = x + self.time_embed[None, :, :, None, None]
-        except:
-            breakpoint()
+        x = x + self.time_embed[None, :, :, None, None]
         x_shape = parse_shape(x, 'bs c t h w')
         x = rearrange(x, 'bs c t h w -> (bs h w) t c')
         x = self.attn(x)
