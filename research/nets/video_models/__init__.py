@@ -4,6 +4,7 @@ from pathlib import Path
 from pkgutil import iter_modules
 
 from ._base import VideoModel
+from .video_diffusion.video_diffusion import VideoDiffusion
 
 video_model_map = {}
 package_dir = Path(__file__).resolve().parent
@@ -18,3 +19,5 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
 # from research.nets.video_models.latent_diffusion_video_v2 import LatentDiffusionVideo_v2
 #
 # import ipdb; ipdb.set_trace()
+
+video_model_map['video_diffusion'] = VideoDiffusion

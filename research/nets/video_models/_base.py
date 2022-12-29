@@ -36,7 +36,7 @@ class VideoModel(Net):
 
     def evaluate(self, epoch, writer, batch, arbiter=None):
         metrics = {}
-        # self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
+        self._unprompted_eval(epoch, writer, metrics, batch, arbiter)
         self._prompted_eval(epoch, writer, metrics, batch, arbiter)
         # self._duplicate_eval(epoch, writer, metrics, batch, arbiter)
         metrics = tree_map(lambda x: torch.as_tensor(x).cpu(), metrics)
