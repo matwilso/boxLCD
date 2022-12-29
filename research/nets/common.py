@@ -32,13 +32,25 @@ class SelfAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(n_embed, n_embed)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(
+        causal_mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(
             1, 1, self.block_size, self.block_size
         )
         self.n_head = n_head
-        if not causal:
-            mask = torch.ones_like(mask)
-        self.register_buffer("mask", mask)
+        ones_mask = torch.ones_like(causal_mask)
+        eye_mask = torch.eye(block_size)[None,None]
+
+        self.register_buffer("causal_mask", causal_mask)
+        self.register_buffer("ones_mask", ones_mask)
+        self.register_buffer("eye_mask", eye_mask)
+
+        # NOTE: users can dynamically change the active mask to enable
+        # behavior like joint image-video training. kind of hacky, but avoids having to plumb
+        if causal:
+            active_mask = self.causal_mask
+        else:
+            active_mask = ones_mask
+        self.register_buffer("active_mask", active_mask)
+
 
     def forward(self, x, layer_past=None):
         (
@@ -58,7 +70,8 @@ class SelfAttention(nn.Module):
         )  # (B, nh, T, hs)
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / np.sqrt(k.size(-1)))
-        att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
+
+        att = att.masked_fill(self.active_mask[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
         y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = (
