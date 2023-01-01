@@ -89,8 +89,12 @@ def config():
     G.teacher_path = Path('.')
     G.teacher_mode = 'step1'
     G.diffusion_mode = 'base'
+
     G.src_resolution = -1
     G.dst_resolution = -1
+
+    G.temporal_stride_src = -1
+    G.temporal_stride_dst = -1
 
     G.min_std = 1e-4
     G.data_frac = 1.0
@@ -120,7 +124,7 @@ def config():
     G.autoreset = 0
 
     G.make_video = 0
-    G.data_workers = 12
+    G.data_workers = 4
 
     # extra info that we set here for convenience and don't modify
     G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called
@@ -147,6 +151,7 @@ def postprocess_G(G):
     G.imsize = G.lcd_w * G.lcd_h
     G.resolution = G.dst_resolution if G.dst_resolution != -1 else G.lcd_h
     G.lcd_key = f'lcd_{G.dst_resolution}' if G.dst_resolution != -1 else 'lcd'
+    G.temporal_stride = G.temporal_stride_dst if G.temporal_stride_dst != -1 else 1
     return G
 
 

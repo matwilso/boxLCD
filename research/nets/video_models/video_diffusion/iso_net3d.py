@@ -2,10 +2,16 @@ import math
 
 import torch
 import torch.nn.functional as F
-from torch import nn
-from research.nets.common import TransformerBlock, zero_module, TimestepEmbedSequential, SelfAttention
-from research.nets.autoencoders.diffusion_v2.simple_unet import timestep_embedding
 from einops import parse_shape, rearrange, reduce, repeat
+from torch import nn
+
+from research.nets.autoencoders.diffusion_v2.simple_unet import timestep_embedding
+from research.nets.common import (
+    SelfAttention,
+    TimestepEmbedSequential,
+    TransformerBlock,
+    zero_module,
+)
 
 # arch maintains same shape, has resnet skips, and injects the time embedding in many places
 
@@ -13,15 +19,17 @@ from einops import parse_shape, rearrange, reduce, repeat
 
 MAX_TIMESTEPS = 256
 
+
 def get_attns(model):
     modules = []
     for module in model.children():
         if isinstance(module, SelfAttention):
             modules.append(module)
-        if isinstance(module, nn.GroupNorm):
-            print(module)
+        #if isinstance(module, nn.GroupNorm):
+        #    print(module)
         modules += get_attns(module)
     return modules
+
 
 class CustomGroupNorm3d(nn.GroupNorm):
     """
@@ -29,6 +37,7 @@ class CustomGroupNorm3d(nn.GroupNorm):
 
     We assume our input is of shape (B, C, T, H, W)
     """
+
     def forward(self, x):
         x = rearrange(x, 'b c t h w -> (b t) c h w')
         x = super().forward(x)
@@ -60,13 +69,18 @@ class IsoNet3D(nn.Module):
             nn.Linear(time_embed_dim, time_embed_dim),
         )
         self.down = Down(
-            temporal_res, spatial_res, in_channels, channels, time_embed_dim, dropout=dropout
+            temporal_res,
+            spatial_res,
+            in_channels,
+            channels,
+            time_embed_dim,
+            dropout=dropout,
         )
         self.turn = ResBlock3d_1x(channels, time_embed_dim, dropout=dropout)
         self.up = Up(temporal_res, spatial_res, channels, time_embed_dim, dropout=dropout)
         self.out = nn.Sequential(
-            #nn.InstanceNorm2d(channels),
-            #nn.GroupNorm(channels, channels),
+            # nn.InstanceNorm2d(channels),
+            # nn.GroupNorm(channels, channels),
             CustomGroupNorm3d(32, channels),
             nn.SiLU(),
             nn.Conv3d(channels, out_channels, (1, 3, 3), padding=(0, 1, 1)),
@@ -117,14 +131,22 @@ class Downsample(nn.Module):
     def __init__(self, channels, out_channels=None, stride=2):
         super().__init__()
         out_channels = out_channels or channels
-        self.conv = nn.Conv3d(channels, out_channels, (1, 3, 3), stride=(1, stride, stride), padding=(0, 1, 1))
+        self.conv = nn.Conv3d(
+            channels,
+            out_channels,
+            (1, 3, 3),
+            stride=(1, stride, stride),
+            padding=(0, 1, 1),
+        )
 
     def forward(self, x, emb=None):
         return self.conv(x)
 
 
 class Down(nn.Module):
-    def __init__(self, temporal_res, spatial_res, in_channels, channels, emb_channels, dropout=0.0):
+    def __init__(
+        self, temporal_res, spatial_res, in_channels, channels, emb_channels, dropout=0.0
+    ):
         super().__init__()
         seq = [
             # not really a downsample, just makes the code simpler to reuse
@@ -187,7 +209,7 @@ class Up(nn.Module):
             ResBlock3d_1x(2 * channels, emb_channels, channels, dropout=dropout),
             ResBlock3d_1x(2 * channels, emb_channels, channels, dropout=dropout),
             TimestepEmbedSequential(
-                ResBlock3d_1x(2 * channels, emb_channels, channels), 
+                ResBlock3d_1x(2 * channels, emb_channels, channels),
                 Upsample(channels),
                 AttentionBlock(temporal_res, channels),
             ),
@@ -236,6 +258,7 @@ class AttentionBlock(nn.Module):
         x = rearrange(x, '(bs h w) t c -> bs c t h w', **x_shape)
         return x
 
+
 class ResBlock3d_1x(nn.Module):
     def __init__(
         self,
@@ -251,24 +274,32 @@ class ResBlock3d_1x(nn.Module):
         self.out_channels = out_channels or channels
 
         self.in_layers = nn.Sequential(
-            #nn.InstanceNorm2d(channels),
-            #nn.GroupNorm(channels, channels),
+            # nn.InstanceNorm2d(channels),
+            # nn.GroupNorm(channels, channels),
             CustomGroupNorm3d(group_size, channels),
             nn.SiLU(),
-            nn.Conv3d(channels, self.out_channels, (1, kernel_size, kernel_size), padding=padding),
+            nn.Conv3d(
+                channels,
+                self.out_channels,
+                (1, kernel_size, kernel_size),
+                padding=padding,
+            ),
         )
         self.emb_layers = nn.Sequential(
             nn.SiLU(), nn.Linear(emb_channels, self.out_channels)
         )
         self.out_layers = nn.Sequential(
-            #nn.InstanceNorm2d(self.out_channels),
-            #nn.GroupNorm(self.out_channels, self.out_channels),
+            # nn.InstanceNorm2d(self.out_channels),
+            # nn.GroupNorm(self.out_channels, self.out_channels),
             CustomGroupNorm3d(group_size, self.out_channels),
             nn.SiLU(),
             nn.Dropout(p=dropout),
             zero_module(
                 nn.Conv3d(
-                    self.out_channels, self.out_channels, (1, kernel_size, kernel_size), padding=padding
+                    self.out_channels,
+                    self.out_channels,
+                    (1, kernel_size, kernel_size),
+                    padding=padding,
                 )
             ),
         )

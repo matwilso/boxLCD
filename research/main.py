@@ -12,6 +12,9 @@ from research import data, runners, utils
 from research.define_config import env_fn, load_G
 from research.nets import net_map
 
+# TODO: convert to argparse stanadard
+# TODO: add weights from functionality
+
 if __name__ == '__main__':
     G = load_G()
 

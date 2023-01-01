@@ -53,9 +53,9 @@ class Trainer:
 
         for itr in itertools.count(1):
             # TRAIN
-            with Timer(self.logger, 'sampling_batches'):
+            with Timer(self.logger, 'sample_batch'):
                 train_batch = self.b(next(train_iter))
-            with Timer(self.logger, 'training_steps'):
+            with Timer(self.logger, 'train_step'):
                 metrics = self.model.train_step(train_batch)
                 for key in metrics:
                     self.logger[key] += [metrics[key].detach().cpu()]
@@ -93,7 +93,9 @@ class Trainer:
                 self.logger['dt/total'] = time.time() - total_time
                 self.logger['dt/epoch'] = time.time() - epoch_time
                 epoch_time = time.time()
-                self.logger['num_vars'] = self.num_vars
+                self.logger['meta/num_vars'] = self.num_vars
+                self.logger['meta/itr'] = itr
+                self.logger['meta/num_examples_seen'] = itr * self.G.bs
                 self.logger = utils.dump_logger(self.logger, self.writer, itr, self.G)
                 self.writer.flush()
                 if (

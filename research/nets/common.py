@@ -37,7 +37,7 @@ class SelfAttention(nn.Module):
         )
         self.n_head = n_head
         ones_mask = torch.ones_like(causal_mask)
-        eye_mask = torch.eye(block_size)[None,None]
+        eye_mask = torch.eye(block_size)[None, None]
 
         self.register_buffer("causal_mask", causal_mask)
         self.register_buffer("ones_mask", ones_mask)
@@ -50,7 +50,6 @@ class SelfAttention(nn.Module):
         else:
             active_mask = ones_mask
         self.register_buffer("active_mask", active_mask)
-
 
     def forward(self, x, layer_past=None):
         (
