@@ -25,7 +25,7 @@ def get_attns(model):
     for module in model.children():
         if isinstance(module, SelfAttention):
             modules.append(module)
-        #if isinstance(module, nn.GroupNorm):
+        # if isinstance(module, nn.GroupNorm):
         #    print(module)
         modules += get_attns(module)
     return modules

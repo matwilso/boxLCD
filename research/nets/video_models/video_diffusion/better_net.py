@@ -13,9 +13,11 @@ from torch import einsum, nn
 
 from research.nets.common import zero_module
 
+
 # helper functions
 def exists(val):
     return val is not None
+
 
 def once(fn):
     called = False
@@ -51,6 +53,7 @@ def cast_tuple(val, length=None):
 
     return output
 
+
 class Identity(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -62,6 +65,7 @@ class Identity(nn.Module):
 # tensor helpers
 def l2norm(t):
     return F.normalize(t, dim=-1)
+
 
 def masked_mean(t, *, dim, mask=None):
     if not exists(mask):
@@ -95,6 +99,7 @@ def resize_video_to(video, target_image_size, clamp_range=None):
 
 # classifier free guidance functions
 
+
 def prob_mask_like(shape, prob, device):
     if prob == 1:
         return torch.ones(shape, device=device, dtype=torch.bool)
@@ -105,6 +110,7 @@ def prob_mask_like(shape, prob, device):
 
 
 # norms and residuals
+
 
 class LayerNorm(nn.Module):
     def __init__(self, dim, stable=False):
@@ -166,6 +172,7 @@ class Parallel(nn.Module):
 
 
 # attention pooling
+
 
 class PerceiverAttention(nn.Module):
     def __init__(self, *, dim, dim_head=64, heads=8, cosine_sim_attn=False):

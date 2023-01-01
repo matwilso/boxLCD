@@ -6,12 +6,13 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange, reduce, repeat
 
+from research import utils
 from research.nets.autoencoders.diffusion_v2.gaussian_diffusion import GaussianDiffusion
 from research.nets.video_models._base import VideoModel
-from research import utils
 
 from .simple_unet3d import SimpleUnet3D
-#from .iso_net3d import IsoNet3D as SimpleUnet3D
+
+# from .iso_net3d import IsoNet3D as SimpleUnet3D
 
 
 class VideoDiffusion(VideoModel):
@@ -31,7 +32,9 @@ class VideoDiffusion(VideoModel):
             self.superres = True
             self.low_res_key = f'lcd_{self.src_res}'
         elif self.G.diffusion_mode == 'supertemp':
-            assert G.temporal_stride_src != -1, "you have to set the src temporal stride for supertemp model"
+            assert (
+                G.temporal_stride_src != -1
+            ), "you have to set the src temporal stride for supertemp model"
             self.supertemp = True
 
         self.net = SimpleUnet3D(
@@ -65,7 +68,7 @@ class VideoDiffusion(VideoModel):
             sample_cond_w=G.sample_cond_w,
         )
         self._init()
-        self.lcd_proc = lambda x: x[:, :, ::self.temporal_stride]
+        self.lcd_proc = lambda x: x[:, :, :: self.temporal_stride]
         assert self.G.window == 32
         # self.net.set_attn_masks(iso_image=True)
 
@@ -109,14 +112,18 @@ class VideoDiffusion(VideoModel):
 
         coarse_tween = (
             VideoDiffusion.tween_coarse(
-                batch[self.G.lcd_key], self.G.temporal_stride_src, self.G.temporal_stride_dst, noise=True
+                batch[self.G.lcd_key],
+                self.G.temporal_stride_src,
+                self.G.temporal_stride_dst,
+                noise=True,
             )
             if self.supertemp
             else None
         )
 
         metrics = self.diffusion.training_losses(
-            net=partial(self.net, guide=y, low_res=low_res, coarse_tween=coarse_tween), x=base_lcd
+            net=partial(self.net, guide=y, low_res=low_res, coarse_tween=coarse_tween),
+            x=base_lcd,
         )
         metrics = {key: val.mean() for key, val in metrics.items()}
         loss = metrics['loss']
@@ -150,7 +157,10 @@ class VideoDiffusion(VideoModel):
 
         coarse_tween = (
             VideoDiffusion.tween_coarse(
-                batch[self.G.lcd_key], self.G.temporal_stride_src, self.G.temporal_stride_dst, noise=True
+                batch[self.G.lcd_key],
+                self.G.temporal_stride_src,
+                self.G.temporal_stride_dst,
+                noise=True,
             )
             if self.supertemp
             else None
@@ -162,9 +172,14 @@ class VideoDiffusion(VideoModel):
             gen_batch = {self.G.lcd_key: decoded[self.G.lcd_key], 'proprio': proprio}
             gen_az, gen_act = arbiter(gen_batch)
 
-            data_batch = {self.G.lcd_key: self.lcd_proc(batch[self.G.lcd_key]), 'proprio': proprio}
+            data_batch = {
+                self.G.lcd_key: self.lcd_proc(batch[self.G.lcd_key]),
+                'proprio': proprio,
+            }
             data_az, data_act = arbiter(data_batch)
-            fvd = utils.compute_fid(gen_az.detach().cpu().numpy(), data_az.detach().cpu().numpy())
+            fvd = utils.compute_fid(
+                gen_az.detach().cpu().numpy(), data_az.detach().cpu().numpy()
+            )
             metrics['eval/unprompted_fvd'] = fvd
 
         def grid(name, x):
@@ -177,8 +192,13 @@ class VideoDiffusion(VideoModel):
             assert x.shape[0] == 25
             x = (x + 1.0) / 2.0
             assert tuple(x.shape) == (25, 3, self.temporal_res, self.res, self.res)
-            vid = rearrange(F.pad(x, (0, 1, 0, 1)), '(n1 n2) c t h w -> t c (n1 h) (n2 w)', n1=5, n2=5)[None]
-            writer.add_video(name, vid, epoch, fps=min(self.temporal_res // 3, 60))
+            # add lines between items in the grid and reshape to grid
+            vid = rearrange(
+                F.pad(x, (0, 1, 0, 1)), '(n1 n2) c t h w -> t c (n1 h) (n2 w)', n1=5, n2=5
+            )[None]
+            # add a blank frame at the end
+            vid = F.pad(vid, (0, 0, 0, 0, 0, 0, 0, 1))
+            writer.add_video(name, vid, epoch, fps=min(self.temporal_res // 2, 60))
 
         def gridvid2(name, x):
             x = (x + 1.0) / 2.0
@@ -187,20 +207,29 @@ class VideoDiffusion(VideoModel):
             vid = rearrange(F.pad(x, (0, 1, 0, 1)), 's b c t h w -> s c (b h) (t w)')[
                 None
             ]
-            writer.add_video(name, vid, epoch, fps=min(T // 3, 60))
-
+            writer.add_video(name, vid, epoch, fps=min(T // 2, 60))
 
         finalx = decoded[self.G.lcd_key]
         batchx = self.lcd_proc(batch[self.G.lcd_key])
 
         vid25('finalx_vid25', finalx[:25])
         vid25('batchx_vid25', batchx[:25])
+        if coarse_tween is not None:
+            vid25('coarse_tween', coarse_tween[:25])
+
+            r = lambda x: rearrange(x, 'b c t h w -> (b t) c h w')
+            self.ssim.update((r(finalx), r(batchx)))
+            ssim = self.ssim.compute()
+            metrics['eval/ssim'] = ssim
+            self.psnr.update((r(finalx), r(batchx)))
+            psnr = self.psnr.compute().cpu()
+            metrics['eval/psnr'] = psnr
 
         # i guess each row should be a video. so just the first 4 and make a 4x4
         grid('finalx_first4', finalx[:4, :, :4])
         grid('batchx_first4', batchx[:4, :, :4])
 
-        #if low_res is not None:
+        # if low_res is not None:
         #    grid('low_res', low_res[:4])
 
         genz = decoded['zs'][:, :4, :, :4]

@@ -21,7 +21,15 @@ MAX_TIMESTEPS = 256
 
 
 class SimpleUnet3D(nn.Module):
-    def __init__(self, temporal_res, spatial_res, channels, dropout, superres=False, supertemp=False):
+    def __init__(
+        self,
+        temporal_res,
+        spatial_res,
+        channels,
+        dropout,
+        superres=False,
+        supertemp=False,
+    ):
         super().__init__()
         out_channels = 3
         time_embed_dim = 2 * channels
@@ -62,7 +70,9 @@ class SimpleUnet3D(nn.Module):
     def set_attn_masks(self, iso_image=False):
         pass
 
-    def forward(self, x, timesteps, guide=None, cond_w=None, low_res=None, coarse_tween=None):
+    def forward(
+        self, x, timesteps, guide=None, cond_w=None, low_res=None, coarse_tween=None
+    ):
         # TODO: maybe have low_res/coarse_tween catted before this function
 
         assert timesteps.max() < MAX_TIMESTEPS
