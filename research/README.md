@@ -11,17 +11,26 @@ Step 1: collect data <br>
 Step 2: learn models on that data <br>
 Step 3: do RL. perhaps inside of a learned model <br>
 
-- [Overview:](#overview)
-- [Collect data](#collect-data)
-- [Arbiter training](#arbiter-training)
-- [MODEL LEARNING](#model-learning)
-  - [Autoencoders](#autoencoders)
-  - [Video](#video)
-  - [Model Evaluations](#model-evaluations)
-- [RL](#rl)
-  - [BodyGoals in real environment](#bodygoals-in-real-environment)
-  - [BodyGoals in learned environment](#bodygoals-in-learned-environment)
-  - [CubeGoals in real environment](#cubegoals-in-real-environment)
+- [research](#research)
+- [SHELL COMMANDS TO RUN THE CODE](#shell-commands-to-run-the-code)
+  - [Overview:](#overview)
+  - [Collect data](#collect-data)
+  - [Arbiter training](#arbiter-training)
+  - [MODEL LEARNING](#model-learning)
+    - [Autoencoders](#autoencoders)
+      - [BVAE](#bvae)
+      - [RNLDA](#rnlda)
+    - [Video](#video)
+      - [RSSM](#rssm)
+      - [FIT (Flat Image Token)](#fit-flat-image-token)
+      - [FBT (Flat Binary Token)](#fbt-flat-binary-token)
+      - [FRNLD (Flat Ronald)](#frnld-flat-ronald)
+    - [Model Evaluations](#model-evaluations)
+  - [RL](#rl)
+    - [BodyGoals in real environment](#bodygoals-in-real-environment)
+    - [BodyGoals in learned environment](#bodygoals-in-learned-environment)
+    - [CubeGoals in real environment](#cubegoals-in-real-environment)
+- [Recent commands](#recent-commands)
 
 ## Collect data
 
@@ -221,3 +230,6 @@ python main.py --mode=train --env=Luxo --datadir=logs/datadump/big_luxo_2.0/ --w
 convert -resize 100% -delay 2 -loop 0 *.png test.gif
 ```
 -->
+
+# Recent commands
+

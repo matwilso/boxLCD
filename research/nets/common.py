@@ -14,14 +14,15 @@ def zero_module(module):
     return module
 
 
-class SelfAttention(nn.Module):
+# TODO: make a general attention that can do self or cross attention
+class MultiheadAttention(nn.Module):
     """
-    A vanilla multi-head masked self-attention layer with a projection at the end.
+    A vanilla multi-head masked attention layer with a projection at the end.
     It is possible to use torch.nn.MultiheadAttention here but I am including an
     explicit implementation here to show that there is nothing too scary here.
     """
 
-    def __init__(self, block_size, n_embed, n_head, causal=True):
+    def __init__(self, block_size, n_embed, n_head, causal=False):
         super().__init__()
         self.block_size = block_size
         assert n_embed % n_head == 0
@@ -31,46 +32,46 @@ class SelfAttention(nn.Module):
         self.value = nn.Linear(n_embed, n_embed)
         # output projection
         self.proj = nn.Linear(n_embed, n_embed)
-        # causal mask to ensure that attention is only applied to the left in the input sequence
-        causal_mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(
-            1, 1, self.block_size, self.block_size
-        )
         self.n_head = n_head
-        ones_mask = torch.ones_like(causal_mask)
-        eye_mask = torch.eye(block_size)[None, None]
 
-        self.register_buffer("causal_mask", causal_mask)
-        self.register_buffer("ones_mask", ones_mask)
-        self.register_buffer("eye_mask", eye_mask)
-
-        # NOTE: users can dynamically change the active mask to enable
-        # behavior like joint image-video training. kind of hacky, but avoids having to plumb
         if causal:
-            active_mask = self.causal_mask
+            # causal mask to ensure that attention is only applied to the left in the input sequence
+            causal_mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(
+                1, 1, self.block_size, self.block_size
+            )
+            self.register_buffer("mask", causal_mask)
         else:
-            active_mask = ones_mask
-        self.register_buffer("active_mask", active_mask)
+            self.mask = None
 
-    def forward(self, x, layer_past=None):
+    def forward(self, *, qn, kv=None):
         (
             B,
             T,
             G,
-        ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
-        # calculate query, key, values for all heads in batch and move head forward to be the batch dim
+        ) = qn.size()  # batch size, sequence length, embedding dimensionality (n_embed)
+
+        if kv is None:
+            kv = qn
+            S = T
+        else:
+            S = kv.size(1)
+
         k = (
-            self.key(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)
+            self.key(kv).view(B, S, self.n_head, G // self.n_head).transpose(1, 2)
         )  # (B, nh, T, hs)
         q = (
-            self.query(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)
+            self.query(qn).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)
         )  # (B, nh, T, hs)
         v = (
-            self.value(x).view(B, T, self.n_head, G // self.n_head).transpose(1, 2)
+            self.value(kv).view(B, S, self.n_head, G // self.n_head).transpose(1, 2)
         )  # (B, nh, T, hs)
-        # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+
         att = (q @ k.transpose(-2, -1)) * (1.0 / np.sqrt(k.size(-1)))
 
-        att = att.masked_fill(self.active_mask[:, :, :T, :T] == 0, float('-inf'))
+        if self.mask is not None:
+            assert kv is None
+            att = att.masked_fill(self.active_mask[:, :, :T, :T] == 0, float('-inf'))
+
         att = F.softmax(att, dim=-1)
         y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = (
@@ -84,21 +85,33 @@ class SelfAttention(nn.Module):
 class TransformerBlock(nn.Module):
     """an unassuming Transformer block (from @karpathy)"""
 
-    def __init__(self, block_size, n_embed, n_head, causal=True):
+    IS_CROSS_ATTENTION = False
+
+    def __init__(self, block_size, n_embed, n_head, causal=False):
         super().__init__()
         self.ln1 = nn.LayerNorm(n_embed)
         self.ln2 = nn.LayerNorm(n_embed)
-        self.attn = SelfAttention(block_size, n_embed, n_head, causal=causal)
+        self.attn = MultiheadAttention(block_size, n_embed, n_head, causal=causal)
         self.mlp = nn.Sequential(
             nn.Linear(n_embed, 4 * n_embed),
             nn.GELU(),
             nn.Linear(4 * n_embed, n_embed),
         )
 
-    def forward(self, x):
-        x = x + self.attn(self.ln1(x))
+    def forward(self, *, q, kv=None):
+        if self.IS_CROSS_ATTENTION:
+            assert kv is not None
+        x = q + self.attn(qn=self.ln1(q), kv=kv)
         x = x + self.mlp(self.ln2(x))
         return x
+
+
+class SelfAttentionBlock(TransformerBlock):
+    IS_CROSS_ATTENTION = False
+
+
+class CrossAttentionBlock(TransformerBlock):
+    IS_CROSS_ATTENTION = True
 
 
 class GaussHead(nn.Module):

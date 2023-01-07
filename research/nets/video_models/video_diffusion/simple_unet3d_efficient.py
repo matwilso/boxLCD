@@ -21,6 +21,7 @@ MAX_TIMESTEPS = 256
 
 SCALE_SKIP = True
 
+
 class Identity(nn.Module):
     def forward(self, x, *args, **kwargs):
         return x
@@ -67,7 +68,9 @@ class SimpleUnet3D(nn.Module):
             dropout=dropout,
             is_base=is_base,
         )
-        self.turn = ResBlock3d(8*channels, time_embed_dim, dropout=dropout, scale_skip=SCALE_SKIP)
+        self.turn = ResBlock3d(
+            8 * channels, time_embed_dim, dropout=dropout, scale_skip=SCALE_SKIP
+        )
         self.up = UUp(
             temporal_res,
             spatial_res,
@@ -133,6 +136,7 @@ class Downsample(nn.Module):
     def forward(self, x, emb=None):
         return self.conv(x)
 
+
 class Upsample(nn.Module):
     """double the size of the input"""
 
@@ -145,25 +149,49 @@ class Upsample(nn.Module):
         x = F.interpolate(x, scale_factor=2, mode="nearest")
         return x
 
+
 class UDown(nn.Module):
     def __init__(
-        self, temporal_res, spatial_res, in_channels, channels, emb_channels, dropout=0.0, is_base=True,
+        self,
+        temporal_res,
+        spatial_res,
+        in_channels,
+        channels,
+        emb_channels,
+        dropout=0.0,
+        is_base=True,
     ):
         super().__init__()
         seq = [
-            Downsample(in_channels, channels, stride=1), 
+            Downsample(in_channels, channels, stride=1),
             ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
             Downsample(channels),
             TimestepEmbedSequential(
-                ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                ResBlock3d(
+                    channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP
+                ),
                 AttentionBlock(temporal_res // 2, channels) if is_base else Identity(),
             ),
             Downsample(channels),
-            ResBlock3d(channels, emb_channels, out_channels=4*channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            ResBlock3d(
+                channels,
+                emb_channels,
+                out_channels=4 * channels,
+                dropout=dropout,
+                scale_skip=SCALE_SKIP,
+            ),
             TimestepEmbedSequential(
-                ResBlock3d(4*channels, emb_channels, out_channels=8*channels, dropout=dropout, scale_skip=SCALE_SKIP),
-                AttentionBlock(temporal_res, 8*channels) if is_base else Identity(),
-                ResBlock3d(8*channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                ResBlock3d(
+                    4 * channels,
+                    emb_channels,
+                    out_channels=8 * channels,
+                    dropout=dropout,
+                    scale_skip=SCALE_SKIP,
+                ),
+                AttentionBlock(temporal_res, 8 * channels) if is_base else Identity(),
+                ResBlock3d(
+                    8 * channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP
+                ),
             ),
         ]
         # TODO: also add extra layers for temporal res above baseline
@@ -176,7 +204,9 @@ class UDown(nn.Module):
         for _ in range(extra_res):
             extra = [
                 TimestepEmbedSequential(
-                    ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                    ResBlock3d(
+                        channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP
+                    ),
                     Downsample(channels),
                 )
             ]
@@ -185,7 +215,7 @@ class UDown(nn.Module):
         self.seq = nn.ModuleList(seq)
 
     def forward(self, x, emb):
-        #breakpoint()
+        # breakpoint()
         cache = []
         for layer in self.seq:
             x = layer(x, emb)
@@ -194,26 +224,64 @@ class UDown(nn.Module):
 
 
 class UUp(nn.Module):
-    def __init__(self, temporal_res, spatial_res, channels, emb_channels, dropout=0.0, is_base=True):
+    def __init__(
+        self, temporal_res, spatial_res, channels, emb_channels, dropout=0.0, is_base=True
+    ):
         super().__init__()
         # on the up, bundle resnets with upsampling so upsamplnig can be simpler
         seq = [
-            ResBlock3d(8 * 2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
-            ResBlock3d(5 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            ResBlock3d(
+                8 * 2 * channels,
+                emb_channels,
+                channels,
+                dropout=dropout,
+                scale_skip=SCALE_SKIP,
+            ),
+            ResBlock3d(
+                5 * channels,
+                emb_channels,
+                channels,
+                dropout=dropout,
+                scale_skip=SCALE_SKIP,
+            ),
             TimestepEmbedSequential(
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                ResBlock3d(
+                    2 * channels,
+                    emb_channels,
+                    channels,
+                    dropout=dropout,
+                    scale_skip=SCALE_SKIP,
+                ),
                 Upsample(channels),
             ),
             TimestepEmbedSequential(
                 ResBlock3d(2 * channels, emb_channels, channels, scale_skip=SCALE_SKIP),
                 AttentionBlock(temporal_res, channels) if is_base else Identity(),
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                ResBlock3d(
+                    channels,
+                    emb_channels,
+                    channels,
+                    dropout=dropout,
+                    scale_skip=SCALE_SKIP,
+                ),
             ),
             TimestepEmbedSequential(
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                ResBlock3d(
+                    2 * channels,
+                    emb_channels,
+                    channels,
+                    dropout=dropout,
+                    scale_skip=SCALE_SKIP,
+                ),
                 Upsample(channels),
             ),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            ResBlock3d(
+                2 * channels,
+                emb_channels,
+                channels,
+                dropout=dropout,
+                scale_skip=SCALE_SKIP,
+            ),
         ]
 
         extra_res = (spatial_res // 16) // 2
@@ -221,7 +289,13 @@ class UUp(nn.Module):
         for _ in range(extra_res):
             extra = [
                 TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                    ResBlock3d(
+                        2 * channels,
+                        emb_channels,
+                        channels,
+                        dropout=dropout,
+                        scale_skip=SCALE_SKIP,
+                    ),
                     Upsample(channels),
                 ),
             ]
@@ -229,7 +303,7 @@ class UUp(nn.Module):
         self.seq = nn.ModuleList(seq)
 
     def forward(self, x, emb, cache):
-        #breakpoint()
+        # breakpoint()
         cache = cache[::-1]
         for i in range(len(self.seq)):
             layer, hoz_skip = self.seq[i], cache[i]

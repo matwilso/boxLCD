@@ -5,6 +5,8 @@ from pkgutil import iter_modules
 
 from ._base import Autoencoder
 from .diffusion_v2.diffusion_model import DiffusionModel
+from .diffusion_v2.interface_net import InterfaceNet
+from .diffusion_v2.rin import RIN
 
 autoencoder_map = {}
 package_dir = Path(__file__).resolve().parent
@@ -16,3 +18,4 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
             autoencoder_map[attribute_name] = attribute
 
 autoencoder_map['diffusion_model'] = DiffusionModel
+autoencoder_map['rin'] = RIN
