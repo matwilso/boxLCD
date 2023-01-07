@@ -261,6 +261,7 @@ class ResBlock3d(nn.Module):
         group_size=16,
         kernel_size=3,
         padding=1,
+        scale_skip=False,
     ):
         super().__init__()
         self.out_channels = out_channels or channels
@@ -289,13 +290,14 @@ class ResBlock3d(nn.Module):
             self.skip_connection = nn.Conv3d(
                 channels, self.out_channels, 1
             )  # step down size
+        self.skip_scale = 1 / np.sqrt(2) if scale_skip else 1.0
 
     def forward(self, x, emb):
         h = self.in_layers(x)
         emb_out = self.emb_layers(emb)[..., None, None, None]
         h = h + emb_out
         h = self.out_layers(h)
-        return self.skip_connection(x) + h
+        return (self.skip_scale * self.skip_connection(x)) + h
 
 
 class ResBlock(nn.Module):

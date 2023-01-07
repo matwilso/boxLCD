@@ -10,7 +10,8 @@ from research import utils
 from research.nets.autoencoders.diffusion_v2.gaussian_diffusion import GaussianDiffusion
 from research.nets.video_models._base import VideoModel
 
-from .simple_unet3d import SimpleUnet3D
+#from .simple_unet3d import SimpleUnet3D
+from .simple_unet3d_efficient import SimpleUnet3D
 
 # from .iso_net3d import IsoNet3D as SimpleUnet3D
 
@@ -75,8 +76,10 @@ class VideoDiffusion(VideoModel):
     @staticmethod
     def upres_coarse(high_res_shape, low_res, noise=False):
         low_res = F.interpolate(low_res, high_res_shape, mode='bilinear')
+        assert low_res.min() >= -1 and low_res.max() <= 1
         if noise:
             low_res = low_res + torch.randn_like(low_res) * 0.01
+            low_res = torch.clamp(low_res, -1, 1)
         return low_res
 
     @staticmethod
@@ -88,8 +91,10 @@ class VideoDiffusion(VideoModel):
         # if base is shape (B, C, base_res, H, W), we want to get (B, C,dest_res, H, W) by interpolating
         H, W = base.shape[-2:]
         tweened = F.interpolate(base, size=(dest_res, H, W), mode='trilinear')
+        assert tweened.min() >= -1 and tweened.max() <= 1
         if noise:
             tweened = tweened + torch.randn_like(tweened) * 0.01
+            tweened = torch.clamp(tweened, -1, 1)
         return tweened
 
     def loss(self, batch):
@@ -184,7 +189,8 @@ class VideoDiffusion(VideoModel):
 
         def grid(name, x):
             x = (x + 1.0) / 2.0
-            assert tuple(x.shape) == (4, 3, 4, self.res, self.res)
+            # assert tuple(x.shape) == (4, 3, 4, self.res, self.res)
+            assert tuple(x.shape)[:2] == (4, 3)
             x = rearrange(F.pad(x, (0, 1, 0, 1)), 'b c t h w -> c (b h) (t w)')
             writer.add_image(name, x, epoch)
 
@@ -197,7 +203,7 @@ class VideoDiffusion(VideoModel):
                 F.pad(x, (0, 1, 0, 1)), '(n1 n2) c t h w -> t c (n1 h) (n2 w)', n1=5, n2=5
             )[None]
             # add a blank frame at the end
-            vid = F.pad(vid, (0, 0, 0, 0, 0, 0, 0, 1))
+            vid = F.pad(vid, (0, 0, 0, 0, 0, 0, 0, 1), value=1.0)
             writer.add_video(name, vid, epoch, fps=min(self.temporal_res // 2, 60))
 
         def gridvid2(name, x):
@@ -209,14 +215,22 @@ class VideoDiffusion(VideoModel):
             ]
             writer.add_video(name, vid, epoch, fps=min(T // 2, 60))
 
+        def error_vid(name, x, y):
+            x = (x + 1.0) / 2.0
+            y = (y + 1.0) / 2.0
+            error = (y - x + 1.0) / 2.0
+            stack = torch.cat([x, y, error], -2)
+            stack = rearrange(stack, 'b c t h w -> t c h (b w)')[None]
+            writer.add_video(name, stack, epoch, fps=min(self.temporal_res // 2, 60))
+
         finalx = decoded[self.G.lcd_key]
         batchx = self.lcd_proc(batch[self.G.lcd_key])
 
         vid25('finalx_vid25', finalx[:25])
         vid25('batchx_vid25', batchx[:25])
         if coarse_tween is not None:
+            error_vid('coarse_tween_error', batchx[:8], finalx[:8])
             vid25('coarse_tween', coarse_tween[:25])
-
             r = lambda x: rearrange(x, 'b c t h w -> (b t) c h w')
             self.ssim.update((r(finalx), r(batchx)))
             ssim = self.ssim.compute()
@@ -226,8 +240,8 @@ class VideoDiffusion(VideoModel):
             metrics['eval/psnr'] = psnr
 
         # i guess each row should be a video. so just the first 4 and make a 4x4
-        grid('finalx_first4', finalx[:4, :, :4])
-        grid('batchx_first4', batchx[:4, :, :4])
+        grid('finalx_still', finalx[:4])
+        grid('batchx_still', batchx[:4])
 
         # if low_res is not None:
         #    grid('low_res', low_res[:4])

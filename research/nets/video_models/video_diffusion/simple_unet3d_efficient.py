@@ -19,6 +19,12 @@ This is a shorter and simpler Unet, designed to work on MNIST.
 
 MAX_TIMESTEPS = 256
 
+SCALE_SKIP = True
+
+class Identity(nn.Module):
+    def forward(self, x, *args, **kwargs):
+        return x
+
 
 class SimpleUnet3D(nn.Module):
     def __init__(
@@ -51,16 +57,25 @@ class SimpleUnet3D(nn.Module):
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
-        self.down = Down(
+        is_base = not superres and not supertemp
+        self.down = UDown(
             temporal_res,
             spatial_res,
             in_channels,
             channels,
             time_embed_dim,
             dropout=dropout,
+            is_base=is_base,
         )
-        self.turn = ResBlock3d(channels, time_embed_dim, dropout=dropout)
-        self.up = Up(temporal_res, spatial_res, channels, time_embed_dim, dropout=dropout)
+        self.turn = ResBlock3d(8*channels, time_embed_dim, dropout=dropout, scale_skip=SCALE_SKIP)
+        self.up = UUp(
+            temporal_res,
+            spatial_res,
+            channels,
+            time_embed_dim,
+            dropout=dropout,
+            is_base=is_base,
+        )
         self.out = nn.Sequential(
             nn.GroupNorm(16 if channels > 32 else 4, channels),
             nn.SiLU(),
@@ -118,50 +133,6 @@ class Downsample(nn.Module):
     def forward(self, x, emb=None):
         return self.conv(x)
 
-
-class Down(nn.Module):
-    def __init__(
-        self, temporal_res, spatial_res, in_channels, channels, emb_channels, dropout=0.0
-    ):
-        super().__init__()
-        seq = [
-            # not really a downsample, just makes the code simpler to reuse
-            Downsample(in_channels, channels, 1),
-            ResBlock3d(channels, emb_channels, dropout=dropout),
-            TimestepEmbedSequential(
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                AttentionBlock(temporal_res, channels),
-            ),
-            Downsample(channels),
-            TimestepEmbedSequential(
-                ResBlock3d(channels, emb_channels, channels, dropout=dropout),
-                AttentionBlock(temporal_res // 2, channels),
-            ),
-            ResBlock3d(channels, emb_channels, dropout=dropout),
-            Downsample(channels),
-        ]
-        # TODO: also add extra layers for temporal res above baseline
-
-        extra_res = (spatial_res // 16) // 2
-        for _ in range(extra_res):
-            extra = [
-                TimestepEmbedSequential(
-                    ResBlock3d(channels, emb_channels, dropout=dropout),
-                    Downsample(channels),
-                )
-            ]
-            seq += extra
-
-        self.seq = nn.ModuleList(seq)
-
-    def forward(self, x, emb):
-        cache = []
-        for layer in self.seq:
-            x = layer(x, emb)
-            cache += [x]
-        return x, cache
-
-
 class Upsample(nn.Module):
     """double the size of the input"""
 
@@ -170,36 +141,87 @@ class Upsample(nn.Module):
         self.conv = nn.Conv3d(channels, channels, 3, padding=1)
 
     def forward(self, x, emb=None):
-        x = F.interpolate(x, scale_factor=2, mode="nearest")
         x = self.conv(x)
+        x = F.interpolate(x, scale_factor=2, mode="nearest")
         return x
 
-
-class Up(nn.Module):
-    def __init__(self, temporal_res, spatial_res, channels, emb_channels, dropout=0.0):
+class UDown(nn.Module):
+    def __init__(
+        self, temporal_res, spatial_res, in_channels, channels, emb_channels, dropout=0.0, is_base=True,
+    ):
         super().__init__()
-        # on the up, bundle resnets with upsampling so upsamplnig can be simpler
         seq = [
+            Downsample(in_channels, channels, stride=1), 
+            ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            Downsample(channels),
             TimestepEmbedSequential(
-                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-                Upsample(channels),
+                ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                AttentionBlock(temporal_res // 2, channels) if is_base else Identity(),
             ),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
+            Downsample(channels),
+            ResBlock3d(channels, emb_channels, out_channels=4*channels, dropout=dropout, scale_skip=SCALE_SKIP),
             TimestepEmbedSequential(
-                ResBlock3d(2 * channels, emb_channels, channels),
-                Upsample(channels),
-                AttentionBlock(temporal_res, channels),
+                ResBlock3d(4*channels, emb_channels, out_channels=8*channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                AttentionBlock(temporal_res, 8*channels) if is_base else Identity(),
+                ResBlock3d(8*channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
             ),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
-            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
         ]
+        # TODO: also add extra layers for temporal res above baseline
+
+        # TODO: kind of hard to define new networks in this way. and make sure the hoz skip lines up
+        # so maybe there is more procedural way to do this.
+
         extra_res = (spatial_res // 16) // 2
+        extra_res = 0
         for _ in range(extra_res):
             extra = [
                 TimestepEmbedSequential(
-                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout),
+                    ResBlock3d(channels, emb_channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                    Downsample(channels),
+                )
+            ]
+            seq += extra
+
+        self.seq = nn.ModuleList(seq)
+
+    def forward(self, x, emb):
+        #breakpoint()
+        cache = []
+        for layer in self.seq:
+            x = layer(x, emb)
+            cache += [x]
+        return x, cache
+
+
+class UUp(nn.Module):
+    def __init__(self, temporal_res, spatial_res, channels, emb_channels, dropout=0.0, is_base=True):
+        super().__init__()
+        # on the up, bundle resnets with upsampling so upsamplnig can be simpler
+        seq = [
+            ResBlock3d(8 * 2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            ResBlock3d(5 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            TimestepEmbedSequential(
+                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                Upsample(channels),
+            ),
+            TimestepEmbedSequential(
+                ResBlock3d(2 * channels, emb_channels, channels, scale_skip=SCALE_SKIP),
+                AttentionBlock(temporal_res, channels) if is_base else Identity(),
+                ResBlock3d(channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+            ),
+            TimestepEmbedSequential(
+                ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+                Upsample(channels),
+            ),
+            ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
+        ]
+
+        extra_res = (spatial_res // 16) // 2
+        extra_res = 0
+        for _ in range(extra_res):
+            extra = [
+                TimestepEmbedSequential(
+                    ResBlock3d(2 * channels, emb_channels, channels, dropout=dropout, scale_skip=SCALE_SKIP),
                     Upsample(channels),
                 ),
             ]
@@ -207,11 +229,16 @@ class Up(nn.Module):
         self.seq = nn.ModuleList(seq)
 
     def forward(self, x, emb, cache):
+        #breakpoint()
         cache = cache[::-1]
         for i in range(len(self.seq)):
             layer, hoz_skip = self.seq[i], cache[i]
-            x = torch.cat([x, hoz_skip], 1)
-            x = layer(x, emb)
+            try:
+                x = torch.cat([x, hoz_skip], 1)
+                x = layer(x, emb)
+            except:
+                # TODO: just need to double on some layers. could skip somes skips
+                breakpoint()
         return x
 
 

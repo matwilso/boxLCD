@@ -66,28 +66,29 @@ class Trainer:
                 ipdb.set_trace()
 
             if itr % self.G.log_n == 0 or self.G.skip_train:
-                self.model.eval()
-                with Timer(self.logger, 'test'):
-                    with torch.no_grad():
-                        # compute loss on all data
-                        for test_batch in self.test_ds:
-                            proc_test_batch = self.b(test_batch)
-                            metrics = self.model.train_step(proc_test_batch, dry=True)
-                            for key in metrics:
-                                self.logger['test/' + key] += [
-                                    metrics[key].detach().cpu()
-                                ]
-                            break
-                with Timer(self.logger, 'evaluate'):
-                    # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
-                    # testb = {key: val for key, val in proc_test_batch.items()}
-                    testb = {key: val[:64] for key, val in proc_test_batch.items()}
-                    eval_metrics = self.model.evaluate(
-                        itr, self.writer, testb, arbiter=self.arbiter
-                    )
-                    for key in eval_metrics:
-                        self.logger[key] += [eval_metrics[key]]
-                self.model.train()
+                if itr % (self.G.log_n * self.G.save_n) == 0:
+                    self.model.eval()
+                    with Timer(self.logger, 'test'):
+                        with torch.no_grad():
+                            # compute loss on all data
+                            for test_batch in self.test_ds:
+                                proc_test_batch = self.b(test_batch)
+                                metrics = self.model.train_step(proc_test_batch, dry=True)
+                                for key in metrics:
+                                    self.logger['test/' + key] += [
+                                        metrics[key].detach().cpu()
+                                    ]
+                                break
+                    with Timer(self.logger, 'evaluate'):
+                        # run the model specific evaluate functtest_timelly draws samples and creates other relevant visualizations.
+                        # testb = {key: val for key, val in proc_test_batch.items()}
+                        testb = {key: val[:64] for key, val in proc_test_batch.items()}
+                        eval_metrics = self.model.evaluate(
+                            itr, self.writer, testb, arbiter=self.arbiter
+                        )
+                        for key in eval_metrics:
+                            self.logger[key] += [eval_metrics[key]]
+                    self.model.train()
 
                 # LOGGING
                 self.logger['dt/total'] = time.time() - total_time
