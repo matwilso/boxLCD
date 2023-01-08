@@ -66,16 +66,13 @@ class RIN(SingleStepAE):
         lcd = batch[self.G.lcd_key]
         y = torch.ones((lcd.shape[0], 128), device=lcd.device)
 
-        n_z = 128
-        dim_z = 256
-        prev_z = torch.zeros((lcd.shape[0], n_z, dim_z), device=lcd.device)
-
-        # TODO:
-        # if random.random() < 0.5:
-        #    self.net()
+        # ok what's the best way to do this
+        # i feel like we could create a function wrapper on our net, that takes whatever inputs it would have
+        # taken and sometimes runs twice. so yeah...
+        # and then it doesn't return z. and then we have a different wrapper for inference
 
         metrics = self.diffusion.training_losses(
-            net=partial(self.net, guide=y, prev_z=prev_z),
+            net=partial(self.net.train_fwd, guide=y, self_cond=random.random() < 0.5),
             x=lcd,
         )
         metrics = {key: val.mean() for key, val in metrics.items()}

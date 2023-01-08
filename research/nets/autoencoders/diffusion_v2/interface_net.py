@@ -86,15 +86,35 @@ class InterfaceNet(nn.Module):
                 p2=patch_size,
             ),
         )
+    
+    def train_fwd(self, x, logsnr, self_cond, *args, **kwargs):
+        n_z = 128
+        dim_z = 256
+        prev_lz = torch.zeros((x.shape[0], n_z, dim_z), device=x.device)
 
-    def forward(self, x, logsnr, prev_z, *args, **kwargs):
+        if self_cond:
+            with torch.no_grad():
+                # run the net first with 0 latent code, but actually train on the final output
+                _, prev_lz = self.forward(x, logsnr, prev_lz, *args, **kwargs)
+
+        x, _ = self.forward(x, logsnr, prev_lz, *args, **kwargs)
+        return x
+
+    def infer_fwd(self, x, logsnr, prev_lz, *args, **kwargs):
+        x, prev_lz = self.forward(x, logsnr, prev_lz, *args, **kwargs)
+        return x, prev_lz
+
+    def forward(self, x, logsnr, prev_lz, *args, **kwargs):
         # TODO: does logsnr just become an extra token. i think so..
+        # TODO: outside of this file, call it lz to make it more clear
         x = self.to_patch_embedding(x) + self.pos_emb
 
         # tokenize image x into patches
-        z = self.z_emb + self.skip_z(prev_z)
+        z = self.z_emb + self.skip_z(prev_lz)
 
         z, x = self.block(z, x)
 
         x = self.proj_out(x)
         return x, z
+
+
