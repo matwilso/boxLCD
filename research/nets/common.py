@@ -13,6 +13,14 @@ def zero_module(module):
         p.detach().zero_()
     return module
 
+class Residual(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        return self.fn(x, **kwargs) + x
+
 
 # TODO: make a general attention that can do self or cross attention
 class MultiheadAttention(nn.Module):
@@ -401,3 +409,22 @@ def timestep_embedding(*, timesteps, dim, max_period):
     if dim % 2:
         embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
     return embedding
+
+
+# TODO: A/B test using this function and maybe switch to it
+# def get_timestep_embedding(
+#    timesteps, embedding_dim, max_time=1000.0, dtype=torch.float32
+# ):
+#    """Get timestep embedding."""
+#    assert len(timesteps.shape) == 1  # and timesteps.dtype == tf.int32
+#    timesteps *= 1000.0 / max_time
+#
+#    half_dim = embedding_dim // 2
+#    emb = np.log(10000) / (half_dim - 1)
+#    emb = torch.exp(torch.arange(half_dim, dtype=dtype) * -emb)
+#    emb = timesteps.astype(dtype)[:, None] * emb[None, :]
+#    emb = torch.concatenate([torch.sin(emb), torch.cos(emb)], axis=1)
+#    if embedding_dim % 2 == 1:  # zero pad
+#        emb = torch.pad(emb, dtype(0), ((0, 0, 0), (0, 1, 0)))
+#    assert emb.shape == (timesteps.shape[0], embedding_dim)
+#    return emb

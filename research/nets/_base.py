@@ -4,6 +4,7 @@ from torch import nn
 from torch.optim import Adam
 
 from research.define_config import env_fn
+from torch.cuda import amp
 
 
 class Net(nn.Module):
@@ -15,6 +16,7 @@ class Net(nn.Module):
         self.cossim = nn.CosineSimilarity(dim=-1)
         self.arbiter = None
         self.name = self.__class__.__name__
+        self.scaler = amp.GradScaler()
 
     @classmethod
     def cname(cls):
@@ -34,7 +36,20 @@ class Net(nn.Module):
     def _init(self):
         self.optimizer = Adam(self.parameters(), lr=self.G.lr)
 
+    def train_step_amp(self, batch, dry=False):
+        self.optimizer.zero_grad()
+        with amp.autocast():
+            loss, metrics = self.loss(batch)
+        if not dry:
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            metrics['meta/loss_scale'] = torch.tensor(self.scaler.get_scale())
+        return metrics
+
     def train_step(self, batch, dry=False):
+        if self.G.amp:
+            return self.train_step_amp(batch, dry)
         self.optimizer.zero_grad()
         loss, metrics = self.loss(batch)
         if not dry:

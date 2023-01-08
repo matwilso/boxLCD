@@ -42,7 +42,7 @@ class GaussianDiffusion:
             if self.teacher_mode == 'step1':
                 self.loss_weight_type = 'snr'
 
-    def _run_model(self, *, net, z, logsnr):
+    def _run_model(self, *, net, z, logsnr, kwargs={}):
         """
         f(net, z, logsnr) --> (x, eps, v)
         """
@@ -61,7 +61,8 @@ class GaussianDiffusion:
         # breakpoint()
 
         # if we are not predicting x, we need to get it
-        model_output = net(z, logsnr)
+        out_dict = net(z, logsnr, **kwargs)
+        model_output = out_dict.pop('x')
 
         if self.mean_type == 'eps':
             model_eps = model_output
@@ -86,7 +87,7 @@ class GaussianDiffusion:
         model_eps = predict_eps_from_x(z=z, x=model_x, logsnr=logsnr)
         model_v = predict_v_from_x_and_eps(x=model_x, eps=model_eps, logsnr=logsnr)
 
-        return {'model_x': model_x, 'model_eps': model_eps, 'model_v': model_v}
+        return {'model_x': model_x, 'model_eps': model_eps, 'model_v': model_v, **out_dict}
 
     def training_losses(self, *, net, x):
         assert x.dtype in [torch.float32, torch.float64]
@@ -196,7 +197,7 @@ class GaussianDiffusion:
         eps_pred_t = predict_eps_from_x(z=z_t, x=x_pred_t, logsnr=logsnr_t)
         return x_pred_t, eps_pred_t
 
-    def ddim_step(self, *, net, logsnr_t, logsnr_s, z_t, cond_w=None):
+    def ddim_step(self, *, net, logsnr_t, logsnr_s, z_t, kwargs, cond_w=None):
         bc = lambda z: broadcast_from_left(z, z_t.shape[:1])
         fbc = lambda z: broadcast_from_left(z, z_t.shape)
 
@@ -204,11 +205,12 @@ class GaussianDiffusion:
             net=net,
             z=z_t,
             logsnr=bc(logsnr_t),
+            kwargs=kwargs,
         )
         x_pred_t = model_out['model_x']
         eps_pred_t = model_out['model_eps']
 
-        if cond_w is not None:
+        if cond_w is not None and False:
             x_pred_t, eps_pred_t = self._cf_guidance(
                 net=net,
                 z_t=z_t,
@@ -220,7 +222,7 @@ class GaussianDiffusion:
         stdv_s = fbc(torch.sqrt(torch.sigmoid(-logsnr_s)))
         alpha_s = fbc(torch.sqrt(torch.sigmoid(logsnr_s)))
         z_s_pred = alpha_s * x_pred_t + stdv_s * eps_pred_t
-        return z_s_pred, x_pred_t, eps_pred_t
+        return z_s_pred, x_pred_t, eps_pred_t, model_out
 
     def reverse_dpm_step(self, *, net, logsnr_t, logsnr_s, z_t, cond_w=None):
         bc = lambda z: broadcast_from_left(z, z_t.shape[:1])
@@ -267,8 +269,8 @@ class GaussianDiffusion:
             cond_w = self.sample_cond_w if self.sample_cond_w != -1.0 else net_cond_w
 
         if self.sampler == 'ddim':
-            body_fn = lambda logsnr_t, logsnr_s, z_t: self.ddim_step(
-                net=net, logsnr_t=logsnr_t, logsnr_s=logsnr_s, z_t=z_t, cond_w=cond_w
+            body_fn = lambda logsnr_t, logsnr_s, z_t, kwargs: self.ddim_step(
+                net=net, logsnr_t=logsnr_t, logsnr_s=logsnr_s, z_t=z_t, kwargs=kwargs, cond_w=cond_w
             )
         elif self.sampler == 'noisy':
             body_fn = lambda logsnr_t, logsnr_s, z_t: self.reverse_dpm_step(
@@ -294,11 +296,12 @@ class GaussianDiffusion:
         all_xs = []
         all_eps = []
         z_t = init_x
+        kwargs = {}
         for i in range(0, self.num_steps)[::-1]:
             torch_i = torch.tensor(i, device=init_x.device)
             logsnr_t = self.logsnr_schedule_fn((torch_i + 1.0) / self.num_steps)
             logsnr_s = self.logsnr_schedule_fn(torch_i / self.num_steps)
-            z_s_pred, x_pred_t, eps_pred_t = body_fn(logsnr_t, logsnr_s, z_t)
+            z_s_pred, x_pred_t, eps_pred_t, kwargs = body_fn(logsnr_t, logsnr_s, z_t, kwargs)
             z_t = torch.where(fbc(torch_i) == 0, x_pred_t, z_s_pred)
             all_zs.append(z_t)
             all_xs.append(x_pred_t)

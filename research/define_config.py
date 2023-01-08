@@ -50,7 +50,7 @@ def config():
     G.ipython_mode = 0
 
     # G.data_mode = 'image'
-    G.amp = 0
+    G.amp = 1
     G.total_itr = int(1e9)
     G.log_n = int(1e4)
     G.save_n = 5
@@ -96,6 +96,14 @@ def config():
     G.temporal_stride_src = -1
     G.temporal_stride_dst = -1
 
+    G.num_blocks = 1
+    G.num_layers = 1
+    G.n_z = 128
+    G.dim_z = 256
+    G.self_cond = 0.9
+
+
+
     G.min_std = 1e-4
     G.data_frac = 1.0
     G.vanished = 1
@@ -124,7 +132,7 @@ def config():
     G.autoreset = 0
 
     G.make_video = 0
-    G.data_workers = 4
+    G.data_workers = 2
 
     # extra info that we set here for convenience and don't modify
     G.full_cmd = 'python ' + ' '.join(sys.argv)  # full command that was called

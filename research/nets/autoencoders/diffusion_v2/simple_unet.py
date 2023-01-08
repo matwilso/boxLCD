@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from research.nets.common import timestep_embedding
+
 # arch maintains same shape, has resnet skips, and injects the time embedding in many places
 
 """
@@ -221,44 +223,3 @@ def zero_module(module):
     for p in module.parameters():
         p.detach().zero_()
     return module
-
-
-def timestep_embedding(*, timesteps, dim, max_period):
-    """
-    Create sinusoidal timestep embeddings.
-
-    :param timesteps: a 1-D Tensor of N indices, one per batch element. These may be fractional.
-    :param dim: the dimension of the output.
-    :param max_period: controls the minimum frequency of the embeddings.
-    :return: an [N x dim] Tensor of positional embeddings.
-    """
-    half = dim // 2
-    freqs = torch.exp(
-        -math.log(max_period)
-        * torch.arange(start=0, end=half, dtype=torch.float32)
-        / half
-    ).to(device=timesteps.device)
-    args = timesteps[:, None].float() * freqs[None]
-    embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-    if dim % 2:
-        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
-    return embedding
-
-
-# TODO: A/B test using this function and maybe switch to it
-# def get_timestep_embedding(
-#    timesteps, embedding_dim, max_time=1000.0, dtype=torch.float32
-# ):
-#    """Get timestep embedding."""
-#    assert len(timesteps.shape) == 1  # and timesteps.dtype == tf.int32
-#    timesteps *= 1000.0 / max_time
-#
-#    half_dim = embedding_dim // 2
-#    emb = np.log(10000) / (half_dim - 1)
-#    emb = torch.exp(torch.arange(half_dim, dtype=dtype) * -emb)
-#    emb = timesteps.astype(dtype)[:, None] * emb[None, :]
-#    emb = torch.concatenate([torch.sin(emb), torch.cos(emb)], axis=1)
-#    if embedding_dim % 2 == 1:  # zero pad
-#        emb = torch.pad(emb, dtype(0), ((0, 0, 0), (0, 1, 0)))
-#    assert emb.shape == (timesteps.shape[0], embedding_dim)
-#    return emb

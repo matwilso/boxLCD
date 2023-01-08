@@ -8,15 +8,15 @@ from einops import rearrange, reduce, repeat
 
 from research.nets.autoencoders._base import SingleStepAE
 
-from .gaussian_diffusion import GaussianDiffusion
-from .interface_net import InterfaceNet
+from research.nets.autoencoders.diffusion_v2.gaussian_diffusion import GaussianDiffusion
+from .video_interface_net import VideoInterfaceNet
 
 
 class RIN(SingleStepAE):
     def __init__(self, env, G):
         super().__init__(env, G)
         self.res = G.dst_resolution
-        self.net = InterfaceNet(resolution=self.res, G=G)
+        self.net = VideoInterfaceNet(resolution=self.res, G=G)
         self.teacher_net = None
         self.diffusion = GaussianDiffusion(
             mean_type=G.mean_type,

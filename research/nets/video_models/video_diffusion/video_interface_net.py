@@ -28,7 +28,7 @@ class Block(nn.Module):
         return z, x
 
 
-class InterfaceNet(nn.Module):
+class VideoInterfaceNet(nn.Module):
     def __init__(self, resolution, G):
         super().__init__()
         #assert resolution == 64

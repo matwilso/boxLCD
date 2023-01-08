@@ -183,7 +183,7 @@ class RolloutDataset(IterableDataset):
 
             curr_barrel = np.load(curr_file, allow_pickle=True)
             elems = {
-                key: torch.as_tensor(curr_barrel[key], dtype=torch.float32)
+                key: torch.from_numpy(curr_barrel[key].astype(np.float32))
                 for key in curr_barrel.keys()
             }
             ep_len = elems['lcd'].shape[1]
@@ -203,14 +203,12 @@ class RolloutDataset(IterableDataset):
                 if max_start > 0:
                     start = np.random.randint(0, max_start)
                     elem = {
-                        key: torch.as_tensor(
-                            val[idx, start : start + self.window], dtype=torch.float32
-                        )
+                        key: val[idx, start : start + self.window]
                         for key, val in elems.items()
                     }
                 else:
                     elem = {
-                        key: torch.as_tensor(val[idx], dtype=torch.float32)
+                        key: val[idx]
                         for key, val in elems.items()
                     }
 
@@ -231,6 +229,11 @@ class RolloutDataset(IterableDataset):
                         if lcd_h != lcd_w:
                             # which is the smaller dimension?
                             breakpoint()
+                        
+                        if lcd_w == resolution:
+                            elem[f'lcd_{resolution}'] = elem['lcd']
+                            continue
+
                         elem[f'lcd_{resolution}'] = F.interpolate(
                             elem['lcd'], size=(resolution, resolution), mode='bilinear'
                         )
@@ -250,6 +253,7 @@ def load_ds(G, resolutions=None):
         max_barrels=1,
         resolutions=resolutions,
     )
+
     test_loader = DataLoader(
         test_dset,
         batch_size=G.bs,
