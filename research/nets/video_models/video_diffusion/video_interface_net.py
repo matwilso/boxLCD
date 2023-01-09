@@ -42,18 +42,16 @@ class VideoInterfaceNet(nn.Module):
 
         sizex = resolution // patch_size
 
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange(
-                'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size
-            ),
-            nn.Linear(patch_size * patch_size * 3, self.dim_z),
+        self.patch_in = nn.Sequential(
+            Rearrange('b c (t pt) (h ph) (w pw) -> b (h w t) (pt ph pw c)', pt=patch_size, ph=patch_size, pw=patch_size),
+            nn.Linear(patch_size * patch_size * patch_size * 3, self.dim_z),
             nn.LayerNorm(self.dim_z),
         )
         Emb = lambda *size: nn.Parameter(
             nn.init.trunc_normal_(torch.zeros(*size), std=0.02)
         )
 
-        self.pos_emb = Emb(1, sizex * sizex, self.dim_z)
+        self.pos_emb = Emb(1, sizex * sizex * sizex, self.dim_z)
         self.skip_z = nn.Sequential(
             nn.Linear(self.dim_z, 4 * self.dim_z),
             nn.GELU(),
@@ -63,17 +61,20 @@ class VideoInterfaceNet(nn.Module):
 
         self.z_emb = Emb(1, self.n_z + 1, self.dim_z)
 
-        self.blocks = nn.ModuleList([Block(sizex*sizex, self.dim_z, num_head, num_layers) for _ in range(num_blocks)])
+        self.blocks = nn.ModuleList([Block(sizex*sizex*sizex, self.dim_z, num_head, num_layers) for _ in range(num_blocks)])
 
-        self.proj_out = nn.Sequential(
+        self.patch_out = nn.Sequential(
             nn.LayerNorm(self.dim_z),
-            nn.Linear(self.dim_z, 3 * patch_size * patch_size),
+            nn.Linear(self.dim_z, 3 * patch_size * patch_size * patch_size),
             Rearrange(
-                'b (h w) (p1 p2 c) -> b c (h p1) (w p2)',
+                'b (h w t) (pt ph pw c) -> b c (t pt) (h ph) (w pw)',
+                t=sizex,
                 h=sizex,
                 w=sizex,
-                p1=patch_size,
-                p2=patch_size,
+                c=3,
+                pt=patch_size,
+                ph=patch_size,
+                pw=patch_size,
             ),
         )
 
@@ -86,24 +87,24 @@ class VideoInterfaceNet(nn.Module):
     def train_fwd(self, x, logsnr, self_cond, *args, **kwargs):
         prev_lz = torch.zeros((x.shape[0], self.n_z, self.dim_z), device=x.device)
 
-        #if self_cond:
-        #    with torch.no_grad():
-        #        # run the net first with 0 latent code, but actually train on the final output
-        #        _, prev_lz = self.forward(x, logsnr, prev_lz, *args, **kwargs)
+        if self_cond:
+            with torch.no_grad():
+                # run the net first with 0 latent code, but actually train on the final output
+                _, prev_lz = self.forward(x, logsnr, prev_lz, *args, **kwargs)
 
         x, _ = self.forward(x, logsnr, prev_lz, *args, **kwargs)
         return {'x': x}
 
     def sample_fwd(self, x, logsnr, *args, **kwargs):
         prev_lz = kwargs.get('lz')
-        #if prev_lz is None:
-        prev_lz = torch.zeros((x.shape[0], self.n_z, self.dim_z), device=x.device)
+        if prev_lz is None:
+            prev_lz = torch.zeros((x.shape[0], self.n_z, self.dim_z), device=x.device)
         x, lz = self.forward(x, logsnr, prev_lz, *args, **kwargs)
         return {'x': x, 'lz': lz}
 
     def forward(self, x, logsnr, prev_lz, *args, **kwargs):
         # tokenize image x into patches
-        x = self.to_patch_embedding(x) + self.pos_emb
+        x = self.patch_in(x) + self.pos_emb
 
         # include timestep as a token
         time_emb = self.time_embed(timestep_embedding(timesteps=logsnr, dim=64, max_period=256))
@@ -115,5 +116,5 @@ class VideoInterfaceNet(nn.Module):
         z = self.z_emb + self.skip_z(prev_lz)
         for block in self.blocks:
             z, x = block(z, x)
-        x = self.proj_out(x)
+        x = self.patch_out(x)
         return x, z

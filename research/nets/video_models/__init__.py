@@ -5,6 +5,7 @@ from pkgutil import iter_modules
 
 from ._base import VideoModel
 from .video_diffusion.video_diffusion import VideoDiffusion
+from .video_diffusion.video_rin import VideoRIN
 
 video_model_map = {}
 package_dir = Path(__file__).resolve().parent
@@ -21,3 +22,4 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
 # import ipdb; ipdb.set_trace()
 
 video_model_map['video_diffusion'] = VideoDiffusion
+video_model_map['video_rin'] = VideoRIN

@@ -52,6 +52,7 @@ def config():
     # G.data_mode = 'image'
     G.amp = 1
     G.total_itr = int(1e9)
+    G.total_time = int(60 * 60 * 24 * 7)
     G.log_n = int(1e4)
     G.save_n = 5
     G.refresh_data = 0

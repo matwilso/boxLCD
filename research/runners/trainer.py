@@ -114,3 +114,7 @@ class Trainer:
                     last_save = time.time()
             if itr >= self.G.total_itr:
                 break
+
+            #print("DELTA", time.time() - total_time, self.G.total_time)
+            if (time.time() - total_time) >= self.G.total_time:
+                break
