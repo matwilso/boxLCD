@@ -14,8 +14,8 @@ class VideoRIN(VideoModel):
     def __init__(self, env, G):
         super().__init__(env, G)
         self.res = G.dst_resolution
-        self.temp_res = 16
-        self.net = VideoInterfaceNet(resolution=self.res, G=G)
+        self.temp_res = G.window
+        self.net = VideoInterfaceNet(resolution=self.res, temp_res=self.temp_res, G=G)
         self.teacher_net = None
         self.diffusion = GaussianDiffusion(
             mean_type=G.mean_type,

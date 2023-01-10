@@ -102,7 +102,9 @@ def config():
     G.n_z = 128
     G.dim_z = 256
     G.self_cond = 0.9
-
+    G.patch_t = 4
+    G.patch_h = 4
+    G.patch_w = 4
 
 
     G.min_std = 1e-4

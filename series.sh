@@ -27,14 +27,16 @@ $COMMON --bs 100 --logdir logs/jan08/vid/exp2/3 --lr 1e-4 --num_layers 2 --num_b
 
 $COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 4 --num_blocks 6 --n_z 128 --dim_z 1024 --self_cond 0.5
 
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 3 --num_blocks 4 --n_z 128 --dim_z 800 --self_cond 0.5
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/5 --lr 1e-4 --num_layers 3 --num_blocks 4 --n_z 128 --dim_z 800 --self_cond 0.5
 
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 128 --dim_z 512 --self_cond 0.5
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/6 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 128 --dim_z 512 --self_cond 0.5
 
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 64 --dim_z 512 --self_cond 0.5
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 64 --dim_z 256 --self_cond 0.5
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-4 --num_layers 2 --num_blocks 2 --n_z 32 --dim_z 1024 --self_cond 0.5
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/7 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 64 --dim_z 512 --self_cond 0.5
 
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 5e-4 --num_layers 2 --num_blocks 3 --n_z 128 --dim_z 512 --self_cond 0.5
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/8 --lr 1e-4 --num_layers 2 --num_blocks 3 --n_z 64 --dim_z 256 --self_cond 0.5
 
-$COMMON --bs 50 --logdir logs/jan08/vid/exp2/4 --lr 1e-5 --num_layers 4 --num_blocks 6 --n_z 128 --dim_z 1024 --self_cond 0.5
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/9 --lr 1e-4 --num_layers 2 --num_blocks 2 --n_z 32 --dim_z 1024 --self_cond 0.5
+
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/10 --lr 5e-4 --num_layers 2 --num_blocks 3 --n_z 128 --dim_z 512 --self_cond 0.5
+
+$COMMON --bs 50 --logdir logs/jan08/vid/exp2/11 --lr 1e-5 --num_layers 4 --num_blocks 6 --n_z 128 --dim_z 1024 --self_cond 0.5

@@ -29,10 +29,12 @@ class Block(nn.Module):
 
 
 class VideoInterfaceNet(nn.Module):
-    def __init__(self, resolution, G):
+    def __init__(self, resolution, temp_res, G):
         super().__init__()
         #assert resolution == 64
-        patch_size = 4
+        self.patch_t = G.patch_t
+        self.patch_h = G.patch_h
+        self.patch_w = G.patch_w
 
         self.n_z = G.n_z
         self.dim_z = G.dim_z
@@ -40,18 +42,23 @@ class VideoInterfaceNet(nn.Module):
         num_layers = G.num_layers
         num_head = G.n_head
 
-        sizex = resolution // patch_size
+        size_t = temp_res // self.patch_t
+        size_h = resolution // self.patch_h
+        size_w = resolution // self.patch_w
+
+        comb_patch = self.patch_t * self.patch_h * self.patch_w
+        comb_size = size_t * size_h * size_w
 
         self.patch_in = nn.Sequential(
-            Rearrange('b c (t pt) (h ph) (w pw) -> b (h w t) (pt ph pw c)', pt=patch_size, ph=patch_size, pw=patch_size),
-            nn.Linear(patch_size * patch_size * patch_size * 3, self.dim_z),
+            Rearrange('b c (t pt) (h ph) (w pw) -> b (h w t) (pt ph pw c)', pt=self.patch_t, ph=self.patch_h, pw=self.patch_w),
+            nn.Linear(comb_patch * 3, self.dim_z),
             nn.LayerNorm(self.dim_z),
         )
         Emb = lambda *size: nn.Parameter(
             nn.init.trunc_normal_(torch.zeros(*size), std=0.02)
         )
 
-        self.pos_emb = Emb(1, sizex * sizex * sizex, self.dim_z)
+        self.pos_emb = Emb(1, comb_size, self.dim_z)
         self.skip_z = nn.Sequential(
             nn.Linear(self.dim_z, 4 * self.dim_z),
             nn.GELU(),
@@ -61,20 +68,20 @@ class VideoInterfaceNet(nn.Module):
 
         self.z_emb = Emb(1, self.n_z + 1, self.dim_z)
 
-        self.blocks = nn.ModuleList([Block(sizex*sizex*sizex, self.dim_z, num_head, num_layers) for _ in range(num_blocks)])
+        self.blocks = nn.ModuleList([Block(comb_size, self.dim_z, num_head, num_layers) for _ in range(num_blocks)])
 
         self.patch_out = nn.Sequential(
             nn.LayerNorm(self.dim_z),
-            nn.Linear(self.dim_z, 3 * patch_size * patch_size * patch_size),
+            nn.Linear(self.dim_z, 3 * comb_patch),
             Rearrange(
                 'b (h w t) (pt ph pw c) -> b c (t pt) (h ph) (w pw)',
-                t=sizex,
-                h=sizex,
-                w=sizex,
+                t=size_t,
+                h=size_h,
+                w=size_w,
                 c=3,
-                pt=patch_size,
-                ph=patch_size,
-                pw=patch_size,
+                pt=self.patch_t,
+                ph=self.patch_h,
+                pw=self.patch_w,
             ),
         )
 
