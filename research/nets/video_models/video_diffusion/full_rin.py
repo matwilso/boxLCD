@@ -5,18 +5,18 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 from einops import rearrange, reduce, repeat
-
+import numpy as np
 
 from research.nets.autoencoders.diffusion_v2.gaussian_diffusion import GaussianDiffusion
-from .video_interface_net import VideoInterfaceNet
+from .full_interface_net import FullInterfaceNet
 from research.nets.video_models._base import VideoModel
-class VideoRIN(VideoModel):
+class FullRIN(VideoModel):
     def __init__(self, env, G):
         super().__init__(env, G)
         self.res = G.dst_resolution
         self.temp_res = G.window
 
-        self.net = VideoInterfaceNet(resolution=self.res, temp_res=self.temp_res, G=G)
+        self.net = FullInterfaceNet(env=env, resolution=self.res, temp_res=self.temp_res, G=G)
         self.teacher_net = None
         self.diffusion = GaussianDiffusion(
             mean_type=G.mean_type,
@@ -28,6 +28,36 @@ class VideoRIN(VideoModel):
         )
         self.lcd_proc = lambda x: x[:, :, :self.temp_res]
         self._init()
+
+        obs_to_input = ['lcd', 'proprio']
+        act_to_input = ['action']
+        all_input = obs_to_input + act_to_input
+        obs_to_output = ['lcd', 'proprio']
+        for key in obs_to_output:
+            assert key in obs_to_input
+
+        #self.shape_map = {key: env.observation_space[key].shape for key in obs_to_input}
+        #self.shape_map['action'] = env.action_space.shape
+        #self.flat_shape_map = {key: np.prod(val) for key, val in self.shape_map.items()}
+
+        #def batch_to_vec(batch):
+        #    flat_list = []
+        #    breakpoint()
+        #    for key in all_input:
+        #        flat_list.append(batch[key].reshape(batch[key].shape[0], -1))
+        #    flat = torch.cat(flat_list, dim=1)
+        #    return flat
+
+        #def vec_to_batch(vec):
+        #    batch = {}
+        #    offset = 0
+        #    for key, val in self.flat_shape_map.items():
+        #        batch[key] = vec[:, offset:offset+val].reshape(vec.shape[0], *self.shape_map[key])
+        #        offset += val
+        #    return batch
+        #self.batch_to_vec = batch_to_vec
+        #self.vec_to_batch = vec_to_batch
+
 
     def _prompted_eval(self, epoch, writer, metrics, batch, arbiter=None):
         pass
@@ -65,11 +95,35 @@ class VideoRIN(VideoModel):
 
     def loss(self, batch):
         lcd = batch[self.G.lcd_key]
-        y = torch.ones((lcd.shape[0], 128), device=lcd.device)
+        obs_to_input = ['lcd', 'proprio']
+        act_to_input = ['action']
+        all_input = obs_to_input + act_to_input
+
+        # batch to vec
+        shape_map = {}
+        flat_list = []
+        for key in all_input:
+            shape_map[key] = batch[key].shape[1:]
+            flat_list.append(batch[key].reshape(batch[key].shape[0], -1))
+        flat_shape_map = {key: np.prod(val) for key, val in shape_map.items()}
+        flat = torch.cat(flat_list, dim=1)
+
+        def vec_to_batch(vec):
+            batch = {}
+            offset = 0
+            for key, val in flat_shape_map.items():
+                batch[key] = vec[:, offset:offset+val].reshape(vec.shape[0], *shape_map[key])
+                offset += val
+            return batch
+
+        def forward(x, *args, **kwargs):
+            y = torch.ones((lcd.shape[0], 128), device=lcd.device)
+            batch = vec_to_batch(x)
+            return self.net.train_fwd(batch, guide=y, self_cond=random.random() < self.G.self_cond, *args, **kwargs)
 
         metrics = self.diffusion.training_losses(
-            net=partial(self.net.train_fwd, guide=y, self_cond=random.random() < self.G.self_cond),
-            x=lcd,
+            net=forward,
+            x=flat,
         )
         metrics = {key: val.mean() for key, val in metrics.items()}
         loss = metrics['loss']

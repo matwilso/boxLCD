@@ -222,20 +222,19 @@ class RolloutDataset(IterableDataset):
                 if True:
                     elem['lcd'] = elem['lcd'] * 2 - 1
 
-                for resolution in self.resolutions:
-                    if resolution != -1:
-                        lcd_t, lcd_c, lcd_w, lcd_h = elem['lcd'].shape
-                        assert lcd_w % resolution == 0 and lcd_h % resolution == 0
-                        if lcd_h != lcd_w:
-                            # which is the smaller dimension?
-                            breakpoint()
-                        
-                        if lcd_w == resolution:
-                            elem[f'lcd_{resolution}'] = elem['lcd']
+                for base_res in self.resolutions:
+                    if base_res != -1:
+                        lcd_t, lcd_c, lcd_h, lcd_w = elem['lcd'].shape
+                        assert lcd_w % base_res == 0 and lcd_h % base_res == 0
+                        # base_res always refers to height. width is from some multiple
+                        hw_ratio = lcd_h / lcd_w
+
+                        if lcd_w == base_res:
+                            elem[f'lcd_{base_res}'] = elem['lcd']
                             continue
 
-                        elem[f'lcd_{resolution}'] = F.interpolate(
-                            elem['lcd'], size=(resolution, resolution), mode='bilinear'
+                        elem[f'lcd_{base_res}'] = F.interpolate(
+                            elem['lcd'], size=(base_res, int(hw_ratio*base_res)), mode='bilinear'
                         )
                 yield elem
             curr_barrel.close()

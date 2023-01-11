@@ -6,6 +6,7 @@ from pkgutil import iter_modules
 from ._base import VideoModel
 from .video_diffusion.video_diffusion import VideoDiffusion
 from .video_diffusion.video_rin import VideoRIN
+from .video_diffusion.full_rin import FullRIN
 
 video_model_map = {}
 package_dir = Path(__file__).resolve().parent
@@ -23,3 +24,4 @@ for (_, module_name, _) in iter_modules([package_dir.__str__()]):
 
 video_model_map['video_diffusion'] = VideoDiffusion
 video_model_map['video_rin'] = VideoRIN
+video_model_map['full_rin'] = FullRIN
