@@ -86,6 +86,12 @@ class FullInterfaceNet(nn.Module):
 
         self.blocks = nn.ModuleList([Block(comb_size, self.dim_z, num_head, num_layers) for _ in range(num_blocks)])
 
+        self.time_embed = nn.Sequential(
+            nn.Linear(64, 4*self.dim_z),
+            nn.GELU(),
+            nn.Linear(4*self.dim_z, self.dim_z),
+        )
+
         self.patch_out = nn.Sequential(
             nn.LayerNorm(self.dim_z),
             nn.Linear(self.dim_z, 3 * comb_patch),
@@ -103,19 +109,16 @@ class FullInterfaceNet(nn.Module):
 
         self.proprio_out = nn.Sequential(
             nn.LayerNorm(self.dim_z),
-            nn.Linear(self.dim_z, proprio_dim)
+            nn.Linear(self.dim_z, self.patch_t*proprio_dim),
+            Rearrange('b t (pt c) -> b (t pt) c', pt=self.patch_t)
         )
 
         self.action_out = nn.Sequential(
             nn.LayerNorm(self.dim_z),
-            nn.Linear(self.dim_z, action_dim)
+            nn.Linear(self.dim_z, self.patch_t*action_dim),
+            Rearrange('b t (pt c) -> b (t pt) c', pt=self.patch_t)
         )
 
-        self.time_embed = nn.Sequential(
-            nn.Linear(64, 4*self.dim_z),
-            nn.GELU(),
-            nn.Linear(4*self.dim_z, self.dim_z),
-        )
     
     def train_fwd(self, batch, logsnr, self_cond, *args, **kwargs):
         lcd = batch['lcd']
@@ -141,6 +144,11 @@ class FullInterfaceNet(nn.Module):
         lcd_in = self.patch_in(batch['lcd'])
         proprio_in = self.proprio_in(batch['proprio'])
         action_in = self.action_in(batch['action'])
+
+        lcd_n = lcd_in.shape[1]
+        proprio_n = proprio_in.shape[1]
+        action_n = action_in.shape[1]
+
         all_in = torch.cat([lcd_in, proprio_in, action_in], dim=1)
         x = all_in + self.pos_emb
 
@@ -155,8 +163,13 @@ class FullInterfaceNet(nn.Module):
         for block in self.blocks:
             z, x = block(z, x)
 
-        breakpoint()
+        # split the output back into the original tokens and shapes
+        lcd_x = self.patch_out(x[:, :lcd_n])
+        proprio_x = self.proprio_out(x[:, lcd_n:lcd_n+proprio_n])
+        action_x = self.action_out(x[:, lcd_n+proprio_n:lcd_n+proprio_n+action_n])
 
-        x = self.patch_out(x)
-
-        return x, z
+        out_batch = {}
+        out_batch['lcd'] = lcd_x
+        out_batch['proprio'] = proprio_x
+        out_batch['action'] = action_x
+        return out_batch, z

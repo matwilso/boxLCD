@@ -119,7 +119,9 @@ class FullRIN(VideoModel):
         def forward(x, *args, **kwargs):
             y = torch.ones((lcd.shape[0], 128), device=lcd.device)
             batch = vec_to_batch(x)
-            return self.net.train_fwd(batch, guide=y, self_cond=random.random() < self.G.self_cond, *args, **kwargs)
+            batch_out = self.net.train_fwd(batch, guide=y, self_cond=random.random() < self.G.self_cond, *args, **kwargs)
+            breakpoint()
+            return 
 
         metrics = self.diffusion.training_losses(
             net=forward,
